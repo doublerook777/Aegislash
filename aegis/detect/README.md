@@ -64,6 +64,16 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   count them as patient identifiers), and cue words inside the expected string ("Village <name>").
 - `check_contracts.py --mock` fails one detect case on purpose: only the mock raises for a file named "bad".
 
+## Identifiers of people in FHIR and FHIR-like JSON
+- `Identifier.value` under a `Patient`, `RelatedPerson` or `Person` resource, under a `subject` / `patient` /
+  `beneficiary` reference, or in a plain JSON `identifier` list whose parent key names a patient (`patient`,
+  `patients`, ...) is a patient identifier **whatever its shape** (digits only, a short code, a made-up format).
+  The whole value is removed (`engine._identifier_role`, `_plain_identifier_role`; role prefix `pid:`).
+- The kind comes from the `system` / `type` beside it (Aadhaar, ABHA, PAN, insurance, ... via `labels.classify`);
+  it is `MRN` by default. Nothing else in the file changes: resource `id`, `fullUrl`, references, coding systems and
+  codes, Observation values, and `Encounter` / `Organization` / `assigner` / `generalPractitioner` identifiers stay.
+- Selftest: three JSON documents added to `DOCS` (invented data).
+
 ## Fixes for the red-team set (`tests/test_results_and_observations.md`, Dataset 4)
 - Added: lowercase PAN; `(912) 455-7781`, `912/450/7781` and landline phones; `ref` no longer means doctor (`ref_by`
   still does); `organization.patient.name` and `organization.contact.name` are people (nearest parent decides);

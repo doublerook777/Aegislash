@@ -16,8 +16,8 @@ import binascii
 import re
 
 from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
-from aegis.detect.labels import category_column, classify, extra_checks, names_a_relative, tokens
-from aegis.detect.normalize import DEVA, decode_view, fold, norm_name, visible
+from aegis.detect.labels import _owner, category_column, classify, extra_checks, names_a_relative, tokens
+from aegis.detect.normalize import DEVA, decode_view, digits, fold, norm_name, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
 from aegis.types import DIRECT_TYPES, QUASI_TYPES, STRONG_ID_TYPES, Record, RecordResult, empty_evidence
 
@@ -51,7 +51,47 @@ def _fhir_types(records: list[Record]) -> dict[str, str]:
             if f["path"].startswith("/") and f["path"].endswith("/resourceType")}
 
 
-def _fhir_role(path: str, role: str | None, types: dict[str, str]) -> str | None:
+# Identifier.value of a person: whatever its shape it names the patient. The system / type beside it may say which kind.
+_PERSON_RESOURCES = ("Patient", "RelatedPerson", "Person")
+_PERSON_REFS = ("subject", "patient", "beneficiary")     # Observation.subject.identifier is the patient's too
+_NOT_PERSON_IDENTIFIER = ("assigner", "managingOrganization", "generalPractitioner", "performer", "author", "requester")
+_IDENT_PARTS = ("identifier", "identifiers")
+_IDENT_VALUE_KEYS = ("value", "number", "id", "val")
+PID = "pid:"      # role prefix: "this value is a patient identifier of the kind after the colon, whatever its shape"
+
+
+def _identifier_kind(holder: str, by_path: dict[str, str]) -> str:
+    """Kind of identifier an Identifier object (the pointer `holder`) says it holds: an ID_ROLES role, "mrn" by default."""
+    for leaf in ("system", "label", "type/text", *(f"type/coding/{i}/{k}" for i in range(3) for k in ("code", "display", "system"))):
+        text = by_path.get(f"{holder}/{leaf}")
+        role = classify(re.split(r"[/#:]", text.rstrip("/"))[-1]) if text else None
+        if role in fields.ID_ROLES:
+            return role
+    return "mrn"
+
+
+def _identifier_role(path: str, below: list[str], kind: str | None, by_path: dict[str, str]) -> str | None:
+    if not below or below[-1] not in _IDENT_VALUE_KEYS or not any(p in _IDENT_PARTS for p in below):
+        return None
+    if set(below) & set(_NOT_PERSON_IDENTIFIER) or not (kind in _PERSON_RESOURCES or set(below) & set(_PERSON_REFS)):
+        return None
+    return PID + _identifier_kind(path.rsplit("/", 1)[0], by_path)
+
+
+def _plain_identifier_role(path: str, label: str, parents: tuple[str, ...], by_path: dict[str, str]) -> str | None:
+    """{"patient": {"identifier": [{"system": ..., "value": ...}]}}: the same rule for JSON that is not FHIR."""
+    keys = [*parents, label]
+    at = max((i for i, k in enumerate(keys) if k in _IDENT_PARTS), default=-1)
+    if at < 0 or set(keys) & set(_NOT_PERSON_IDENTIFIER):
+        return None
+    if not (at == len(keys) - 1 or (at == len(keys) - 2 and label in _IDENT_VALUE_KEYS)):
+        return None
+    if at == 0 or _owner((re.sub(r"s$", "", keys[at - 1]),)) not in ("patient_name", "relative_name"):   # the key just above
+        return None
+    return PID + (_identifier_kind(path.rsplit("/", 1)[0], by_path) if at == len(keys) - 2 else "mrn")
+
+
+def _fhir_role(path: str, role: str | None, types: dict[str, str], by_path: dict[str, str]) -> str | None:
     parts = path.split("/")
     for i in range(len(parts) - 1, 0, -1):
         kind = types.get("/".join(parts[:i]))
@@ -60,6 +100,8 @@ def _fhir_role(path: str, role: str | None, types: dict[str, str]) -> str | None
             break
     else:
         return role
+    if pid := _identifier_role(path, below, kind, by_path):
+        return pid
     if "subject" in below and below[-1] == "display":
         return "patient_name"
     if below[-1] == "display" and any(p in below for p in ("author", "performer", "requester", "recorder", "asserter")):
@@ -113,7 +155,9 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
                 label, parents = _json_label(f["path"])
                 role = classify(label, parents)
                 if types:
-                    role = _fhir_role(f["path"], role, types)
+                    role = _fhir_role(f["path"], role, types, by_path)
+                if not (role or "").startswith(PID):
+                    role = _plain_identifier_role(f["path"], label, parents, by_path) or role
                 role = _pair_role(f["path"], by_path) or role
                 columns.setdefault(re.sub(r"/\d+(?=/|$)", "/*", f["path"]), []).append(key)
             roles[key] = role
@@ -319,8 +363,13 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
     if kind == "value":
         label, parents = (f["context"] or "", ()) if f["path"].startswith("col:") else _json_label(f["path"])
 
+    # the value of a person's Identifier: a patient identifier whatever its shape (kind: see _identifier_kind)
+    forced = None
+    if role and role.startswith(PID):
+        forced, role = role[len(PID):], role[len(PID):]
+
     # a record number always has a digit: "patient_ref" holding words is read like any unknown value
-    if role == "mrn" and kind == "value" and not re.search(r"\d", text):
+    if role == "mrn" and kind == "value" and not forced and not re.search(r"\d", text):
         role = None
 
     # the header is only a hint: a "PIN" column may really hold the whole address ("Home Place & PIN"),
@@ -365,6 +414,18 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
             found += fields.structured(text, 0, len(text), "phone", dmy)
         elif extra_check == "student":
             found += fields.name_value(text, 0, len(text), "name")
+    if forced and text.strip() and not any(c.type in fields.ID_ROLES.values() and text[c.start:c.end] == text.strip()
+                                           for c in found):
+        # no known shape (digits only, a short code): all of the value is the identifier
+        a = len(text) - len(text.lstrip())
+        b = len(text.rstrip())
+        kind_of = fields.ID_ROLES[forced]
+        if kind_of != "MRN" and not any(c.type == kind_of for c in found):
+            kind_of = "MRN"     # "aadhaar" system but not a number: still one identifier of the patient
+        found = [c for c in found if c.type not in fields.ID_ROLES.values()
+                 or c.end <= a or c.start >= b]
+        found.append(Cand(a, b, kind_of, digits(text) or re.sub(r"[^A-Z0-9]", "", text.upper()), "patient",
+                          prio=PRIORITY[kind_of] + 2))
     found += names.find_path_names(text)
     found += names.find_url_pii(text)
     if kind == "filename":

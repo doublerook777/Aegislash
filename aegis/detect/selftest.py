@@ -452,6 +452,38 @@ DOCS = [
      ["Barnali Thengal", "Devika Ranganathan"], []),
     ({"organization": {"name": "Sunrise Care Centre", "department": {"name": "Cardiology"}},
       "patient": {"insurer": {"name": "Star Health"}}}, [], ["Sunrise Care Centre", "Cardiology", "Star Health"]),
+    # FHIR: the identifier of a Patient / RelatedPerson is removed whatever its shape; everything else in the bundle stays
+    ({"resourceType": "Bundle", "type": "collection", "entry": [
+        {"fullUrl": "urn:uuid:pt-71", "resource": {
+            "resourceType": "Patient", "id": "pt-71",
+            "identifier": [{"system": "https://example.org/patient-no", "value": "7340192"},
+                           {"type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v2-0203", "code": "MR"}]},
+                            "value": "4123"},
+                           {"system": "https://example.org/opaque", "value": "QZ-AB"}],
+            "gender": "female"}},
+        {"fullUrl": "urn:uuid:rp-72", "resource": {
+            "resourceType": "RelatedPerson", "id": "rp-72", "patient": {"reference": "Patient/pt-71"},
+            "identifier": [{"system": "https://example.org/rel-no", "value": "88123"}]}},
+        {"fullUrl": "urn:uuid:enc-73", "resource": {
+            "resourceType": "Encounter", "id": "enc-73", "status": "finished",
+            "identifier": [{"system": "https://example.org/visits", "value": "6650217"}],
+            "subject": {"reference": "Patient/pt-71"}}},
+        {"fullUrl": "urn:uuid:obs-74", "resource": {
+            "resourceType": "Observation", "id": "obs-74", "status": "final",
+            "code": {"coding": [{"system": "http://loinc.org", "code": "718-7", "display": "Haemoglobin"}]},
+            "subject": {"reference": "Patient/pt-71"}, "valueQuantity": {"value": 10.4, "unit": "g/dL"}}},
+        {"fullUrl": "urn:uuid:org-75", "resource": {
+            "resourceType": "Organization", "id": "org-75", "identifier": [{"value": "5509134"}]}}]},
+     ["7340192", "4123", "QZ-AB", "88123"],
+     ["6650217", "718-7", "10.4", "g/dL", "Patient/pt-71", "http://loinc.org", "5509134", "pt-71", "Haemoglobin"]),
+    # the patient's identifier inside another resource's subject reference
+    ({"resourceType": "Observation", "id": "o1", "subject": {"identifier": {"system": "https://example.org/uhid", "value": "3120045"}},
+      "code": {"coding": [{"system": "http://snomed.info/sct", "code": "271649006"}]}, "valueQuantity": {"value": 128}},
+     ["3120045"], ["271649006", "128", "http://snomed.info/sct"]),
+    # JSON that is not FHIR but has the same shape: a patient's identifier list, any shape
+    ({"patients": [{"identifier": [{"system": "hospital-no", "value": "60918"}], "visit": {"identifier": [{"value": "7712093"}]}}],
+      "organization": {"identifier": [{"value": "9034112"}]}},
+     ["60918"], ["7712093", "9034112"]),
 ]
 
 
