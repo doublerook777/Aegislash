@@ -138,6 +138,28 @@ CASES = [
      ["Consent", "Nurse", "Uncle", "guardian"]),
     ("Wheezing returned after 2 days. Itching signed off by physician. Pharmacy signed the bill.", [],
      ["Wheezing", "Itching", "Pharmacy"]),
+    # Scrubadub-inspired improvements + English/Hindi/Hinglish translations
+    ("Contact ramesh.verma at gmail dot com or ph 98.45.01.12.23; BP 118/76.",
+     ["ramesh.verma at gmail dot com", "98.45.01.12.23"], ["118/76"]),
+    ("Patient: Ra\u200bhul\u200d Chatur\u200bvedi, Mob: 73053\u200b31651, Co-admitted: Dеvikа Rаo.",
+     ["Ra\u200bhul\u200d Chatur\u200bvedi", "73053\u200b31651", "Dеvikа Rаo"], []),
+    ("URL ref: https://portal.example/view?patient=Priyanka%20Sengupta&tel=%2B91%207759130735",
+     ["Priyanka%20Sengupta", "%2B91%207759130735"], []),
+    ("Satyendra discharged in stable condition on Tab Azithromycin 500 mg.",
+     ["Satyendra"], ["Azithromycin 500 mg"]),
+    ("Priyanka ne sign kiya aur Rohan ko chhutti mili; BP 120/80.",
+     ["Priyanka", "Rohan"], ["120/80"]),
+    ("रमेश ने हस्ताक्षर किए और प्रिया को छुट्टी दी गई; पैरासिटामोल 500mg जारी।",
+     ["रमेश", "प्रिया"], ["पैरासिटामोल 500mg"]),
+    ("Follow up with Pema Choden and Agustín Fonseca; PAN gxlpv2692s.",
+     ["Pema Choden", "Agustín Fonseca", "gxlpv2692s"], []),
+    # the same new rules must leave report and ward text alone
+    ("Culture verified, Repeat CBC signed.", [], ["Culture", "Repeat CBC"]),
+    ("Troponin, Negative called to physician.", [], ["Negative"]),
+    ("Seen at 10 at AIIMS dot in OPD.", [], ["AIIMS"]),
+    ("Lobsang verified the payment receipt at the counter.", ["Lobsang"], []),
+    ("Culture verified the organism; Smear signed out by pathologist.", [], ["Culture", "Smear"]),
+    ("Janam tithi 14/05/1988, जन्मतिथि 12-08-1992.", ["14/05/1988", "12-08-1992"], []),
 ]
 
 
@@ -150,6 +172,8 @@ def _run_line(line: str) -> list[str]:
 
 # whole-column cases: (headers, rows, header -> expected finding type for every row, or None = nothing flagged)
 TABLES = [
+    # recent years under an unreadable header are events, not birth years
+    (["Q_YR"], [["2009"], ["2014"], ["2021"], ["2024"]], {"Q_YR": None}),
     # "Surname, Given" in an unreadable column, a birth-year column, Hindi-in-Latin headers
     (["PX_LBL", "X_YOB", "CLIN_TXT"], [["Thengal, Barnali", "1968", "stable"], ["Pereira, Hector", "1981", "afebrile"],
                                        ["Oraon, Suraj", "2003", "review"]],
@@ -194,6 +218,9 @@ def _run_tables() -> int:
 
 # JSON cases: (pointer -> value or key, strings that MUST be found, strings that MUST survive)
 DOCS = [
+    # an unlisted two-word value is a person only when its label says so
+    ({"organism": "Escherichia Coli", "sign": "Murphy Positive", "reviewer": "Tshering Wangdi"},
+     ["Tshering Wangdi"], ["Escherichia Coli", "Murphy Positive"]),
     # lookup tables keyed by people, whatever the table is called
     ({"on_call_map": {"Barnali Thengal": "bed 3"}}, ["Barnali Thengal"], ["bed 3"]),
     ({"drug_index": {"Amlodipine Besylate": "5 mg"}, "ward_map": {"General Ward": "2"},

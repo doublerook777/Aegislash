@@ -15,9 +15,10 @@ for _zero in (0x0966, 0xFF10, 0x09E6, 0x0A66, 0x0AE6):  # Devanagari, fullwidth,
         _FOLD[_zero + _i] = str(_i)
 for _c in "‐‑‒–—―−":
     _FOLD[ord(_c)] = "-"
-for _c in "    ":
+for _c in "\u00a0\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000":
     _FOLD[ord(_c)] = " "
 _FOLD[ord("’")] = "'"
+_FOLD[ord("‘")] = "'"
 # accented Latin letters are matched as their base letter ("í" -> "i"); name patterns are plain A-Z
 for _n in range(0x00C0, 0x0250):
     _base = unicodedata.normalize("NFD", chr(_n))[0]

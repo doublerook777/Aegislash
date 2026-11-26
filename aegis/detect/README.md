@@ -100,23 +100,20 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 - **`patient=<Name>`** (log lines, query strings) now works like `patient: <Name>`.
 - **Years from 1800** are dates (`01/01/1892`, `1889-07-21`, `02 Feb 1895`, a birth year `1893`). `12 Mar 1830 hrs` is still a
   time of day. Privacy shifts such a date like any other (`01/01/1892` -> `17/12/1891`).
-- **A given name with no surname, only when the sentence says the person did something:** `<Name> signed the ...`,
-  `<Name> took discharge / DAMA / LAMA`. Staff, family words, organisations and medical words never count
-  (`Nurse signed the form`, `Uncle signed the consent`, `Pharmacy signed the bill`); `Consent signed by ...` does not match.
-- Checks: selftest 102/102 (14 new cases, 9 of them fail on `8d1e5ce`; the others are medical or staff text that must survive).
-  Detect findings on all 273 parseable files of `dev/` and `tests/` changed only where the fixes apply (31,752 -> 31,768);
-  `dev/` sanitized output and `records.jsonl` are byte-identical to `8d1e5ce`.
-- **Left on purpose** (do not "fix" without a new idea):
-  - `Devika` in `Bed 4 given to Devika`: "given to <word>" is everyday clinical wording ("given to mother", "given to
-    the ward"); a word list of first names would be the only way and would also hit medical words and real surnames.
+- **Family and helper words are not the patient** in the action cues of PR #17 (`Uncle signed the consent`, `Dietician took
+  discharge ...`): `names._NOT_THE_PATIENT`. (`<Name> signed the ...`, `<Name> took discharge` and `given to <Name>` are PR #17's
+  rules; this branch first had its own copy, dropped when `main` gained them.)
+- **URL parameters:** `patient=Priyanka%20Sengupta` is one finding. PR #17's `find_url_pii` reads the raw text; now that
+  escapes are decoded first, a name value is extended over the following name words.
+- Checks (on `main` 214d2a6 + this branch): selftest 115/115 (14 new cases; 7 of them fail on `214d2a6`, the rest are medical or
+  staff text that must survive). Detect findings on all 273 parseable files of `dev/` and `tests/` changed only where the
+  fixes apply (31,772 -> 31,785); `dev/` sanitized output and `records.jsonl` are byte-identical to `214d2a6`.
+- **Left on purpose** (do not "fix" without a new idea; `Devika`, `Priyanka`, `Rohan` are now found by PR #17's cues):
   - `Sakshi returned for headache review`: "<word> returned" is also how symptoms read (`Wheezing returned`). Removing it
     would delete medical text.
   - `Tindwari` in `R. Mishra (32/M), Tindwari, copper low`: a bare word after age/sex is as often a diagnosis (`(40/F),
     Migraine,`) as a village. There is no village list.
   - `Pahari` in breaker set 3 is another patient's block column; it stays by team decision.
-  - Names as JSON keys with no table name that says "people" (`{"Ngangom Bimol": {"ext": ...}}`), a name under
-    `reviewer` written as `\u` escapes, and `Adán Chávez verified the billing slip` (unlisted surname, no cue): the
-    three canaries of `tests/adversarial` that still show up.
   - A query string whose values are not names or numbers (`?q=...`) is only read by the general rules, not by key.
 
 ## Next (generalisation)
