@@ -76,6 +76,21 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   all words from real identifiers. Dataset 4 was **not** rerun (not in the repo), and is no longer unseen for detect.
 - Known false positive: `Lot no 0912-334455` reads as a landline.
 
+## Fixes from the batch 4 fresh test (headers, "h.no", "r/o")
+- Batch 4 (60 lines + 8 exports by another AI, branch `detect/presidio-lab`, `experiments/presidio/FRESH_TEST.md`).
+  Its first, unseen score on `8553c85`: 88.7% / 87.2% of personal data covered (lines / exports), 99.1% / 99.8% kept.
+- A column read as "PIN" whose cell has a comma, a PIN and other words is parsed as an address. "Ward / Patient"
+  columns take the name after a bed number and are otherwise read like free text. `Bed 8 - <name>` no longer flags
+  "Bed". Lowercase `h.no` / `hno`. `r/o` followed by something that looks like an illness is not a village; when
+  unsure it is still removed.
+- **No unseen result for these fixes.** Batch 4 had been read, so it only shows they work there: from `a7faabf` to
+  this change, lines 89.8% -> 92.0% covered, exports 88.7% -> 99.0%, medical kept 99.1% -> 99.5% / 99.8% -> 99.8%,
+  nothing newly failing. A batch 5 could not be written (the writer ran out of quota). Round 3 and the inputs in
+  `dev/` and `tests/` gave the same results as before.
+- Checks: selftest 95/95; practice output and records byte-identical to `a7faabf`.
+- Still open: a "PIN" cell holding a place with no comma or no PIN; landlines spaced like `0522 2345678`; a hospital
+  named after a person (`Pt. <name>`); one-word names with no clue; "sister <name>" meaning a relative.
+
 ## Next (generalisation)
 1. Another round of fresh unseen cases; fix general causes, never single sentences.
 2. Known blind spots: one-word names with no clue (nicknames, "<name> signed"); full names whose surname is not in
