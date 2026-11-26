@@ -109,6 +109,15 @@ CASES = [
     ("pichle das din se pet dard, lal chakte, x ray normal, khan pan theek", [],
      ["das din", "pet dard", "lal chakte", "x ray normal", "khan pan"]),
     ("patient has chest pain and mild fever, advised rest at home", [], ["chest pain", "mild fever", "rest at home"]),
+    # dotted and "+91/" phones, mixed Aadhaar separators
+    ("Call 97.31.20.45.88 or +91/8123/004455; Na 138.5", ["97.31.20.45.88", "+91/8123/004455"], ["138.5"]),
+    ("ID seen 5821-7734 9012 at desk, HbA1c 7.2", ["5821-7734 9012"], ["HbA1c 7.2"]),
+    # zero-width characters, look-alike letters, accents (typed whole or as separate marks)
+    ("Patient: Bar\u200bnali Then\u200dgal, mob 97312\u200b04588", ["Bar\u200bnali Then\u200dgal", "97312\u200b04588"], []),
+    ("Patient: B\u0430rn\u0430li Thengal (44/F)", ["B\u0430rn\u0430li Thengal"], []),
+    ("Patient Name: H\u00e9ctor Pereira", ["H\u00e9ctor Pereira"], []),
+    ("Patient Name: He\u0301ctor Pereira", ["He\u0301ctor Pereira"], []),
+    ("TSH 2.1 \u03bcIU/mL, dose 50 \u00b5g, TNF-\u03b1 raised", [], ["\u03bcIU/mL", "50 \u00b5g", "TNF-\u03b1"]),
     # Scrubadub-inspired improvements + English/Hindi/Hinglish translations
     ("Contact ramesh.verma at gmail dot com or ph 98.45.01.12.23; BP 118/76.",
      ["ramesh.verma at gmail dot com", "98.45.01.12.23"], ["118/76"]),
@@ -137,6 +146,12 @@ def _run_line(line: str) -> list[str]:
 
 # whole-column cases: (headers, rows, header -> expected finding type for every row, or None = nothing flagged)
 TABLES = [
+    # "Surname, Given" in an unreadable column, a birth-year column, Hindi-in-Latin headers
+    (["PX_LBL", "X_YOB", "CLIN_TXT"], [["Thengal, Barnali", "1968", "stable"], ["Pereira, Hector", "1981", "afebrile"],
+                                       ["Oraon, Suraj", "2003", "review"]],
+     {"PX_LBL": "PATIENT_NAME", "X_YOB": "DOB", "CLIN_TXT": None}),
+    (["rogee", "pehchaan_sankhya", "postal6", "nidan"], [["Barnali Thengal", "1234 5678 9012", "781001", "Anemia"]],
+     {"rogee": "PATIENT_NAME", "pehchaan_sankhya": "AADHAAR", "postal6": "PIN", "nidan": None}),
     (["P_NOM", "K_SUP", "M_RXR", "Q_LOC", "Z_6D", "N_MEMO"],
      [["Anirban Sen", "Mitali Sen", "Farhan Qureshi", "21A Lake Road, Near City Park", "700029", "seen by Dr. Farhan Qureshi"],
       ["Lalita Oraon", "Birsu Oraon", "Neha Kapoor", "H.No. 4, Station Road, Ranchi", "834001", "Dr. Neha Kapoor advised rest"],
@@ -221,6 +236,7 @@ def _run_docs() -> int:
 
 # a name run together or in lowercase inside a file name: (file name, text, expected pieces found in the file name)
 FILENAMES = [
+    ("बरनाली_शर्मा_पर्चा.txt", "BP 110/70\n", ["बरनाली_शर्मा"]),
     ("ds-barnalithengal-31145549.txt", "Patient Name: Barnali Thengal\n", ["barnalithengal"]),
     ("ds_devika_ranganathan.txt", "Patient Name: Devika Ranganathan\n", ["devika_ranganathan"]),
 ]

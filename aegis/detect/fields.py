@@ -53,9 +53,14 @@ def kin_and_name(text: str) -> list[Cand]:
     return name_value(text, m.start("n"), m.end("n"), "relative_name")
 
 
-_SURNAME_FIRST = re.compile(
-    r"^\s*(?P<last>(?:[A-Za-z.'-]+|[ऀ-ॿ]+)),\s*(?P<first>(?:[A-Za-z.'-]+|[ऀ-ॿ]+)(?:\s+(?:[A-Za-z.'-]+|[ऀ-ॿ]+))?)\s*$"
-)
+# "Surname, Given [Middle]": the comma belongs to the name. Degrees are upper case and do not match.
+_SURNAME_FIRST = re.compile(r"[A-Z][a-z'-]+, ?[A-Z][a-z'-]+(?: [A-Z](?![A-Za-z])\.?| [A-Z][a-z'-]+)?")
+_NOT_GIVEN = frozenset("male female other nurse sister doctor staff patient self son daughter wife husband father mother".split())
+
+
+def surname_first(value: str) -> bool:
+    words = re.findall(r"[a-z]+", value.casefold())
+    return bool(_SURNAME_FIRST.fullmatch(value)) and not set(words) & (_NOT_GIVEN | (STOP - {"asha"}) | ORG)
 
 
 def name_value(text: str, s: int, e: int, role: str) -> list[Cand]:
@@ -71,31 +76,24 @@ def name_value(text: str, s: int, e: int, role: str) -> list[Cand]:
     m = _TITLES.match(text[s:e])
     if m:
         s += m.end()
-    sf = _SURNAME_FIRST.match(text[s:e])
-    sf_ok = bool(
-        sf
-        and not any(c.isdigit() for c in text[s:e])
-        and sf.group("first").split()[0].strip(".").casefold() not in STOP
-        and sf.group("last").strip(".").casefold() not in STOP
-    )
-    if not sf_ok:
-        cut = re.search(r"[,(\[|;:/]| - |\s{2,}|\d|\n", text[s:e])
-        if cut:
-            e = s + cut.start()
+    whole = surname_first(text[s:e].strip(" \t\r\n\"'.;|"))
+    cut = re.search(r"[(\[|;:/]| - |\s{2,}|\d|\n" if whole else r"[,(\[|;:/]| - |\s{2,}|\d|\n", text[s:e])
+    if cut:
+        e = s + cut.start()
     s, e = _strip(text, s, e)
     value = text[s:e]
     words = value.split()
     if not value or len(words) > 5 or _NOT_A_NAME.match(value) or re.match(r"(?:Dr\b|डॉ|ASHA\b(?! [A-Z]))", value):
         return []
-    if not (DEVA.search(value) or re.fullmatch(r"[A-Za-z][A-Za-z.' ,-]*", value)):
+    if not (DEVA.search(value) or whole or re.fullmatch(r"[A-Za-z][A-Za-z.' -]*", value)):
         return []
     if role == "name":
         # a bare "name" label: only accept values that really look like a person
-        if all(w.strip(".,").casefold() in (STOP | ORG) - {"asha"} for w in words):
+        if all(w.strip(".").casefold() in (STOP | ORG) - {"asha"} for w in words):
             return []
         if not (re.fullmatch(DEVA_NAME, value) or all(w[0].isupper() for w in words)):
             return []
-    if not DEVA.search(value) and not sf_ok:
+    if not DEVA.search(value) and not whole:
         span = trim_name(text, s, e) if role == "name" else (s, e)
         if not span:
             return []
@@ -135,12 +133,11 @@ def structured(text: str, s: int, e: int, role: str, dmy: bool) -> list[Cand]:
                 re.sub(r"[^A-Z0-9]", "", value.upper()) if kind in ("PAN", "INSURANCE_ID") else digits(value))
         return [Cand(s, e, kind, norm, "patient")]
 
+    if role == "dob" and re.fullmatch(r"(?:19|20)\d{2}", value):
+        return [Cand(s, e, "DOB", None, "patient")]     # a birth year: no ISO date to give as norm
     if role in ("dob", "date"):
-        found_dates = [c._replace(start=c.start + s, end=c.end + s)
-                       for c in find_dates(value, dmy, is_dob_field=role == "dob")]
-        if not found_dates and role == "dob" and re.fullmatch(r"(?:19\d{2}|20[0-2]\d)", value):
-            return [Cand(s, e, "DOB", value, "patient")]
-        return found_dates
+        return [c._replace(start=c.start + s, end=c.end + s)
+                for c in find_dates(value, dmy, is_dob_field=role == "dob")]
 
     if role in ("age", "age_sex"):
         out = []

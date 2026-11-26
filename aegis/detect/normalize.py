@@ -1,7 +1,8 @@
-"""Text normalising: digit folding, script detection, Devanagari -> Latin.
+"""Text normalising: digit folding, look-alike letters, hidden characters, Devanagari -> Latin.
 
 `fold` changes characters one-for-one, so an offset found in the folded text is the same
-offset in the original. Never add a rule here that changes the length of the text.
+offset in the original. Never add a rule to `fold` that changes the length of the text.
+`visible` does shorten text; it returns the original position of every character it keeps.
 """
 from __future__ import annotations
 
@@ -14,69 +15,47 @@ for _zero in (0x0966, 0xFF10, 0x09E6, 0x0A66, 0x0AE6):  # Devanagari, fullwidth,
         _FOLD[_zero + _i] = str(_i)
 for _c in "‐‑‒–—―−":
     _FOLD[ord(_c)] = "-"
-for _c in " \u00a0\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000":
+for _c in "\u00a0\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000":
     _FOLD[ord(_c)] = " "
 _FOLD[ord("’")] = "'"
 _FOLD[ord("‘")] = "'"
+# accented Latin letters are matched as their base letter ("í" -> "i"); name patterns are plain A-Z
+for _n in range(0x00C0, 0x0250):
+    _base = unicodedata.normalize("NFD", chr(_n))[0]
+    if _base != chr(_n) and _base.isascii() and _base.isalpha():
+        _FOLD[_n] = _base
 
-# 1-to-1 Cyrillic/Greek homoglyph and Latin diacritic folding (preserves string length & offsets)
-_HOMOGLYPHS = {
-    "а": "a", "А": "A", "в": "B", "В": "B", "е": "e", "Е": "E", "ё": "e", "Ё": "E",
-    "з": "3", "З": "3", "і": "i", "І": "I", "ї": "i", "Ї": "I", "к": "k", "К": "K",
-    "м": "m", "М": "M", "н": "H", "Н": "H", "о": "o", "О": "O", "р": "p", "Р": "P",
-    "с": "c", "С": "C", "т": "t", "Т": "T", "у": "y", "У": "Y", "х": "x", "Х": "X",
-    "α": "a", "Α": "A", "β": "B", "Β": "B", "ε": "e", "Ε": "E", "ζ": "Z", "Ζ": "Z",
-    "η": "n", "Η": "H", "ι": "i", "Ι": "I", "κ": "k", "Κ": "K", "μ": "m", "Μ": "M",
-    "ν": "v", "Ν": "N", "ο": "o", "Ο": "O", "ρ": "p", "Ρ": "P", "ς": "c", "τ": "t",
-    "Τ": "T", "υ": "u", "Υ": "Y", "χ": "x", "Χ": "X",
-}
-for _src, _dst in _HOMOGLYPHS.items():
-    _FOLD[ord(_src)] = _dst
-
-for _src, _dst in (
-    ("áàâäãåāăą", "a"), ("éèêëēĕėęě", "e"), ("íìîïĩīĭįı", "i"),
-    ("óòôöõøōŏő", "o"), ("úùûüũūŭůűų", "u"), ("ñńņň", "n"),
-    ("çćĉċč", "c"), ("ýÿŷ", "y"), ("śŝşš", "s"), ("źżž", "z"),
-    ("řŕŗ", "r"), ("ťţŧ", "t"), ("ďđ", "d"), ("łĺļľ", "l"), ("ğĝġģ", "g"),
-):
-    for _ch in _src:
-        _FOLD[ord(_ch)] = _dst
-        if _ch.upper() != _ch and len(_ch.upper()) == 1:
-            _FOLD[ord(_ch.upper())] = _dst.upper()
-
-_ZW_STRIP = frozenset("\u200b\ufeff\u00ad")
-_ZW_JOIN = frozenset("\u200c\u200d")
 DEVA = re.compile(r"[ऀ-ॿ]")
 
 
+# Cyrillic and Greek letters that look like Latin ones. Only replaced inside a word that also has real Latin
+# letters, so a micro sign or a word written wholly in another script is left alone.
+_LOOKALIKE = str.maketrans("аеорсухіјѕԁһӏАВЕЅІЈКМНОРСТУХ" "οαιΑΒΕΖΗΙΚΜΝΟΡΤΥΧ",
+                           "aeopcyxijsdhlABESIJKMHOPCTYX" "oaiABEZHIKMNOPTYX")
+_WORD = re.compile(r"[A-Za-z\u0370-\u03ff\u0400-\u052f]+")
+
+
+def _unmask(m: re.Match) -> str:
+    word = m.group(0)
+    return word.translate(_LOOKALIKE) if re.search(r"[A-Za-z]", word) else word
+
+
 def fold(s: str) -> str:
-    return s.translate(_FOLD)
+    s = s.translate(_FOLD)
+    return s if s.isascii() else _WORD.sub(_unmask, s)
 
 
-def strip_evasion_with_map(s: str) -> tuple[str, list[int] | None]:
-    """Strip zero-width obfuscation (and non-Devanagari combining marks) while returning an offset map.
+# zero-width characters, direction marks and soft hyphens; also accents typed as separate marks after a letter
+_HIDDEN = re.compile(r"[\u00ad\u200b-\u200f\u2060-\u2064\ufeff]|(?<=[A-Za-z])[\u0300-\u036f]+")
 
-    Returns ``(clean, idx_map)`` where ``idx_map`` is ``None`` on the fast path (nothing stripped),
-    or a list of original character indices for every character in ``clean``.
-    """
-    if not any(c in _ZW_STRIP or c in _ZW_JOIN or (unicodedata.combining(c) and not ("\u0900" <= c <= "\u097f")) for c in s):
+
+def visible(s: str) -> tuple[str, list[int] | None]:
+    """`s` without hidden characters, and where each kept character was in `s` (None: nothing removed)."""
+    if s.isascii() or not _HIDDEN.search(s):
         return s, None
-    out_chars: list[str] = []
-    idx_map: list[int] = []
-    n = len(s)
-    for i, ch in enumerate(s):
-        if ch in _ZW_STRIP:
-            continue
-        if ch in _ZW_JOIN:
-            prev_deva = i > 0 and "\u0900" <= s[i - 1] <= "\u097f"
-            next_deva = i + 1 < n and "\u0900" <= s[i + 1] <= "\u097f"
-            if not (prev_deva and next_deva):
-                continue
-        if unicodedata.combining(ch) and not ("\u0900" <= ch <= "\u097f"):
-            continue
-        out_chars.append(ch)
-        idx_map.append(i)
-    return "".join(out_chars), idx_map
+    dropped = {i for m in _HIDDEN.finditer(s) for i in range(m.start(), m.end())}
+    kept = [i for i in range(len(s)) if i not in dropped]
+    return "".join(s[i] for i in kept), kept
 
 
 def digits(s: str) -> str:
@@ -135,7 +114,7 @@ def to_latin(s: str) -> str:
 
 def norm_name(s: str) -> str:
     """Casefolded Latin form used in Finding.norm and Evidence."""
-    return " ".join(re.sub(r"[^a-z ]+", " ", to_latin(s).casefold()).split())
+    return " ".join(re.sub(r"[^a-z ]+", " ", to_latin(fold(s)).casefold()).split())
 
 
 def script_of(s: str) -> str:

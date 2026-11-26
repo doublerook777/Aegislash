@@ -25,7 +25,7 @@ _RELATIVE = _words("guardian relative relatives kin nok father fathers husband h
 _PHONE = _words("phone ph mobile mob tel telephone whatsapp cell callback contactno contactdigits msisdn फ़ोन फोन मोबाइल दूरभाष संपर्क")
 _MRN = _words("uhid mrn umr crno uid_h भर्ती_संख्या पंजीकरण आईपीडी")
 _ID_WORDS = _words("id no num number ref code सं संख्या")
-_DOB = _words("dob birth birthdate birthyear yob janm janam जन्म")
+_DOB = _words("dob yob birth birthdate birthyear janm janam जन्म")
 _AGE = _words("age umar umr aayu yrs आयु उम्र")
 _GENDER = _words("gender sex ling लिंग")
 _PIN = _words("pin pincode zip zipcode postal postalcode dak dakghar पिन डाक")
@@ -35,7 +35,7 @@ _VILLAGE = _words("village vill gaon gaanv gaav gav gram city town गांव 
 _ADDRESS = _words("address addr adr street pata residence mohalla locality area house door doorno hno ghar makan "
                   "पता निवास घर मकान मोहल्ला")
 _NAME = _words("name nm naam fname lname fullname नाम")
-_SUBJECT = _words("patient pt beneficiary member subject client person insured मरीज़ मरीज रोगी mareez marij rogi")
+_SUBJECT = _words("patient pt beneficiary member subject client person insured मरीज़ मरीज रोगी mareez marij rogi rogee")
 # labels whose values are medical / administrative: never look for names in them
 _KEEP = _words("diagnosis dx drug drugs medicine medication test tests result results unit range loinc procedure "
                "department dept ward bed hospital facility lab package status category code display strength "
@@ -78,8 +78,7 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
         return None
     s = set(t)
     # strip trailing digits from tokens like "postal6", "tel1" when matching role words
-    s_alpha = {re.sub(r"\d+$", "", tok) for tok in t if re.sub(r"\d+$", "", tok)}
-    s_all = s | s_alpha
+    s_all = s | {re.sub(r"\d+$", "", tok) for tok in t} - {""}
     joined = "".join(t)
     up = {w for p in parents for w in tokens(p)}
 
@@ -92,7 +91,8 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
         return "email"
     if "abha" in joined or "healthid" in joined or "आभा" in s:
         return "abha_address" if s & {"address", "addr"} else "abha"
-    if s & {"aadhaar", "aadhar", "adhaar", "adhar", "uidai", "आधार", "uid"} or "aadha" in joined or "aadh" in s:
+    if (s & {"aadhaar", "aadhar", "adhaar", "adhar", "uidai", "आधार", "uid"} or "aadha" in joined or "aadh" in s
+            or s & {"pehchaan", "pehchan", "pahchan"} and s & {"sankhya", "number", "no"}):    # "identity number"
         return "aadhaar"
     if "pan" in s or joined.endswith("panno"):
         return "pan"
@@ -125,7 +125,7 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
     # one column holding several address parts ("पता_ग्राम_पिन", "house, village and PIN")
     if s_all & _PIN and s & (_ADDRESS | _VILLAGE):
         return "address"
-    if s_all & _PIN:
+    if s_all & _PIN:                    # also "postal6": a six-digit postal code
         return "pin"
     if s & _DISTRICT:
         return "district"
