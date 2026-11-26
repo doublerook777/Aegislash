@@ -77,8 +77,8 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 - Known false positive: `Lot no 0912-334455` reads as a landline.
 
 ## Fixes from the batch 4 fresh test (headers, "h.no", "r/o")
-- Batch 4 (60 lines + 8 exports by another AI, branch `detect/presidio-lab`, `experiments/presidio/FRESH_TEST.md`).
-  Its first, unseen score on `8553c85`: 88.7% / 87.2% of personal data covered (lines / exports), 99.1% / 99.8% kept.
+- Batch 4: 60 lines + 8 exports by another AI. The cases and full write-up are not in this repository (they are on the
+  local, unpushed branch `detect/presidio-lab`). Its first, unseen score on `8553c85`: 88.7% / 87.2% of personal data covered (lines / exports), 99.1% / 99.8% kept.
 - A column read as "PIN" whose cell has a comma, a PIN and other words is parsed as an address. "Ward / Patient"
   columns take the name after a bed number and are otherwise read like free text. `Bed 8 - <name>` no longer flags
   "Bed". Lowercase `h.no` / `hno`. `r/o` followed by something that looks like an illness is not a village; when
