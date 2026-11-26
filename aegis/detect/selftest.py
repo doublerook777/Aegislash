@@ -137,6 +137,8 @@ CASES = [
     ("Culture verified, Repeat CBC signed.", [], ["Culture", "Repeat CBC"]),
     ("Troponin, Negative called to physician.", [], ["Negative"]),
     ("Seen at 10 at AIIMS dot in OPD.", [], ["AIIMS"]),
+    ("Lobsang verified the payment receipt at the counter.", ["Lobsang"], []),
+    ("Culture verified the organism; Smear signed out by pathologist.", [], ["Culture", "Smear"]),
     ("Janam tithi 14/05/1988, जन्मतिथि 12-08-1992.", ["14/05/1988", "12-08-1992"], []),
 ]
 

@@ -275,7 +275,8 @@ _CLAUSE_START = r"(?:^|\n|[।.!?]\s+|:\s+|,\s+|\b(?:and|aur)\s+|(?:और|त�
 _PERSON_DOES = (
     r"discharged +(?:home|on request|against|from (?:the )?(?:hospital|ward)|in +(?:a +)?(?:[a-z]+ +)?condition)"
     r"|took discharge|absconded"
-    r"|(?:signed|verified) +(?:(?:the|a|his|her) +)?(?:[a-z]+ +){0,2}(?:consent|form|bond|undertaking|declaration|bill|identity|signature|address)"
+    r"|(?:signed|verified) +(?:(?:the|a|his|her) +)?(?:[a-z]+ +){0,2}(?:consent|form|bond|undertaking|declaration|identity|signature|address"
+    r"|bills?|slip|receipt|voucher|register|documents?|paperwork|papers)"
     r"|called +(?:up|back|to +(?:ask|enquire|inquire|inform|confirm|request))"
     r"|expired +(?:despite|during +(?:treatment|admission))"
 )
