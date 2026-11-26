@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import urllib.parse
 
+from aegis.detect.gazetteer import SURNAMES
 from aegis.detect.labels import classify
 from aegis.detect.normalize import DEVA, digits, norm_name
 from aegis.detect.spans import PRIORITY, Cand
@@ -70,10 +71,23 @@ LATIN_NAME = rf"(?:(?:Mohd|Md)\.? )?{_CAP}(?: {_CAP}){{0,3}}"
 DEVA_NAME = rf"{_DEVA_WORD}(?: {_DEVA_WORD}){{0,2}}"
 NAME = rf"(?:{LATIN_NAME}|{DEVA_NAME})"
 
+# A doctor's name never runs on into a word that introduces somebody else: protecting "Dr <x> Patient <y>" as one
+# name would leave the patient in the output
+_NEXT_PERSON = (r"(?i:patient|pt|name|mr|mrs|ms|smt|shri|km|master|baby|attendant|wife|husband|son|daughter|informed|"
+                r"seen|ref)(?![A-Za-z])")
+_DOCTOR_LATIN = rf"(?:(?:Mohd|Md)\.? )?{_CAP}(?: (?!{_NEXT_PERSON}){_CAP}){{0,3}}"
+_COURTESY = r"\((?i:mrs?|ms|miss)\.?\)"
 _DOCTOR = re.compile(
-    rf"(?:\bDr\b\.?|\bDOCTOR\b|\bDoctor\b|\bProf\b\.?|डॉ\.?|डा\.|डॉक्टर)\s*(?:{LATIN_NAME}|{DEVA_NAME})"
+    # "DR.(MRS) X" in any case; a bare capital "DR" is not trusted, all-caps lines would hide the patient
+    rf"(?:\bDr\b\.?|\bDOCTOR\b|\bDoctor\b|\bProf\b\.?|डॉ\.?|डा\.|डॉक्टर|\b(?i:dr)\b\.?(?=\s*{_COURTESY}))"
+    rf"(?:\s*{_COURTESY})?\s*(?:{_DOCTOR_LATIN}|{DEVA_NAME})"
     rf"(?:\s*\([^)\n]*\))?")
 _EPONYM = re.compile(rf"\b{_CAP}(?:'s)?(?= (?:[Dd]isease|[Ss]yndrome|[Pp]alsy|[Ss]ign|[Pp]rocedure)\b)")
+
+
+# first words that cannot begin a relative's name ("History sibling: Normal", "son General Ward")
+_NEVER_FIRST = (STOP | ORG | frozenset("normal nil none not negative positive stable healthy alive expired deceased "
+                                       "unknown yes no".split())) - SURNAMES - {"asha"}
 
 
 def name_words(value: str) -> list[str]:
@@ -86,7 +100,9 @@ def doctor_mentions(text: str) -> list[str]:
 
 def doctor_name(mention: str) -> list[str]:
     """The words after the title: "Dr. R. Mehta (MD)" -> ["r", "mehta"]."""
-    return name_words(re.sub(r"^(?:Dr\b\.?|DOCTOR|Doctor|Prof\b\.?|डॉ\.?|डा\.|डॉक्टर)|\(.*$", "", mention))
+    title = (r"^(?:(?i:dr)\b\.?|DOCTOR|Doctor|Prof\b\.?|डॉ\.?|डा\.|डॉक्टर)"
+             r"(?:\s*\((?i:mrs?|ms|miss|prof|capt|col|maj|major)\.?\))?")
+    return name_words(re.sub(r"\(.*$", "", re.sub(title, "", mention)))
 
 
 def protected_spans(text: str) -> list[tuple[int, int]]:
@@ -97,9 +113,12 @@ def protected_spans(text: str) -> list[tuple[int, int]]:
 def trim_name(text: str, start: int, end: int) -> tuple[int, int] | None:
     """Shrink a captured span to the real name: drop titles and stop words from both ends."""
     words = [(m.start() + start, m.end() + start) for m in re.finditer(r"[^\s]+", text[start:end])]
+    first_word = words[0] if words else None
     def bad(span):
         w = text[span[0]:span[1]].strip(".,'’:;()-")
-        title = re.fullmatch(_TITLE, text[span[0]:span[1]]) is not None and w not in ("Md", "Mohd")  # part of a name
+        # "Md", "Mohd" are part of a name; so is "Kumari" after a first name ("<name> Kumari")
+        part_of_name = w in ("Md", "Mohd") or (w == "Kumari" and span != first_word)
+        title = re.fullmatch(_TITLE, text[span[0]:span[1]]) is not None and not part_of_name
         return not w or w.casefold() in STOP - {"asha"} or title
     while words and bad(words[0]):
         words.pop(0)
@@ -151,6 +170,14 @@ _cue(rf"\b(?i:{_PERSON_WORD}|informed by|called by|witnessed by|accompanied by|b
      rf"(?: *\([^)\n]{{0,30}}\))?(?:\s*[:\-] *| +)(?P<name>{LATIN_NAME})", "relative")
 _cue(rf"(?P<name>{LATIN_NAME})'s +(?i:{_PERSON_WORD})", "patient")
 _cue(rf"(?P<name>{LATIN_NAME}) *\( *(?i:{_PERSON_WORD})", "relative")
+# More family words, and "<relation> = <name>". Kept apart from the cue above, so that the first-word check below can
+# only ever drop what these two add
+_MORE_KIN = r"(?:bro|dtr|sibling|bhabhi|devrani|jethani|bahu|nanad|dadaji|nanaji)"
+_CHECK_FIRST_WORD = set()
+for _pattern in (rf"\b(?i:{_MORE_KIN})(?:\s*[:\-=] *| +)(?P<name>{LATIN_NAME})",
+                 rf"\b(?i:{_PERSON_WORD}) *= *(?P<name>{LATIN_NAME})"):
+    _CHECK_FIRST_WORD.add(len(_CUES))
+    _cue(_pattern, "relative")
 # Hinglish honorifics: "Shahid sahab", "Anita behenji", "Kamal Bhaiya"
 _cue(rf"(?P<name>{LATIN_NAME}) +(?i:{_KIN_REL})\b", "relative", None, True)
 _cue(rf"(?P<name>{LATIN_NAME}) +(?i:{_KIN_PAT})\b", "patient", None, True)
@@ -360,6 +387,9 @@ def find_names(text: str) -> list[Cand]:
         for m in pattern.finditer(text):
             s, e = m.span("name")
             if index >= _PHONE_ADJACENT_FROM and set(text[s:e].casefold().split()) & (ORG | MEDICAL):
+                continue
+            first = re.match(r"[A-Za-z]+", text[s:e])
+            if index in _CHECK_FIRST_WORD and first and first.group(0).casefold() in _NEVER_FIRST:
                 continue
             if relation == "C/O" and not text[s].isupper() and not DEVA.match(text[s]):
                 continue

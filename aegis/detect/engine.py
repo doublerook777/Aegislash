@@ -16,7 +16,7 @@ import binascii
 import re
 
 from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
-from aegis.detect.labels import classify, tokens
+from aegis.detect.labels import classify, extra_checks, names_a_relative, tokens
 from aegis.detect.normalize import DEVA, fold, norm_name, unquote_view, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
 from aegis.types import DIRECT_TYPES, QUASI_TYPES, STRONG_ID_TYPES, Record, RecordResult, empty_evidence
@@ -26,6 +26,9 @@ NAME_TYPES = ("PATIENT_NAME", "RELATIVE_NAME")
 _HINGLISH = re.compile(r"\b(?:ka|ki|ke|ko|ne|hai|hain|nahi|raha|rahe|rahi|gaya|gayi|diya|liya|se|mein|aur|ji|sahab|behenji|bhai)\b")
 _CONDITION_KEYS = ("diagnosis", "diagnoses", "condition", "dx", "icd", "निदान")
 _LABEL_LINE = re.compile(r"^\s*(?:[-*•]\s*)?(?P<label>[^:=\n]{1,40}?)\s*(?::(?!\d|//)|=| - | – )[ \t]*(?P<value>.*)$")
+# "नाम- <name>": tried only when the line has none of the separators above
+_NAME_DASH_LINE = re.compile(r"^\s*(?:[-*•]\s*)?(?P<label>[^:=\n]{1,40}?)(?<![\s\d])- [ \t]*(?P<value>.*)$")
+_NAME_LABEL_WORDS = frozenset(("name", "naam", "nm", "नाम"))
 
 
 # ---------------------------------------------------------------- 1. roles
@@ -133,11 +136,27 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
     return roles
 
 
+def _is_mobile(value: str) -> bool:
+    """Ten digits starting 6-9 (with an optional 0 or +91), and nothing but phone punctuation."""
+    if not re.fullmatch(r"\+?[\d ().-]{10,20}", value) or re.search(r"\d\.\d{1,2}$", value):
+        return False
+    d = re.sub(r"\D", "", value)
+    if value.startswith("+91"):
+        d = d[2:]
+    elif len(d) == 11 and d[0] == "0":
+        d = d[1:]
+    return len(d) == 10 and d[0] in "6789"
+
+
 def _guess_role(vals: list[str]) -> str | None:
     if len(vals) < 3:
         return None
     if all(re.fullmatch(r"[1-9]\d{2}(?!000)\d{3}", v.strip()) for v in vals):
         return "pin"
+    # phone numbers, however they are spaced ("9412 7 30518")
+    # every cell: one that is not a number may name a person, and a phone column is not searched for names
+    if all(_is_mobile(fold(v).strip()) for v in vals):
+        return "phone"
     if all(re.fullmatch(r"(?:19[1-9]\d|20[0-2]\d)", v.strip()) for v in vals):
         yrs = [int(v.strip()) for v in vals]
         # diagnosis, admission or follow-up years are recent and close together; patients' birth years are not
@@ -169,7 +188,9 @@ def _labelled(text: str, dmy: bool) -> list[Cand]:
         for m in re.finditer(r"(?:(?! {3}|\t|\||[;,](?=[^,;:|\n]{1,30}:(?!\d))|;).)+", line):
             lab = _LABEL_LINE.match(m.group(0))
             if not lab:
-                continue
+                lab = _NAME_DASH_LINE.match(m.group(0))
+                if not lab or not set(tokens(lab.group("label"))) & _NAME_LABEL_WORDS:
+                    continue  # "Patient- stable" is a sentence, "नाम- <name>" is a label
             label = lab.group("label")
             if re.search(r"\d{4}", label):
                 continue  # "PAN ABCDE1234F: BP 118/76": the "label" holds the number itself
@@ -291,9 +312,13 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
     if role == "mrn" and kind == "value" and not re.search(r"\d", text):
         role = None
 
-    # the header is only a hint: a "PIN" column may really hold the whole address ("Home Place & PIN")
-    if role == "pin" and kind == "value" and address.holds_address(text):
-        role = "address"
+    # the header is only a hint: a "PIN" column may really hold the whole address ("Home Place & PIN"),
+    # or words with no PIN at all, which are then read like any unknown value
+    if role == "pin" and kind == "value":
+        if address.holds_address(text):
+            role = "address"
+        elif address.has_no_pin(text):
+            role = None
 
     found = ids.find_ids(text)
     if role in fields.ID_ROLES:
@@ -307,6 +332,9 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
         found += fields.kin_and_name(text)
     if role not in (None, "free"):
         found += fields.structured(text, 0, len(text), role, dmy)
+    # "परिजन_संपर्क", "relative mobile": the cell may name the relative as well as, or instead of, giving a number
+    if role == "phone" and kind == "value" and names_a_relative(label):
+        found += fields.relative_in_contact(text)
 
     if role in (None, "free", "date", "bed_patient"):
         found += dates.find_ages(text)
@@ -318,6 +346,14 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
         if kind not in ("filename", "header", "key"):
             found += gazetteer.find_joined_names(text, names.STOP)
         found += _labelled(text, dmy)
+    if role is None and kind == "value":
+        extra_check = extra_checks(label)
+        if extra_check == "place" and not set(tokens(text)) & names.MEDICAL:
+            found += address.parse_address(text, 0, len(text))
+        elif extra_check == "phone":
+            found += fields.structured(text, 0, len(text), "phone", dmy)
+        elif extra_check == "student":
+            found += fields.name_value(text, 0, len(text), "name")
     found += names.find_path_names(text)
     found += names.find_url_pii(text)
     if kind == "filename":

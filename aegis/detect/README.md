@@ -131,6 +131,33 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 - Still open: a "PIN" cell holding a place with no comma or no PIN; landlines spaced like `0522 2345678`; a hospital
   named after a person (`Pt. <name>`); one-word names with no clue; "sister <name>" meaning a relative.
 
+## Fixes from the batch 5 fresh test, and how little they carried over to batch 6
+- Batches 5 and 6 (60 lines + 8 exports each) were written by Claude agents that were not given the code or any
+  failure. Cases, scorer and write-up: `experiments/presidio/FRESH_TEST.md`. Batch 6's writer saw this fix's commit
+  title, which names the areas changed.
+- Fixed: dotted headers ("P.I.N."), notes columns written by a nurse or doctor, "relative contact" columns (a
+  regression: their names were missed once "संपर्क" became a phone word), `<name> Kumari`, HL7 `Family^Given`, more
+  relation words and `=`, relation before or after a name in relative columns, `MR#` / TPA / insurance labels, Hindi
+  and roman-numeral months, landmark / neighbourhood / `Student` / `fon` headers, oddly spaced phone columns.
+- **A leak older than this change:** "Ref Dr <x> Patient <y>" protected all of it as the doctor's name.
+- **Rules that protect, shorten or give a column a role can leak.** Earlier drafts of this change did, while the
+  self-test, practice data and test batches passed. A generated comparison with the previous code found them:
+  `experiments/presidio/differential.py <old root> <new root>`. So a newly understood header only ADDS checks
+  (`labels.extra_checks`), and the new relation words have their own cues.
+- Personal data covered, previous code -> this code (lines / exports):
+
+  | batch | status | previous | now |
+  |---|---|---|---|
+  | 5 | its failures were fixed | 53.7% / 71.0% | 66.9% / 80.3% |
+  | 6 | never read | 56.9% / 60.5% | 59.5% / 61.9% |
+
+  **Expect the batch 6 gain, about 1-3 points, not the batch 5 one.** (An earlier draft scored 60.3% / 63.5% on its
+  first run; part of that came from the unsafe rules.) Medical text kept on batches 5 and 6 did not go down.
+- Unseen coverage has ranged from about 55% to 89% across batches from different writers. Do not quote one batch.
+- Still open: names with no clue; places in free text with no capital or cue; a medical term right after a relation
+  word ("son <diagnosis>") can be removed as a name; in an address cell, "<name> came with <relation> <name>" removes
+  only the second name; a bare capital `DR <name>` is not protected as a doctor (on purpose).
+
 ## Next (generalisation)
 1. Another round of fresh unseen cases; fix general causes, never single sentences.
 2. Known blind spots: one-word names with no clue (nicknames, "<name> signed"); full names whose surname is not in

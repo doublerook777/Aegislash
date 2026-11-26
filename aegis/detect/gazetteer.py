@@ -262,10 +262,24 @@ def find_joined_names(text: str, stop: frozenset[str]) -> list[Cand]:
     return out
 
 
+# HL7 v2 writes names "Family^Given^Middle". A chain starting "Dr" is a doctor; test names use "^" too, so one part
+# must be a known surname
+_HL7_NAME = re.compile(r"(?<![A-Za-z^])[A-Z][a-z]+(?:\^[A-Z][a-z]*)+(?![A-Za-z^])")
+
+
+def _hl7(text: str) -> list[Cand]:
+    out = []
+    for m in _HL7_NAME.finditer(text):
+        parts = m.group(0).casefold().split("^")
+        if parts[0] not in ("dr", "doctor", "prof") and set(parts) & SURNAMES:
+            out.append(_cand(text, m.start(), m.end()))
+    return out
+
+
 def find_listed_names(text: str, stop: frozenset[str]) -> list[Cand]:
     """`stop` is the caller's list of words that are never names (medicines, report words)."""
     never = stop - SURNAMES - {"asha"}
-    return _latin(text, never) + _lower(text, never) + _deva(text)
+    return _latin(text, never) + _lower(text, never) + _deva(text) + _hl7(text)
 
 
 _PERSON_KEY_RUN = re.compile(r"^(?:[A-Z][a-z]{1,20}(?: [A-Z][a-z]{1,20}){1,2}|[ऀ-ॣॱ-ॿ]{2,20}(?: [ऀ-ॣॱ-ॿ]{2,20}){1,2})$")

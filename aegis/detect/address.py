@@ -29,7 +29,7 @@ _LANDMARK_NOUN = (r"(?:Mandir|Temple|Masjid|Mosque|Gurudwara|Church|School|Colle
                   r"Office|Bank|Market|Bazar|Bazaar|Talab|Pond|Tower|Stand|Gate|Park|Hospital|PHC|Chauraha|Well|Tree|Fatak|Phatak|Naka|"
                   r"Maidan|Chowki|Cinema|Depot|Hall|Bridge|Pump|Dharamshala|Library|Stadium|Circle)")
 LANDMARK = re.compile(
-    rf"\b(?i:near|nr\.?|opp\.?|opposite|behind|beside|next to)(?: *: *| +)(?:{_PLACE_WORD} ){{0,3}}{_LANDMARK_NOUN}\b"
+    rf"\b(?i:near|nr\.?|opp\.?|opposite|behind|beside|next to)(?: *: *| +)(?:(?i:old|new) )?(?:{_PLACE_WORD} ){{0,3}}{_LANDMARK_NOUN}\b"
     rf"|(?:{_DEVA_W} ){{1,3}}(?:के पास|के पीछे|के सामने|के बगल(?: में)?)"
     rf"|(?:{_PLACE_WORD} ){{0,3}}{_LANDMARK_NOUN} (?i:ke|ki) (?i:paas|pass|peeche|piche|saamne|samne|bagal)\b")
 VILLAGE_CUE = re.compile(
@@ -104,6 +104,11 @@ def holds_address(text: str) -> bool:
     """More than a PIN code: a six-digit code plus comma-separated words that are not just its label."""
     rest = _PIN_LABEL_WORDS.sub("", text)
     return "," in text and bool(_PIN_ANY.search(text)) and bool(re.search(r"[A-Za-z]{3,}|[ऀ-ॿ]{2,}", rest))
+
+
+def has_no_pin(text: str) -> bool:
+    """Words, and no six digits anywhere: not a PIN code cell."""
+    return len(re.sub(r"\D", "", text)) != 6 and not _PIN_ANY.search(text) and bool(re.search(r"[A-Za-z]{3,}|[ऀ-ॿ]{2,}", text))
 
 
 _CARE_OF_ADDRESS = re.compile(r"(?<![A-Za-z/])(?i:c/o)[ :.-]+(?P<a>\d{1,4}[A-Z]?(?:/\d+)?, *[^;\n|]{5,120})")

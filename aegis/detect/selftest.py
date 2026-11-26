@@ -177,6 +177,53 @@ CASES = [
     ("Lobsang verified the payment receipt at the counter.", ["Lobsang"], []),
     ("Culture verified the organism; Smear signed out by pathologist.", [], ["Culture", "Smear"]),
     ("Janam tithi 14/05/1988, जन्मतिथि 12-08-1992.", ["14/05/1988", "12-08-1992"], []),
+    # Kumari and Devi after a first name are part of the name, not a title
+    ("Patient: Km. Barsha Kumari came with cough.", ["Barsha Kumari"], ["cough"]),
+    # doctor titles in capitals or with a courtesy title in brackets
+    ("Chemo plan by DR.(MRS) TARULATA MAHANTA today.", [], ["TARULATA MAHANTA"]),
+    # relation words and separators
+    ("Consent taken. Son = Nandlal. Will pay tomorrow.", ["Nandlal"], ["Consent"]),
+    ("elder bro Ompal waiting outside, will sign.", ["Ompal"], ["waiting"]),
+    ("sibling Kiruba also screened, report normal.", ["Kiruba"], ["screened"]),
+    ("Call bahu Jasleen if he wanders at night.", ["Jasleen"], ["night"]),
+    ("dtr Rituparna will collect the reports.", ["Rituparna"], ["reports"]),
+    ("Family history: sibling Diabetes since 2019.", [], ["Diabetes"]),
+    # record and insurance numbers announced by a label
+    ("UHID-->QRS/OP/0045127 || BP 130/84", ["QRS/OP/0045127"], ["130/84"]),
+    ("Old file MR# 31-207-5568 traced.", ["31-207-5568"], ["traced"]),
+    ("TPA card no. ZXC7-00518837-04 pending, bill Rs 12,500", ["ZXC7-00518837-04"], ["12,500"]),
+    ("आयुष्मान कार्ड संख्या RJ-QX-66120934 दर्ज, खुराक 500mg", ["RJ-QX-66120934"], ["500mg"]),
+    ("TPA card not available, HbA1c 8.1% noted.", [], ["HbA1c 8.1%", "not available"]),
+    # birth dates written with a Hindi or roman-numeral month
+    ("जन्मतिथि ३ फ़रवरी १९७९, वज़न 62 kg", ["३ फ़रवरी १९७९"], ["62 kg"]),
+    ("DOB 21/XI/1958, on Telmisartan.", ["21/XI/1958"], ["Telmisartan"]),
+    ("Stage II/IV disease, grade III/2020 criteria.", [], ["II/IV", "III/2020"]),
+    # "Name- value" with a dash and no space before it
+    ("पंजीकरण काउंटर; नाम- सुमित्रा महंत", ["सुमित्रा महंत"], ["काउंटर"]),
+    ("Follow- up after two weeks.", [], ["up after two weeks"]),
+    # HL7 style names, and HL7 doctors and test names that look similar
+    ("PID Mahanta^Tarulata admitted to HDU.", ["Mahanta^Tarulata"], ["HDU"]),
+    ("Attending Dr^Rathi^Ompal on call.", [], ["Rathi", "Ompal"]),
+    ("OBX Glucose^Fasting 102 mg/dL", [], ["Glucose^Fasting"]),
+    # "near old <place>"
+    ("Lives near old Hanuman Temple, on Amlodipine.", ["near old Hanuman Temple"], ["Amlodipine"]),
+
+    # a tight dash only introduces a value after a label that says "name"
+    ("Patient- stable today, BP 120/80.", [], ["stable"]),
+    ("मरीज- को बुखार है, खुराक 500mg", [], ["बुखार"]),
+    # doctor protection must never spread over the patient who follows, whatever the capitals
+    ("REF DR RATHI PATIENT SUMITRA MAHANTA ADMITTED", ["SUMITRA MAHANTA"], []),
+    ("SEEN BY DR RATHI PT NAME NANDLAL HAZARIKA", ["NANDLAL HAZARIKA"], []),
+    ("Ref DR RATHI Mrs Barsha Hazarika came", ["Barsha Hazarika"], []),
+    ("ref dr Rathi Patient Sumitra Mahanta admitted", ["Sumitra Mahanta"], []),
+    ("UNDER DR RATHI MR OMPAL MAHANTA BP 120/80", ["OMPAL MAHANTA"], ["120/80"]),
+    ("Ref Dr Rathi Patient Sumitra Mahanta admitted", ["Sumitra Mahanta"], []),
+    ("DR.(MRS) MAHANTA PATIENT NANDLAL HAZARIKA", ["NANDLAL HAZARIKA"], []),
+    # a dash after a name label never takes over from a later colon
+    ("Patient Name- verified: Barsha Hazarika", ["Barsha Hazarika"], []),
+    # a leading word that is not a name must not take the name after it down with it
+    ("Witness Barsha Hazarika tel 9412730518", ["Barsha Hazarika", "9412730518"], []),
+    ("Admitted Ompal (father: Nandlal Mahanta) of H.No. 9, 781014", ["Ompal", "Nandlal Mahanta"], []),
 ]
 
 
@@ -215,6 +262,9 @@ TABLES = [
      [["31145549", "31147001", "31149002", "Neha Kapoor", "Farhan Qureshi", "4000-11000", "226010", "880123"]],
      {"case_sheet_ref": "MRN", "patient_ref": "MRN", "mrn_ref": "MRN", "ref_by": None, "ref_doctor": None,
       "ref_range": None, "dak_code": "PIN", "sample_code": None}),
+    # an unreadable header over phone numbers written with odd spacing; other long numbers are not phones
+    (["zz_reach", "zz_bill"], [["9412 7 30518", "4500.00"], ["70112-904-18", "1200.50"], ["8800 41 2276", "980.00"]],
+     {"zz_reach": "PHONE", "zz_bill": None}),
 ]
 
 
@@ -252,7 +302,62 @@ CELLS = [
     ("Ward / Patient", "Ward 4 - Male Surgical", [], ["Male Surgical"]),
     ("Ward / Patient", "Ishrat Jahan Ansari", ["Ishrat Jahan Ansari"], []),
     ("patient_ward", "Maternity", [], ["Maternity"]),
+    # dotted short forms in headers
+    ("P.I.N.", "781014", ["781014"], []),
+    ("U.H.I.D.", "55-204-9911", ["55-204-9911"], []),
+    # landmark and neighbourhood headers
+    ("Landmark", "next to the old post office", ["old post office"], []),
+    ("ptNbhd", "Lalpur Basti", ["Lalpur Basti"], []),
+    ("Nearby", "dairy booth", ["dairy booth"], []),
+    # a notes column stays a notes column even when a nurse or doctor writes it
+    ("wardNurseNote", "son Nandlal informed, BP 120/80", ["Nandlal"], ["BP 120/80"]),
+    ("Doctor Remarks", "Continue Metformin 500 mg, wife Jasleen counselled", ["Jasleen"], ["Metformin 500 mg"]),
+    ("Doctor", "Tarulata Mahanta", [], ["Tarulata Mahanta"]),
+    ("Student", "Barsha Hazarika", ["Barsha Hazarika"], []),
+    # relative columns that put the relation first, or in brackets after the name
+    ("kin_mentioned", "amma - Kiruba", ["Kiruba"], []),
+    ("Relative", "papa Nandlal, didi Barsha", ["Nandlal", "Barsha"], []),
+    ("Relative", "devrani Sumitra", ["Sumitra"], []),
+    ("Brought By (with relation)", "Jasleen Gill (wife)", ["Jasleen Gill"], []),
+    ("Brought By (with relation)", "self (walk in)", [], ["self"]),
+    # an insurance number with an Aadhaar-looking tail is removed whole
+    ("Policy No", "ACMEGEN-4821-5530-9917", ["ACMEGEN-4821-5530-9917"], []),
+
+    # a name cell that runs into a sentence stops there, but never when another person follows
+    ("Patient", "Barsha came with cough", ["Barsha"], ["cough"]),
+    ("Patient", "Barsha with Nandlal", ["Barsha", "Nandlal"], []),
+    ("Patient", "Barsha came with husband nandlal", ["Barsha", "nandlal"], []),
+    # a header that is newly understood must not switch off the search for names
+    ("P.I.N.", "wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    ("PIN", "ask wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    ("Student", "Ompal Rathi came with wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    ("Landmark", "Ompal Rathi came with wife Barsha Hazarika", ["Ompal Rathi", "Barsha Hazarika"], []),
+    ("Landmark", "Paracetamol given since 2 days", [], ["Paracetamol"]),
+    ("fon_no", "9412 7 30518", ["9412 7 30518"], []),
+    ("fon_no", "ask wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    # only a plain "student" column holds names; a hospital near by is not a landmark of a home
+    ("student_vision", "normal both eyes", [], ["normal"]),
+    ("Student Remarks", "attends regularly, weight low", [], ["attends"]),
+    ("Nearby Hospital", "District Hospital Sehore", [], ["District Hospital"]),
+    # "relative contact" columns hold a name, a number or both, even though "contact" reads as a phone label
+    ("परिजन_संपर्क", "भाई नंदलाल महंत", ["नंदलाल महंत"], []),
+    ("Guardian Contact", "Barsha Hazarika 94127-30518", ["Barsha Hazarika", "94127-30518"], []),
+    ("Guardian Contact", "94127 30518", ["94127 30518"], []),
+    ("Attendant Mobile", "not available", [], ["not available"]),
 ]
+
+
+def _run_mixed_column() -> int:
+    """Mostly phone numbers under an unreadable header: the one cell that names a person must still be searched."""
+    values = ["9412 7 30518", "70112-904-18", "8800 41 2276", "9435 2 11870", "ask wife Barsha Hazarika"]
+    records = [{"record_id": f"t.csv#row:{n}", "file": "t.csv", "loc": f"row:{n}", "fmt": "csv",
+                "fields": [{"path": "col:0", "kind": "value", "context": "zz_reach2", "value": v}]}
+               for n, v in enumerate(values, 1)]
+    found = [f["text"] for f in detect_file(records)[-1]["findings"]]
+    if not any("Barsha Hazarika" in f for f in found):
+        print(f"FAIL  mixed phone column: found {found}")
+        return 1
+    return 0
 
 
 def _run_cells() -> int:
@@ -350,7 +455,7 @@ def main() -> int:
         if missed or eaten:
             failed += 1
             print(f"FAIL  {line}\n      missed={missed} wrongly_removed={eaten}")
-    table_failures = _run_tables()
+    table_failures = _run_tables() + _run_mixed_column()
     print(f"{len(TABLES)} column tables checked, {table_failures} problems")
     cell_failures = _run_cells()
     print(f"{len(CELLS)} single cells checked, {cell_failures} problems")
