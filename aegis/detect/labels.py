@@ -11,7 +11,11 @@ _CAMEL = re.compile(r"(?<=[a-z])(?=[A-Z])")
 _SPLIT = re.compile(r"[^a-z0-9ऀ-ॿ]+")
 
 
+_DOTTED = re.compile(r"(?<![A-Za-z])(?:[A-Za-z]\.){2,}(?:[A-Za-z](?![A-Za-z]))?")
+
+
 def tokens(label: str) -> list[str]:
+    label = _DOTTED.sub(lambda m: m.group(0).replace(".", ""), label or "")     # "P.I.N." -> "PIN"
     return [t for t in _SPLIT.split(_CAMEL.sub(" ", label or "").casefold()) if t]
 
 
@@ -22,7 +26,7 @@ def _words(s: str) -> frozenset[str]:
 _DOCTOR = _words("doctor dr consultant physician surgeon nurse referred referrer author practitioner clinician medico mo डॉक्टर चिकित्सक")
 _RELATIVE = _words("guardian relative relatives kin nok father fathers husband husbands mother mothers spouse attendant informant careof pita attender parivar sadasya gharwale gharwala gharwali "
                    "pati parent caregiver witness nominee पिता पति अभिभावक माता")
-_PHONE = _words("phone ph mobile mob tel telephone whatsapp cell callback contactno contactdigits msisdn फ़ोन फोन मोबाइल दूरभाष संपर्क")
+_PHONE = _words("phone ph mobile mob tel telephone whatsapp cell callback contactno contactdigits msisdn fon फ़ोन फोन मोबाइल दूरभाष संपर्क")
 _MRN = _words("uhid mrn umr crno uid_h भर्ती_संख्या पंजीकरण आईपीडी")
 _ID_WORDS = _words("id no num number ref code सं संख्या")
 _DOB = _words("dob yob birth birthdate birthyear janm janam जन्म")
@@ -33,6 +37,7 @@ _DISTRICT = _words("district distt dist jila zila zilla जिला ज़ि�
 _TEHSIL = _words("tehsil taluk taluka tahsil block तहसील")
 _VILLAGE = _words("village vill gaon gaanv gaav gav gram city town गांव गाँव ग्राम")
 _ADDRESS = _words("address addr adr street pata residence mohalla locality area house door doorno hno ghar makan "
+                  "landmark landmarks lndmrk nearby nbhd neighbourhood neighborhood dwelling "
                   "पता निवास घर मकान मोहल्ला")
 _NAME = _words("name nm naam fname lname fullname नाम")
 _SUBJECT = _words("patient pt beneficiary member subject client person insured मरीज़ मरीज रोगी mareez marij rogi rogee")
@@ -43,11 +48,16 @@ _KEEP = _words("diagnosis dx drug drugs medicine medication test tests result re
                "coding schema profile निदान विभाग दवा")
 _NOT_PERSON = _words("hospital facility lab test tests drug medicine panel panels coding file organization org "
                      "department ward package scheme insurer company payer_org user username device software")
+_STUDENT = _words("student विद्यार्थी छात्र छात्रा")
 _PLACE_IN_HOSPITAL = _words("ward bed")
 _CONTACT = _words("contact contacts caller")
 _NOT_MRN = _words("visit bill invoice sample claim policy ticket trip report order txn receipt encounter")
 _FREE = _words("notes note remarks remark comment comments complaints complaint history narrative advice summary")
 _DATE = _words("date dated datetime tarikh तारीख दिनांक collected reported registered admitted discharged at on")
+
+
+def names_a_relative(label: str) -> bool:
+    return bool(set(tokens(label)) & (_RELATIVE | {"परिजन"}))
 
 
 def _owner(parents: tuple[str, ...]) -> str | None:
@@ -83,11 +93,12 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
     joined = "".join(t)
     up = {w for p in parents for w in tokens(p)}
 
+    # a notes column stays a notes column whoever writes it ("nurse_note"): relatives are named in it
+    if s & _FREE and not s & _ADDRESS:
+        return "free"
     # "ref" alone is only "reference" (patient_ref, mrn_ref, ref_range); "ref_by" names the referring doctor
     if (s & _DOCTOR or {"ref", "by"} <= s) and not s_all & _PHONE:
         return "doctor"
-    if s & _FREE and not s & _ADDRESS:
-        return "free"
     if s & {"email", "mail", "ईमेल"} or joined.endswith("email"):
         return "email"
     if "abha" in joined or "healthid" in joined or "आभा" in s:
@@ -161,6 +172,9 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
             return "patient_name"
         return owner or "name"
     if s & _SUBJECT and not s & _ID_WORDS and not s & _KEEP:
+        return "patient_name"
+    # school health sheets: "Student" holds the child's name, but "student_vision" does not
+    if s <= _STUDENT:
         return "patient_name"
     # "Bed & Patient", "ward_patient": where the person lies and who they are, in one column
     if s & _SUBJECT and not s & _ID_WORDS and s & _KEEP and s & _KEEP <= _PLACE_IN_HOSPITAL:

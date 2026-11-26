@@ -29,7 +29,7 @@ _LANDMARK_NOUN = (r"(?:Mandir|Temple|Masjid|Mosque|Gurudwara|Church|School|Colle
                   r"Office|Bank|Market|Bazar|Bazaar|Talab|Pond|Tower|Stand|Gate|Park|Hospital|PHC|Chauraha|Well|Tree|Fatak|Phatak|Naka|"
                   r"Maidan|Chowki|Cinema|Depot|Hall|Bridge|Pump|Dharamshala|Library|Stadium|Circle)")
 LANDMARK = re.compile(
-    rf"\b(?i:near|nr\.?|opp\.?|opposite|behind|beside|next to)(?: *: *| +)(?:{_PLACE_WORD} ){{0,3}}{_LANDMARK_NOUN}\b"
+    rf"\b(?i:near|nr\.?|opp\.?|opposite|behind|beside|next to)(?: *: *| +)(?:(?i:old|new) )?(?:{_PLACE_WORD} ){{0,3}}{_LANDMARK_NOUN}\b"
     rf"|(?:{_DEVA_W} ){{1,3}}(?:के पास|के पीछे|के सामने|के बगल(?: में)?)"
     rf"|(?:{_PLACE_WORD} ){{0,3}}{_LANDMARK_NOUN} (?i:ke|ki) (?i:paas|pass|peeche|piche|saamne|samne|bagal)\b")
 VILLAGE_CUE = re.compile(

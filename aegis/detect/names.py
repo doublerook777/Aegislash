@@ -71,7 +71,9 @@ DEVA_NAME = rf"{_DEVA_WORD}(?: {_DEVA_WORD}){{0,2}}"
 NAME = rf"(?:{LATIN_NAME}|{DEVA_NAME})"
 
 _DOCTOR = re.compile(
-    rf"(?:\bDr\b\.?|\bDOCTOR\b|\bDoctor\b|\bProf\b\.?|डॉ\.?|डा\.|डॉक्टर)\s*(?:{LATIN_NAME}|{DEVA_NAME})"
+    # "Dr. X", "DR X", "DR.(MRS) X"
+    rf"(?:\b(?i:dr)\b\.?|\bDOCTOR\b|\bDoctor\b|\bProf\b\.?|डॉ\.?|डा\.|डॉक्टर)"
+    rf"(?:\s*\((?i:mrs?|ms|miss|prof|capt|col|maj|major)\.?\))?\s*(?:{LATIN_NAME}|{DEVA_NAME})"
     rf"(?:\s*\([^)\n]*\))?")
 _EPONYM = re.compile(rf"\b{_CAP}(?:'s)?(?= (?:[Dd]isease|[Ss]yndrome|[Pp]alsy|[Ss]ign|[Pp]rocedure)\b)")
 
@@ -86,7 +88,9 @@ def doctor_mentions(text: str) -> list[str]:
 
 def doctor_name(mention: str) -> list[str]:
     """The words after the title: "Dr. R. Mehta (MD)" -> ["r", "mehta"]."""
-    return name_words(re.sub(r"^(?:Dr\b\.?|DOCTOR|Doctor|Prof\b\.?|डॉ\.?|डा\.|डॉक्टर)|\(.*$", "", mention))
+    title = (r"^(?:(?i:dr)\b\.?|DOCTOR|Doctor|Prof\b\.?|डॉ\.?|डा\.|डॉक्टर)"
+             r"(?:\s*\((?i:mrs?|ms|miss|prof|capt|col|maj|major)\.?\))?")
+    return name_words(re.sub(r"\(.*$", "", re.sub(title, "", mention)))
 
 
 def protected_spans(text: str) -> list[tuple[int, int]]:
@@ -97,9 +101,12 @@ def protected_spans(text: str) -> list[tuple[int, int]]:
 def trim_name(text: str, start: int, end: int) -> tuple[int, int] | None:
     """Shrink a captured span to the real name: drop titles and stop words from both ends."""
     words = [(m.start() + start, m.end() + start) for m in re.finditer(r"[^\s]+", text[start:end])]
+    first_word = words[0] if words else None
     def bad(span):
         w = text[span[0]:span[1]].strip(".,'’:;()-")
-        title = re.fullmatch(_TITLE, text[span[0]:span[1]]) is not None and w not in ("Md", "Mohd")  # part of a name
+        # "Md", "Mohd" are part of a name; so is "Kumari" after a first name ("<name> Kumari")
+        part_of_name = w in ("Md", "Mohd") or (w == "Kumari" and span != first_word)
+        title = re.fullmatch(_TITLE, text[span[0]:span[1]]) is not None and not part_of_name
         return not w or w.casefold() in STOP - {"asha"} or title
     while words and bad(words[0]):
         words.pop(0)
@@ -128,6 +135,7 @@ _DEVA_HON = "जी|साहब|साहिब|बहन|बहनजी|भ�
 _PERSON_WORD = (r"(?:attendant|attender|relative|informant|caretaker|care ?giver|guardian|neighbou?r|son-in-law|"
                 r"daughter-in-law|grand(?:son|daughter|father|mother)|nephew|niece|uncle|aunt|bua|mausi|chacha|"
                 r"(?:brother|sister|father|mother)-in-law|cousin|spouse|sasur|"
+                r"bro|dtr|sibling|bhabhi|devrani|jethani|bahu|nanad|dadaji|nanaji|"
                 r"son|daughter|wife|husband|brother|father|mother)")
 
 # (regex with group "name", role, relation, hinglish?)
@@ -148,7 +156,7 @@ _cue(rf"(?<![ऀ-ॿ])(?:पुत्र|पुत्री|पत्नी|स�
 _cue(rf"(?<![A-Za-z/])(?i:[fmg]/o)\b[.:]? *(?:(?:{_TITLE}|Baby) )?(?P<name>{LATIN_NAME})", "patient")
 # "Attendant: X", "called by X", "witnessed by X"
 _cue(rf"\b(?i:{_PERSON_WORD}|informed by|called by|witnessed by|accompanied by|brought by|raised by|reported by)"
-     rf"(?: *\([^)\n]{{0,30}}\))?(?:\s*[:\-] *| +)(?P<name>{LATIN_NAME})", "relative")
+     rf"(?: *\([^)\n]{{0,30}}\))?(?:\s*[:\-=] *| +)(?P<name>{LATIN_NAME})", "relative")
 _cue(rf"(?P<name>{LATIN_NAME})'s +(?i:{_PERSON_WORD})", "patient")
 _cue(rf"(?P<name>{LATIN_NAME}) *\( *(?i:{_PERSON_WORD})", "relative")
 # Hinglish honorifics: "Shahid sahab", "Anita behenji", "Kamal Bhaiya"

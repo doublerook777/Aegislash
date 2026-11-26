@@ -16,7 +16,7 @@ import binascii
 import re
 
 from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
-from aegis.detect.labels import classify, tokens
+from aegis.detect.labels import classify, names_a_relative, tokens
 from aegis.detect.normalize import DEVA, fold, norm_name, unquote_view, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
 from aegis.types import DIRECT_TYPES, QUASI_TYPES, STRONG_ID_TYPES, Record, RecordResult, empty_evidence
@@ -25,7 +25,9 @@ NAME_TYPES = ("PATIENT_NAME", "RELATIVE_NAME")
 # two or more of these words mean the sentence is Hinglish (Hindi written in Latin letters)
 _HINGLISH = re.compile(r"\b(?:ka|ki|ke|ko|ne|hai|hain|nahi|raha|rahe|rahi|gaya|gayi|diya|liya|se|mein|aur|ji|sahab|behenji|bhai)\b")
 _CONDITION_KEYS = ("diagnosis", "diagnoses", "condition", "dx", "icd", "निदान")
-_LABEL_LINE = re.compile(r"^\s*(?:[-*•]\s*)?(?P<label>[^:=\n]{1,40}?)\s*(?::(?!\d|//)|=| - | – )[ \t]*(?P<value>.*)$")
+_LABEL_LINE = re.compile(
+    r"^\s*(?:[-*•]\s*)?(?P<label>[^:=\n]{1,40}?)\s*(?::(?!\d|//)|=| - | – |(?P<tight>(?<![\s\d])- ))[ \t]*(?P<value>.*)$")
+_NAME_LABEL_WORDS = frozenset(("name", "naam", "nm", "नाम"))
 
 
 # ---------------------------------------------------------------- 1. roles
@@ -133,11 +135,26 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
     return roles
 
 
+def _is_mobile(value: str) -> bool:
+    """Ten digits starting 6-9 (with an optional 0 or +91), and nothing but phone punctuation."""
+    if not re.fullmatch(r"\+?[\d ().-]{10,20}", value) or re.search(r"\d\.\d{1,2}$", value):
+        return False
+    d = re.sub(r"\D", "", value)
+    if value.startswith("+91"):
+        d = d[2:]
+    elif len(d) == 11 and d[0] == "0":
+        d = d[1:]
+    return len(d) == 10 and d[0] in "6789"
+
+
 def _guess_role(vals: list[str]) -> str | None:
     if len(vals) < 3:
         return None
     if all(re.fullmatch(r"[1-9]\d{2}(?!000)\d{3}", v.strip()) for v in vals):
         return "pin"
+    # phone numbers, however they are spaced ("9412 7 30518")
+    if sum(_is_mobile(fold(v).strip()) for v in vals) >= 0.8 * len(vals):
+        return "phone"
     if all(re.fullmatch(r"(?:19[1-9]\d|20[0-2]\d)", v.strip()) for v in vals):
         yrs = [int(v.strip()) for v in vals]
         # diagnosis, admission or follow-up years are recent and close together; patients' birth years are not
@@ -171,6 +188,8 @@ def _labelled(text: str, dmy: bool) -> list[Cand]:
             if not lab:
                 continue
             label = lab.group("label")
+            if lab.group("tight") and not set(tokens(label)) & _NAME_LABEL_WORDS:
+                continue  # "Patient- stable" is a sentence, "नाम- <name>" is a label
             if re.search(r"\d{4}", label):
                 continue  # "PAN ABCDE1234F: BP 118/76": the "label" holds the number itself
             dashed = not re.match(r"\s*[:=]", m.group(0)[lab.end("label"):])
@@ -307,6 +326,9 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
         found += fields.kin_and_name(text)
     if role not in (None, "free"):
         found += fields.structured(text, 0, len(text), role, dmy)
+    # "परिजन_संपर्क", "relative mobile": the cell may name the relative as well as, or instead of, giving a number
+    if role == "phone" and kind == "value" and names_a_relative(label):
+        found += fields.relative_in_contact(text)
 
     if role in (None, "free", "date", "bed_patient"):
         found += dates.find_ages(text)

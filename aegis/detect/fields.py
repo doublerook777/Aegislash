@@ -22,6 +22,15 @@ _WARD_WORDS = frozenset("male female general medical surgical surgery medicine m
                         "labor isolation private semi special ortho orthopaedic gynae obstetric neonatal burns icu nicu "
                         "picu hdu ccu ward unit wing".split())
 _TITLES = re.compile(rf"^\s*(?:(?!Mohd\b|Md\b){_TITLE}\s*)+")
+_KIN_ANY = (r"(?:husband|wife|father|mother|son|daughter|brother|sister|uncle|aunt|cousin|guardian|friend|neighbou?r|"
+            r"amma|appa|papa|mummy|didi|bhaiya|bhabhi|bahu|beta|beti|pati|patni)")
+_SENTENCE_STARTS = re.compile(r"\s(?:came|comes|with|is|was|has|had|presented|admitted|reports|complains|visited|"
+                              r"since|today|yesterday|who)(?![A-Za-z])")
+def _plain_words(tail: str) -> bool:
+    """All lowercase and no relation word: "came with cough", but not "with <Name>" or "with husband <name>"."""
+    return tail == tail.lower() and not DEVA.search(tail) and not re.search(rf"(?<![a-z]){_KIN_ANY}(?![a-z])", tail)
+
+
 _NOT_A_NAME = re.compile(r"^(?:n/?a|na|nil|none|null|unknown|-+|self|same|test)$", re.I)
 
 
@@ -52,8 +61,25 @@ _KIN_THEN_NAME = re.compile(
     r"cousin|uncle|aunt|guardian|[hwsdfm]/o)|पति|पत्नी|पिता|माता|पुत्र|पुत्री|बेटा|बेटी|भाई|बहन|बहू|शौहर)\b[ :.\-]+(?P<n>.+)$")
 
 
+# "<name> (wife)"
+_NAME_THEN_KIN = re.compile(
+    r"^\s*(?P<n>[A-Z][A-Za-z.' ]+?) *\( *(?i:spouse|husband|wife|father|mother|son|daughter|brother|sister|cousin|uncle|"
+    r"aunt|guardian|friend|neighbou?r)\b[^)]*\)")
+
+# a relative column may put the relation first: "amma - <name>", "papa <name>, didi <name>". It is only cut off when
+# written in lowercase or followed by a separator: "Nana <surname>" can be somebody's name
+_KIN_WORD = (r"(?:amma|appa|papa|mummy|mom|dad|didi|bhaiya|bhabhi|devrani|jethani|bahu|pota|poti|dada|dadi|nana|nani|"
+             r"chacha|chachi|tau|tai|mama|mami|mausi|bua|dtr|bro|sibling|son|daughter|wife|husband|father|mother|"
+             r"brother|sister|uncle|aunt|cousin)")
+_KIN_PREFIX = re.compile(rf"^\s*(?:{_KIN_WORD}(?: +| *[-:=] *)|(?i:{_KIN_WORD}) *[-:=] *)(?=[A-Zऀ-ॿ])")
+_LIST_BREAK = re.compile(r"[,;/&]| and ")
+
+
 def kin_and_name(text: str) -> list[Cand]:
-    """A "relation" column may hold the person too: "Father <name>"."""
+    """A "relation" column may hold the person too: "Father <name>" or "<name> (wife)"."""
+    m = _NAME_THEN_KIN.match(text)
+    if m:
+        return name_value(text, m.start("n"), m.end("n"), "relative_name")
     m = _KIN_THEN_NAME.match(text)
     if not m or not (DEVA.search(m.group("n")) or m.group("n")[:1].isupper()):
         return []
@@ -70,6 +96,12 @@ def surname_first(value: str) -> bool:
     return bool(_SURNAME_FIRST.fullmatch(value)) and not set(words) & (_NOT_GIVEN | (STOP - {"asha"}) | ORG)
 
 
+def relative_in_contact(text: str) -> list[Cand]:
+    """A relative's "contact" cell: "<relation> <name>", or something that looks like a name, with or without a number."""
+    found = kin_and_name(text) or name_value(text, 0, len(text), "name")
+    return [c._replace(type="RELATIVE_NAME", role="relative", prio=PRIORITY["RELATIVE_NAME"] + 2) for c in found]
+
+
 def name_value(text: str, s: int, e: int, role: str) -> list[Cand]:
     """The value of a name column. `role` decides patient vs relative."""
     kind = "RELATIVE_NAME" if role == "relative_name" else "PATIENT_NAME"
@@ -77,6 +109,12 @@ def name_value(text: str, s: int, e: int, role: str) -> list[Cand]:
     relation = None
     while m := _BED_PREFIX.match(text[s:e]):   # "Ward 3 Bed 8 - <name>"
         s += m.end()
+    if role == "relative_name" and (m := _KIN_PREFIX.match(text[s:e])):
+        s += m.end()
+    # a name cell that runs on into a sentence ("<name> came with cough") ends where the sentence starts
+    m = _SENTENCE_STARTS.search(text, s, e)
+    if m and _plain_words(text[m.start():e]):
+        e = m.start()
     m = _RELATION_PREFIX.match(text[s:e])
     if m:
         relation = relation_of(m.group("rel"))
@@ -116,6 +154,14 @@ def structured(text: str, s: int, e: int, role: str, dmy: bool) -> list[Cand]:
     if e <= s:
         return []
     value = text[s:e]
+    if role == "relative_name":
+        # several relatives in one cell, each announced by its relation
+        pieces, start = [], s
+        for m in [*_LIST_BREAK.finditer(text, s, e), None]:
+            pieces.append(_strip(text, start, m.start() if m else e))
+            start = m.end() if m else e
+        if len(pieces) > 1 and all(_KIN_PREFIX.match(text[a:b]) for a, b in pieces):
+            return [c for a, b in pieces for c in name_value(text, a, b, role)]
     if role in NAME_ROLES:
         return name_value(text, s, e, role)
     if role == "bed_patient":
@@ -130,7 +176,8 @@ def structured(text: str, s: int, e: int, role: str, dmy: bool) -> list[Cand]:
         found = [c._replace(start=c.start + s, end=c.end + s) for c in find_ids(value)]
         # the column holds one number: take all of it, even if only a part has a known shape ("RCH-JH-26-44109")
         if (kind in ("MRN", "INSURANCE_ID") and re.fullmatch(r"[A-Za-z0-9#/_.-]{5,30}", value)
-                and len(digits(value)) >= 4 and all(c.type in ("MRN", "INSURANCE_ID", "PHONE") for c in found)
+                # (a 12-digit tail can look like an Aadhaar number: it is still one ID, remove all of it)
+                and len(digits(value)) >= 4 and all(c.type in ("MRN", "INSURANCE_ID", "PHONE", "AADHAAR") for c in found)
                 and not any(c.start == s and c.end == e for c in found)):
             norm = re.sub(r"[^A-Z0-9]", "", value.upper()) if kind == "INSURANCE_ID" else digits(value)
             return [Cand(s, e, kind, norm, "patient", prio=PRIORITY[kind] + 2)]

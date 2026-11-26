@@ -80,14 +80,19 @@ MRN_SHAPES = [
 
 
 # A number announced by its label, whatever its format ("Rec# : HOSP/2023/07/00123", "Aadhaar No: 1111-2222-3333").
-_SEP = r"\.?\s*[:#=\-]*\s*"
+_SEP = r"\.?\s*[:#=\->|~]*\s*"
 _LABELLED = [
     ("MRN", re.compile(
         r"(?<![A-Za-z])(?i:uhid|mrn|c\.? ?r\.? ?no|reg(?:istration|n)?\.? ?(?:no|id|number)|rec(?:ord)?\.? ?(?:no#?|id|#)"
-        r"|hosp(?:ital)?\.? ?(?:no|id)|pt\.? ?id|patient (?:id|no)|ipd? ?no|admission (?:no|number)|file no)" + _SEP
+        r"|hosp(?:ital)?\.? ?(?:no|id)|pt\.? ?id|patient (?:id|no)|ipd? ?no|admission (?:no|number)|file no|mr(?= ?#))" + _SEP
         + r"(?P<v>#?(?=[A-Za-z/\-]*\d[A-Za-z/\-]*\d)[A-Za-z0-9](?:[A-Za-z0-9/\-]{1,28}[A-Za-z0-9]))")),
     ("MRN", re.compile(r"(?:आईपीडी|आईपी|यूएचआईडी|पंजीकरण)(?: ?(?:नंबर|नं\.?|संख्या|क्रमांक))?" + _SEP
                        + r"(?P<v>(?=[A-Z/\-]*\d(?:[A-Z/\-]*\d){2})[A-Z0-9](?:[A-Z0-9/\-]{1,28}[A-Z0-9]))")),
+    # "TPA card no. <id>", "insurer ref is <id>", "आयुष्मान कार्ड संख्या <id>": the value needs at least four digits
+    ("INSURANCE_ID", re.compile(r"(?:(?<![A-Za-z])(?i:tpa|ayushman|pmjay|insurer|insurance|health insurance)"
+                                r"(?i: (?:card|policy|member|claim))? ?(?i:no|number|id|ref)(?![A-Za-z])(?i: is)?"
+                                r"|(?:आयुष्मान|बीमा)(?: कार्ड)? ?(?:संख्या|नंबर|नं\.?|क्रमांक))" + _SEP
+                                + r"(?P<v>(?=(?:[A-Za-z/\-]*\d){4})[A-Za-z0-9](?:[A-Za-z0-9/\-]{4,34}[A-Za-z0-9]))")),
     ("AADHAAR", re.compile(r"(?:(?i:aadh?aa?r|adhar)|आधार)(?i: ?(?:card)? ?(?:no|number|id)?)" + _SEP
                            + r"(?P<v>\d{4}[ -]?\d{4}[ -]?\d{4})(?!\d)")),
     ("ABHA_NUMBER", re.compile(r"(?:(?i:abha|health ?id)|एबीएचए)(?i: ?(?:id|no|number)?)" + _SEP
@@ -140,7 +145,8 @@ def find_ids(text: str) -> list[Cand]:
     for kind, pattern in _LABELLED:
         for m in pattern.finditer(text):
             value = m.group("v")
-            norm = phone_norm(value) if kind == "PHONE" else digits(value)
+            norm = (phone_norm(value) if kind == "PHONE" else
+                    re.sub(r"[^A-Z0-9]", "", value.upper()) if kind == "INSURANCE_ID" else digits(value))
             out.append(Cand(m.start("v"), m.end("v"), kind, norm, "patient"))
     for m in PAN.finditer(text):
         out.append(Cand(m.start(), m.end(), "PAN", m.group(0).upper()))
