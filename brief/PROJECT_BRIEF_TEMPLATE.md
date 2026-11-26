@@ -50,7 +50,7 @@ sanitized/  +  report.json  +  records.jsonl
 | linking precision / recall / F0.5 | `0.99 / 0.90 / 0.97` (`765/819` records linked, `1` wrong merge) |
 | re-identification risk (`scripts/risk_report.py`) | `35/49` (`71.4%`) unique on `(age_band, gender, district)`; `49/49` on `(age_band, district, adm_week, diagnosis)`; A2/A4 est. `conf >= 0.5`: `32.7%` (`10` unique / `240` registry); A5 rare+narrow-QI hits: `0/18` |
 | run time / peak memory | `6.05 s` (`dev/input`, 200 files, 819 records; Windows RSS fallback `0.0 MB`; byte-identical repeat runs & secret-keyed unlinkability verified) |
-| on data you did not tune on | `3.2%` leaked (`102/3230`), `0/4` canaries, `100.0%` medical kept (`4312/4313`) on a perturbed-label copy of `dev/input`; `38/38` `aegis.detect.selftest` cases passing |
+| on data you did not tune on | `3.2%` leaked (`102/3230`), `0/4` canaries, `100.0%` medical kept (`4312/4313`) on a perturbed-label copy of `dev/input`; `69/69` `aegis.detect.selftest` cases passing |
 
 By tuning `config/policy.yaml` (`age_band_years: 5`, `date_shift_max_days: 180`, `min_group_size: 5`, `rare_condition_threshold: 3`), standard patients retain 5-year age resolution, district geography, 3-digit PIN prefixes, and exact stay intervals, while only rare/small-cell patients sacrifice fine location and narrow age bands to block registry and known-facts re-identification.
 

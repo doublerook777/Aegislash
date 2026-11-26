@@ -88,9 +88,9 @@ Export: sanitized/ + report.json + records.jsonl (verified by final leak gate)
 | Medical values preserved | `100.0%` (`4496 / 4497`) | `check_dev.py` |
 | Patient linking (precision / recall / F0.5) | `0.99 / 0.90 / 0.97` (`765 / 819` records linked, `1` wrong merge) | `check_dev.py` |
 | Equivalence classes & A2/A4 / A5 risk | `35/49` unique on `(age_band, gender, district)`; A2/A4 est. `conf >= 0.5`: `32.7%`; A5 rare+narrow-QI hits: `0 / 18` | `scripts/risk_report.py` |
-| Unseen-label self-test (perturbed headers/keys/labels) | `3.2%` leaked (`102/3230`), `0/4` canaries, `100.0%` medical kept (`4312/4313`); `38/38` `aegis.detect.selftest` | `check_dev.py` / `selftest.py` |
+| Unseen-label self-test (perturbed headers/keys/labels) | `3.2%` leaked (`102/3230`), `0/4` canaries, `100.0%` medical kept (`4312/4313`); `69/69` `aegis.detect.selftest` | `check_dev.py` / `selftest.py` |
 | Runtime & determinism | `6.05 s` (`200` files, `819` records); byte-identical repeat runs & secret-keyed unlinkability verified | `report.json` / 3-run check |
-| Contracts & privacy unit tests | `13/13` contract cases passing; `6/6` `aegis/privacy/test_privacy.py` passing | `check_contracts.py` / `unittest` |
+| Contracts & unit tests | `13/13` contract cases passing; `14/14` `pytest` (`link` + `privacy`) passing | `check_contracts.py` / `pytest` |
 
 ## Known Limitations
 
