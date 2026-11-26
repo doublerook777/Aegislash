@@ -1,0 +1,5 @@
+claim_id,patient_name,pan_no,amount,diagnosis
+CLM-1,Gaurav Malhotra,gxlpv2692s,14500,Appendicitis
+CLM-2,Sonal Kulkarni,ywfpk4957p,22000,Fracture Femur
+CLM-3,Nitin Agarwal,AbCdE1234f,8900,Pneumonia
+CLM-4,Pooja Bansal,BNSLP8821K,12000,Dengue

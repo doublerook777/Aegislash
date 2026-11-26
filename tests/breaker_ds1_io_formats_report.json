@@ -1,0 +1,79 @@
+{
+  "schema": "raksha-report/1",
+  "files": [
+    {
+      "input_sha256": "d2d1031207fd01511275f29d55578d8f42a56ad1dad8fa0aebc6e83fc307e752",
+      "output": "sanitized/attachments/wrapped_b64_consent.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a0c76c3764933e7c2de265eba10060a5688cf13c8d8fc21559c9d98679110ace",
+      "output": "sanitized/corrupt/depth_1500_bomb.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "5e0d79c40dc99e3935291d6992e7d53af40772407656199e4b2b68bfe258031e",
+      "output": null,
+      "status": "quarantined",
+      "reason": "malformed_json"
+    },
+    {
+      "input_sha256": "53d7dda14e3f6228b9d69523f34919c7c63f452910ad97234b19581c4774c58a",
+      "output": "sanitized/fhir/bundle_query_ref.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "81abc1ec5d4a57aa990b7976cb3609d50164a4c47a87eddedf9c76956b85d9f3",
+      "output": "sanitized/lab/stream_export_jsonl.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "4f086e669b2336ee287ecf21598effd067570f800e77d45c9c1252f345a79cd6",
+      "output": "sanitized/legacy/depth_950_nested.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "2a94a590c6c0f8964a6ccd1a06d1e17fd5e6d9f25c995472a478671c05fb7ce5",
+      "output": "sanitized/legacy/mixed_delim_cp1252.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "f506a88c471775020c477fc87ffc1af9666289e486767e2b41cd4c513f26131c",
+      "output": "sanitized/notes/followup_unlabelled_tokens.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "9eadd96da74015f65fb191cac6fc863badae157f7570d3df8cab95a1e1b48d00",
+      "output": "sanitized/notes/late_binary_after_4kb.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "9d4eb9e01145a350dd3457b6a36ddd44570ea0d672de99c199f1f4b745ec9df7",
+      "output": "sanitized/opd/single_and_five_token_names.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "70cd98a5431c76171da56a2037d19dbf40b8de5a11f335165fc8e9f07a0042e9",
+      "output": "sanitized/registration/wrapped_multi_patient.json",
+      "status": "sanitized"
+    }
+  ],
+  "counts": {
+    "files_total": 11,
+    "files_sanitized": 10,
+    "files_quarantined": 1,
+    "records_processed": 13,
+    "identifiers_detected": 0,
+    "records_linked": 0,
+    "records_generalized": 0,
+    "records_suppressed": 0,
+    "records_quarantined": 0
+  },
+  "entities": {},
+  "timing": {
+    "seconds": 0.17
+  },
+  "resources": {
+    "peak_rss_mb": 0.0
+  }
+}

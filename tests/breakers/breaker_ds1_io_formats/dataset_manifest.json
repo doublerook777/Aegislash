@@ -1,0 +1,67 @@
+{
+  "schema": "raksha-dataset/1",
+  "name": "breaker_ds1_io_formats",
+  "description": "IO boundary, decoding (>4KB NUL), JSONL fallback, JSON wrapper split collapse, base64 wrapping, LeakGate limits",
+  "counts": {
+    "files": 11,
+    "units": 17,
+    "entities": 39
+  },
+  "attacks": [
+    {
+      "file": "notes/late_binary_after_4kb.txt",
+      "attack": "NUL/binary trailer injected after byte 4096",
+      "fails_because": "aegis/io/decode.py:18,28 only checks raw[:4096] for b'\\x00', so the file passes decode() instead of being quarantined."
+    },
+    {
+      "file": "lab/stream_export_jsonl.csv",
+      "attack": "JSON Lines (.jsonl) content inside a .csv file",
+      "fails_because": "formats.py:75 calls _looks_json() via single-doc json.loads -> ValueError(Extra data) -> _parse_csv breaks JSON objects across col:N using line-0 values as column headers."
+    },
+    {
+      "file": "registration/wrapped_multi_patient.json",
+      "attack": "Wrapper metadata key 'patient_export_source' collapses visits array into one doc record",
+      "fails_because": "formats.py:156 matches 'patient' in _PERSON_KEY on a scalar metadata field and returns [], merging all /visits/* rows into a single 'doc' record so per-patient linkage breaks."
+    },
+    {
+      "file": "attachments/wrapped_b64_consent.json",
+      "attack": "Data-URI prefix and 32-char newline-wrapped Base64 attachments",
+      "fails_because": "formats.py:48-54 _b64_text() uses strict _B64_RX.fullmatch(v) without stripping 'data:...;base64,' or newlines, leaving encoded PII untouched in output."
+    },
+    {
+      "file": "legacy/depth_950_nested.json",
+      "attack": "950-level nested JSON right below CPython RecursionError (~1000)",
+      "fails_because": "formats.py:88,173 relies on RecursionError instead of an explicit depth cap, so extreme nesting passes unquarantined (or hits platform-dependent recursion limits)."
+    },
+    {
+      "file": "corrupt/depth_1500_bomb.json",
+      "attack": "1500-level deeply nested JSON bomb",
+      "fails_because": "Must trigger RecursionError -> Unsupported('json_too_deep') -> quarantine; if copied raw or processed, canary leaks."
+    },
+    {
+      "file": "opd/single_and_five_token_names.csv",
+      "attack": "1-token and 5-token patient names",
+      "fails_because": "leakgate.py:52 enforces 2 <= len(toks) <= 4; both single-word names ('Sakshi') and 5-word names are silently skipped by LeakGate cross-file scrubbing."
+    },
+    {
+      "file": "notes/followup_unlabelled_tokens.txt",
+      "attack": "Unlabelled repeat of 1-token and 5-token names in narrative text",
+      "fails_because": "Even if detect catches them in CSV, LeakGate cannot propagate 1-token or 5-token names into free text."
+    },
+    {
+      "file": "legacy/mixed_delim_cp1252.csv",
+      "attack": "cp1252 CSV with 2 commas in header vs 3 semicolons per data row",
+      "fails_because": "formats.py:94-98 _sniff_delimiter checks ONLY line 0 (',' count 2 > ';' count 1), collapsing every data row into col:0 under context='id'."
+    },
+    {
+      "file": "fhir/bundle_query_ref.json",
+      "attack": "FHIR subject reference with ?_format=json query suffix",
+      "fails_because": "formats.py:296-301 _sync_fhir_refs only rewrites exact string matches in ref_map, leaving Patient/pat-901?_format=json broken or leaking old ID."
+    },
+    {
+      "file": "corrupt/xml_as_json.json",
+      "attack": "XML payload with .json extension",
+      "fails_because": "Must raise Unsupported('malformed_json') and quarantine without copying canary."
+    }
+  ]
+}

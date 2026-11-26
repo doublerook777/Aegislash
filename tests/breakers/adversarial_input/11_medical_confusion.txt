@@ -1,0 +1,7 @@
+Patient: Ramesh Gupta, 54M, referred by Dr. Suresh Patel.
+C/O chest pain, H/O diabetes (K/C/O since 2015).
+Attendant: S/O Govind Lal, ph: 9800000001.
+Vitals: BP 130/90, HR 88, SpO2 98%.
+Ward: Cardiology, Bed 7B.
+Prescribed by Dr. Anjali Sharma: Tab Metformin 500mg 1-0-1.
+Patient Wife Sunita Gupta also present, ph: 9800000002.

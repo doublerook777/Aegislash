@@ -1,0 +1,436 @@
+{
+  "schema": "raksha-truth/1",
+  "dataset": "breaker_ds2_detect_bypass",
+  "description": "Detect blindspots: lowercase PAN, slash/paren phones & STD landlines, invalid-checksum synthetic Aadhaar, unseen headers/keys, URL-encoded PII, Cyrillic homoglyphs",
+  "files": {
+    "billing/lowercase_pan_claims.csv": {
+      "path": "billing/lowercase_pan_claims.csv",
+      "expect": "sanitize",
+      "sha256": "9f64f90e933d9140b17d94641c662e5503f7e912d1c8261059fd87de1d9d5284",
+      "units": {
+        "row:0": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Gaurav Malhotra",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PAN",
+              "surface": "gxlpv2692s",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Appendicitis"
+            }
+          ]
+        },
+        "row:1": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Sonal Kulkarni",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PAN",
+              "surface": "ywfpk4957p",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Fracture Femur"
+            }
+          ]
+        },
+        "row:2": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Nitin Agarwal",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PAN",
+              "surface": "AbCdE1234f",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Pneumonia"
+            }
+          ]
+        },
+        "row:3": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Pooja Bansal",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PAN",
+              "surface": "BNSLP8821K",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Dengue"
+            }
+          ]
+        }
+      }
+    },
+    "notes/escalation_unseen_phones.txt": {
+      "path": "notes/escalation_unseen_phones.txt",
+      "expect": "sanitize",
+      "sha256": "3082b4aa9dada35bd9767017759ea2e631d74d1314c26d189feb787a616e7e1d",
+      "units": {
+        "doc": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Zulqarnain Barua",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "989/900/1122",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "0522-2418392",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "(795) 633-0006",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "+91/9788/002233",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "011-26597135",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "CANARY",
+              "surface": "CANARY_DS2_CALLER",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Acute bronchitis"
+            },
+            {
+              "text": "94%"
+            }
+          ]
+        }
+      }
+    },
+    "registration/synthetic_aadhaar_variants.csv": {
+      "path": "registration/synthetic_aadhaar_variants.csv",
+      "expect": "sanitize",
+      "sha256": "7cd460f3c958a7d8f2b777f4170223d2020f4d213f4de46cd46e92946fc494b4",
+      "units": {
+        "row:0": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Hargobind Khorana",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567-8901 2345",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "MRN",
+              "surface": "20265549",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "205264",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "CKD Stage 3"
+            }
+          ]
+        },
+        "row:1": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Vasundhara Raje",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "1234 5678 9012",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "MRN",
+              "surface": "20265550",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "226010",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Type 2 Diabetes"
+            }
+          ]
+        },
+        "row:2": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Keshav Dev",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "2345 6789 0124",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "MRN",
+              "surface": "20265551",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "241001",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Hypertension"
+            }
+          ]
+        }
+      }
+    },
+    "misc/unscanned_json_keys.json": {
+      "path": "misc/unscanned_json_keys.json",
+      "expect": "sanitize",
+      "sha256": "82bedd00929408eb34e3e1e08d4906eb050aeb7340337dd56f29bc82e51866cc",
+      "units": {
+        "doc": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Firdaus Chagla",
+              "script": "latin",
+              "channel": "key"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Brijmohan Lal",
+              "script": "latin",
+              "channel": "key"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Zubair Shaikh",
+              "script": "latin",
+              "channel": "key"
+            },
+            {
+              "type": "MRN",
+              "surface": "20267711",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "CANARY",
+              "surface": "CANARY_DS2_KEY1",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Sepsis"
+            },
+            {
+              "text": "Insulin Glargine"
+            }
+          ]
+        }
+      }
+    },
+    "notes/url_homoglyph_medical_trap.txt": {
+      "path": "notes/url_homoglyph_medical_trap.txt",
+      "expect": "sanitize",
+      "sha256": "cbc3263cea311ce9b2aaeed7c6e4e873b76f2715e10341bff6687a89d94b8955",
+      "units": {
+        "doc": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Rukhsana_Bhattacharya",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9876543210",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Rаmesh Shаrmа",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Suresh Pandey",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Dr. Suresh Pandey"
+            },
+            {
+              "text": "Parkinson's disease"
+            },
+            {
+              "text": "Wilson's"
+            },
+            {
+              "text": "134/82"
+            }
+          ]
+        }
+      }
+    },
+    "opd/deva_digits_and_doctor_col.csv": {
+      "path": "opd/deva_digits_and_doctor_col.csv",
+      "expect": "sanitize",
+      "sha256": "89bebcd4835aa910ff0be80f370c8c29f574f76a03240fe89ad02c88d01f712e",
+      "units": {
+        "row:0": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "कमला देवी",
+              "script": "deva",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "९८७/६५४/३२१०",
+              "script": "deva",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Dr. Arvind Mehta"
+            },
+            {
+              "text": "COPD"
+            }
+          ]
+        },
+        "row:1": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "रामेश्वर यादव",
+              "script": "deva",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "९८११२२३३४४",
+              "script": "deva",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Thyroiditis"
+            }
+          ]
+        },
+        "row:2": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "मीना कुमारी",
+              "script": "deva",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "९९००११२२३३",
+              "script": "deva",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Asthma"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

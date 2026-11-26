@@ -1,0 +1,15 @@
+{
+  "ward": "Cardiology",
+  "patients": {
+    "Shahid_Khan_MRN001": {
+      "age": 34,
+      "bp": "120/80",
+      "dx": "Diabetes"
+    },
+    "Zubair_Hussain_MRN002": {
+      "age": 45,
+      "bp": "140/90",
+      "dx": "CKD"
+    }
+  }
+}
