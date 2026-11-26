@@ -81,13 +81,17 @@ Assumptions:
 |---|---|---|---|---|
 | io | Member-1 | calls detect, link, privacy | real (`aegis/io/`); runs end-to-end on the 3 mocks, CONTRACT OK, READY TO SUBMIT | 2026-11-26 |
 | detect | Member-2 | contracts/detect.md | mocked | 2026-11-26 |
-| link | Member-3 | contracts/link.md | mocked (`pseudonym` real) | 2026-11-26 |
-| privacy | Member-4 | contracts/privacy.md | real (`aegis/privacy/`, `config/policy.yaml`, `scripts/risk_report.py`, `README.md`, `brief/`); unit + contract tests pass; awaiting team merge for full-pipeline metrics | 2026-11-26 |
+| link | Member-3 | contracts/link.md | real (`aegis/link/`) | 2026-11-26 |
+| privacy | Member-4 | contracts/privacy.md | real (`aegis/privacy/`, `config/policy.yaml`, `scripts/risk_report.py`, `README.md`, `brief/`); unit + contract tests pass; awaiting `detect` merge for full-pipeline metrics | 2026-11-26 |
 
 io notes (2026-11-26):
 - Done: two-pass pipeline, decoding (BOM/UTF-16 incl. BOM-less/cp1252/corrupt UTF-8), CSV/TSV (delimiter sniff), JSON-behind-.csv, deep JSON, record splitting matching truth locators, base64 attachments, JSON type restore, key/header/file renames, leak gate, report/records. Verified with a truth-based fake detector (test only, not in repo): 0/3230 leaks, 4855/4855 medical kept, 0 structure mismatches, deterministic; 2,000 files in 1.7 s / 241 MB.
 - Next: swap in real detect/link/privacy as they land; re-run `check_dev.py`.
 - Contract notes (no shape change): (1) io decodes whole-string base64 JSON leaves (FHIR attachments) and gives detect the decoded text; it re-encodes on write. (2) `keys` passed to `privacy.plan` has no entries for `@file` records (link never sees them): use `keys.get`. (3) For single-document files, `@file` findings (file name) are passed to `privacy.replace` with the document's `record_id`, so the file name gets the patient's PSN. (4) A JSON top-level array counts as records only when its elements carry person fields (patient/uhid/name/...) and the top level has no subject of its own (matches truth locators).
+
+link notes (2026-11-26):
+- Done: cross-script Hindi-aware Devanagari/IAST/Latin normalizer (`aegis/link/normalize.py`), two-phase blocker/clustering linker (`aegis/link/resolver.py`) with strong IDs, Name+DOB, Name+Relative, Name+Village+Age±1, uniqueness gating, and anti-over-merge invariants; wired into `aegis/link/__init__.py`.
+- Next: re-measure `check_dev.py` once real `detect` (Member-2) lands.
 
 ## Open questions
 Format: what I'm unsure about | why it matters | options | recommended default | owner to answer
