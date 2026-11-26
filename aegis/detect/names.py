@@ -270,9 +270,18 @@ _STRICT_CUES.append((re.compile(rf"(?<![A-Za-z])(?i:ptn|pt|patient|subj(?:ect)?|
 _STRICT_CUES.append((re.compile(rf"(?<![A-Za-z])(?i:caller|callee) *[:=] *(?P<name>{_FULL})"), "relative"))
 # Action-cue person patterns across English, Hinglish, and Devanagari Hindi (handles 1-word & unlisted names)
 _CLAUSE_START = r"(?:^|\n|[।.!?]\s+|:\s+|,\s+|\b(?:and|aur)\s+|(?:और|तथा)\s+)"
+# A verb alone is not enough: reports are also "verified" and "signed", and insurance "expired". The words after
+# the verb must be something that only happens to, or is done by, a person.
+_PERSON_DOES = (
+    r"discharged +(?:home|on request|against|from (?:the )?(?:hospital|ward)|in +(?:a +)?(?:[a-z]+ +)?condition)"
+    r"|took discharge|absconded"
+    r"|(?:signed|verified) +(?:(?:the|a|his|her) +)?(?:[a-z]+ +){0,2}(?:consent|form|bond|undertaking|declaration|bill|identity|signature|address)"
+    r"|called +(?:up|back|to +(?:ask|enquire|inquire|inform|confirm|request))"
+    r"|expired +(?:despite|during +(?:treatment|admission))"
+)
 _ACTION_CUES: list[tuple[re.Pattern, str]] = [(re.compile(p), role) for p, role in (
     # English clinical subject-verb: "Satyendra discharged in stable condition", "Priyanka signed the surgical consent form"
-    (rf"{_CLAUSE_START}(?P<name>{_ONE_OR_MORE}) +(?:was )?(?:discharged|took discharge|signed(?: the)?|verified(?: the)?|called(?: on)?|absconded|expired)\b", "patient"),
+    (rf"{_CLAUSE_START}(?P<name>{_ONE_OR_MORE}) +(?:was )?(?:{_PERSON_DOES})\b", "patient"),
     # English person-object cues: "given to Devika", "Follow up with Pema Choden", "Co-admitted: Devika Rao"
     (rf"(?:\b(?i:given to|handed over to|handover to|follow[- ]?up with|spoke (?:to|with)|discussed with|verified by|co-admitted)\s*[:\-]?\s*)(?P<name>{_ONE_OR_MORE})", "patient"),
     # Hinglish action cues: "Satyendra ko chhutti mili", "Priyanka ne sign kiya"
@@ -285,6 +294,7 @@ _NEVER_IN_NAME = frozenset("under to into via through with without after before 
 _PRONOUNS = frozenset("""
 he she they we i you it who this that these those someone anyone everyone nobody somebody anybody everybody
 both all none each other another there here
+child baby infant neonate boy girl male female man woman lady gentleman
 woh wo yeh ye unhone inhone maine humne koi sabhi वह यह उन्होंने इन्होंने मैंने हमने कोई सभी
 """.split())
 
@@ -293,7 +303,9 @@ def _valid_action_name(raw: str) -> bool:
     words = [w.strip(".,").casefold() for w in raw.split()]
     if not words or any(w in (STOP - {"asha"}) | ORG | _NEVER_IN_NAME | _PRONOUNS for w in words):
         return False
-    return True
+    # "Repeat CBC": a lab or test short form next to ordinary words is not a name
+    shouted = [w.isascii() and len(w.strip(".")) > 1 and w.strip(".").isupper() for w in raw.split()]
+    return not any(shouted) or all(shouted)
 
 
 def _strict_names(text: str) -> list[Cand]:

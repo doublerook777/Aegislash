@@ -140,7 +140,8 @@ def _guess_role(vals: list[str]) -> str | None:
         return "pin"
     if all(re.fullmatch(r"(?:19[1-9]\d|20[0-2]\d)", v.strip()) for v in vals):
         yrs = [int(v.strip()) for v in vals]
-        if max(yrs) - min(yrs) >= 5 or any(y < 2015 for y in yrs):
+        # diagnosis, admission or follow-up years are recent and close together; patients' birth years are not
+        if max(yrs) - min(yrs) >= 10 and sorted(yrs)[len(yrs) // 2] < 1995:
             return "dob"
     # addresses: most values carry a house number, landmark or PIN together with a comma
     addresses = [v for v in vals if "," in v and any(c.type in ("HOUSE", "LANDMARK", "LOCALITY", "PIN")
@@ -260,7 +261,26 @@ def _looks_like_person(key: str) -> bool:
     return not set(key.casefold().split()) & (names.STOP | gazetteer.NOT_A_PERSON_WORDS)
 
 
-def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
+# labels that say the value beside them is a person; classify() gives these no role of its own
+_PERSON_CLUES = frozenset("reviewer reviewers verifier signatory witness nominee informant attendant escort guardian "
+                          "kin spouse mother mothers father fathers maiden caller callee contact person".split())
+
+
+def _person_labels(by_path: dict[str, str]) -> set[str]:
+    """Paths whose own key, or the label paired with them ({"url": ".../mothers-maiden-name", "valueString": X}),
+    points at a person."""
+    out = set()
+    for path in by_path:
+        holder, _, key = path.rpartition("/")
+        labels = [key]
+        if _PAIR_VALUE.match(key):
+            labels += [re.split(r"[/#]", by_path.get(f"{holder}/{k}", "").rstrip("/"))[-1] for k in _PAIR_LABEL]
+        if any(set(tokens(label)) & _PERSON_CLUES for label in labels):
+            out.add(path)
+    return out
+
+
+def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False) -> list[Cand]:
     text = fold(f["value"])
     kind = f["kind"]
     label, parents = ("", ())
@@ -305,7 +325,7 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
             found += fields.name_value(text, 0, len(text), "name")
         elif (_is_lookup_table(holder) or not holder) and _looks_like_person(text):
             found += fields.name_value(text, 0, len(text), "name")
-    elif kind == "value" and role is None and not f["path"].startswith("col:"):
+    elif kind == "value" and role is None and person_label:
         if not any(classify(k) in ("doctor", "keep") for k in (label, *parents)):
             found += gazetteer.find_unlisted_person(text, names.STOP)
     found += _conditions(text, role, label, parents)
@@ -453,11 +473,12 @@ def _detect(records: list[Record]) -> list[RecordResult]:
                if f["kind"] == "header" or f["path"].startswith("col:")]
     dmy = dates.day_first(texts, list(dict.fromkeys(headers)))
 
+    people = _person_labels({f["path"]: f["value"] for r in records for f in r["fields"] if f["path"].startswith("/")})
     per_field = {}
     for r in records:
         for f in r["fields"]:
             key = (r["record_id"], f["path"])
-            per_field[key] = (fold(f["value"]), candidates(f, roles.get(key), dmy))
+            per_field[key] = (fold(f["value"]), candidates(f, roles.get(key), dmy, f["path"] in people))
     _propagate(records, per_field)
 
     out: list[RecordResult] = []

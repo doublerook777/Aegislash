@@ -15,11 +15,23 @@ _R = r"(?![A-Za-z0-9])"    # right boundary
 
 EMAIL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
 # Scrubadub-inspired obfuscated email ("ramesh at gmail dot com")
+_DOT = r"(?:\.|\s+dot\s+)"    # "gmail.com" or "gmail dot com", never "home. In"
 EMAIL_OBF = re.compile(
-    r"\b[A-Za-z0-9][A-Za-z0-9._+-]{1,40}\s+at\s+[A-Za-z0-9-]+(?:\s*(?:\.|dot)\s*[A-Za-z0-9-]+)*"
-    r"\s*(?:\.|dot)\s*(?:com|in|org|net|edu|gov|co|io|info|biz)\b",
+    r"\b(?P<user>[A-Za-z0-9][A-Za-z0-9._+-]{1,40})\s+at\s+(?P<host>[A-Za-z0-9-]+(?:" + _DOT + r"[A-Za-z0-9-]+)*)"
+    + _DOT + r"(?P<end>com|in|org|net|edu|gov|co|io|info|biz)\b",
     re.I,
 )
+_MAIL_HOSTS = re.compile(r"^(?:gmail|yahoo|outlook|hotmail|rediffmail|protonmail|icloud)\b|\b(?:co|ac|gov|nic|org|net)$", re.I)
+
+
+def _looks_like_email(m: re.Match) -> bool:
+    user = m.group("user")
+    if not re.search(r"[A-Za-z]", user):
+        return False                       # "Seen at 10 at ..."
+    # "in" is also an English word: ask for a user name or a mail host that ordinary text would not have
+    return m.group("end").casefold() != "in" or bool(re.search(r"[._0-9+]", user) or _MAIL_HOSTS.search(m.group("host")))
+
+
 ABHA_ADDR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._]*@(?:abdm|sbx|ndhm|abha)" + _R, re.I)
 ABHA_NUM = re.compile(_L + r"\d{2}([- ])\d{4}\1\d{4}\1\d{4}(?!\d)")
 AADHAAR_MASKED = re.compile(r"(?<![A-Za-z0-9])(?:[Xx*•]{4}[- ]?){2}\d{4}(?!\d)")
@@ -110,8 +122,10 @@ def find_ids(text: str) -> list[Cand]:
         end = m.end() - 1 if m.group(0).endswith(".") else m.end()
         out.append(Cand(m.start(), end, "EMAIL", text[m.start():end].casefold()))
     for m in EMAIL_OBF.finditer(text):
+        if not _looks_like_email(m):
+            continue
         norm_em = re.sub(r"\s+at\s+", "@", m.group(0).casefold())
-        norm_em = re.sub(r"\s*(?:\.|dot)\s*", ".", norm_em)
+        norm_em = re.sub(r"\s+dot\s+", ".", norm_em)
         out.append(Cand(m.start(), m.end(), "EMAIL", norm_em))
     for m in ABHA_NUM.finditer(text):
         out.append(Cand(m.start(), m.end(), "ABHA_NUMBER", digits(m.group(0))))
