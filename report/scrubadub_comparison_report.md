@@ -153,8 +153,12 @@ The numbers below are from `main` with all four, on Linux, `RAKSHA_SECRET=practi
 \*Section 2 numbers (before #17), as section 6 did not rerun `tests/adversarial`.
 
 - `dev/input` sanitized output and `records.jsonl` are byte-identical to `8d1e5ce` (after #15) and to every merge since, and two runs are byte-identical.
-- The remaining canaries in `ds1`, `ds2` and `ds3` are marker words (`CANARY_DS1_*` and so on) that the checker counts; they are not personal data.
-- **Medical kept** here is the end-to-end figure from `check_dev.py`; the detect-level figures in sections 2 and 6 (for example 19 / 19 on `ds2`) count only what detect leaves untouched. The one value lost on `dev`, and those on `adversarial` and `ds2`, were not investigated for this section.
+- The remaining canaries in `ds2` and `ds3` are marker words (`CANARY_DS2_*`, `CANARY_DS3_*`), not personal data. The two in `ds1` are not all harmless:
+  `CANARY_DS1_B64URI` is a marker word inside the decoded consent text and is written back inside the base64, but `CANARY_DS1_LATEBIN` is in
+  `notes/late_binary_after_4kb.txt`, a file with NUL bytes after byte 4,096 that is **exported instead of quarantined** (the audit in
+  `report/vulnerability_audit_report.md`, V8, is right). Officially each canary found costs -3.
+- **Medical kept** here is the end-to-end figure from `check_dev.py`; the detect-level figures in sections 2 and 6 (for example 19 / 19 on `ds2`) count only what detect leaves untouched. The one value lost on `ds2` is `Dr. Suresh Pandey`: detect protects it, then the leak gate overwrites it to `Dr. [REDACTED]` because the same note also has a patient
+  called Suresh Pandey (audit V11). The values lost on `dev` and `adversarial` were not investigated for this section.
 - **Linking on `ds1` and `ds2`** shows 0.00 because the checker has no pair to score: `ds1` has five patients who each appear once, and `ds2` has no units that need linking. It is not a regression.
 - Self-test 129 / 129, contracts 13 / 13, pytest 50 passed, `CONTRACT OK` on every set. Time and memory on `dev/input` are unchanged (about 6.3 s, 67 MB).
 
