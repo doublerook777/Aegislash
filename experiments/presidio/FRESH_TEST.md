@@ -2,6 +2,10 @@
 
 Date: 2026-11-26. Detector: `aegis/` as at commit `8553c85` (unchanged). Nothing was fixed.
 
+**Update:** `main` later gained changes that already fix `Kin.Ref` and the 3 landline misses. The header,
+`h.no` and `r/o` fixes are on branch `detect/header-value-check`. They have **no unseen result**: a new
+batch could not be written because the `agy` worker ran out of quota. The text below describes `8553c85`.
+
 ## Short answer
 
 - On new text we covered **88.7%** of personal data in single lines and **87.2%** in table exports.
