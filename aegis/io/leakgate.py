@@ -11,6 +11,9 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from aegis.detect.normalize import decode_view
+from aegis.io.formats import find_runs
+
 DIGIT_TYPES = ("PHONE", "AADHAAR", "ABHA_NUMBER", "MRN", "INSURANCE_ID", "OTHER_ID")
 LITERAL_TYPES = ("EMAIL", "PAN", "ABHA_ADDRESS", "INSURANCE_ID", "OTHER_ID")
 NAME_TYPES = ("PATIENT_NAME", "RELATIVE_NAME")
@@ -18,8 +21,6 @@ NAME_TYPES = ("PATIENT_NAME", "RELATIVE_NAME")
 _DIGIT_RUN = re.compile(r"(?<![0-9०-९])[0-9०-९](?:[0-9०-९]|[ \-./](?=[0-9०-९])){4,}")
 # a word is letters/digits/Devanagari; "_" separates words ("Agustín_Fonseca" in a file name is two words)
 _TOKEN = re.compile(r"(?:[^\W_]|[ऀ-ॿ])+")
-# "%20", "%5C", "%2B" ...: an escaped space or punctuation mark also separates words ("Priyanka%20Sengupta")
-_PCT_SEP = re.compile(r"%(?:[2][0-9A-Fa-f]|3[AaBbCcDdEeFf]|40|5[BbCcDdEeFf]|60|7[BbCcDdEe])")
 _DEVA_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
 REDACTED = "[REDACTED]"
 
@@ -30,11 +31,6 @@ def _fold(s: str) -> str:
 
 def _digits(s: str) -> str:
     return "".join(c for c in s.translate(_DEVA_DIGITS) if c.isdigit())
-
-
-def _unescaped(s: str) -> str:
-    """Same length as `s`: escaped separators ("%20") become spaces, so offsets still match the original."""
-    return _PCT_SEP.sub("   ", s) if "%" in s else s
 
 
 class LeakGate:
@@ -54,11 +50,11 @@ class LeakGate:
             if len(t) >= 6 and not t.isdigit():
                 self.literals.add(t)
         if ftype in NAME_TYPES:
-            toks = tuple(_fold(m.group(0)) for m in _TOKEN.finditer(_unescaped(text)))
+            toks = tuple(_fold(m.group(0)) for m in _TOKEN.finditer(decode_view(text)[0]))
             if 2 <= len(toks) <= 4 and sum(map(len, toks)) >= 6:
                 self.names.add(toks)
                 # "Fonseca, Agustín" (surname first) is also written "Agustín Fonseca"
-                last, comma, given = _unescaped(text).partition(",")
+                last, comma, given = decode_view(text)[0].partition(",")
                 if comma:
                     rest = tuple(_fold(m.group(0)) for m in _TOKEN.finditer(given))
                     head = tuple(_fold(m.group(0)) for m in _TOKEN.finditer(last))
@@ -75,32 +71,40 @@ class LeakGate:
         return d in self.digits or (len(d) > 10 and d[-10:] in self.digits) or (len(d) > 6 and d[-6:] in self.digits and len(d) <= 8)
 
     def scrub(self, value: str) -> str:
-        """Return value with every known identifier replaced."""
+        """Return value with every known identifier replaced. Escapes ("%20", "\\u0932", "&#2354;") are read first and a
+        hit is replaced as a whole, escape sequences included."""
         if not value:
             return value
         out = value
         if self.digits:
-            out = self._scrub_digits(out)
+            out = self._replace(out, self._digit_spans)
         if self._literal_rx is not None:
-            out = self._literal_rx.sub(lambda m: self._count(REDACTED), out)
+            out = self._replace(out, lambda t: [m.span() for m in self._literal_rx.finditer(t)])
         if self.names:
-            out = self._scrub_names(out)
+            out = self._replace(out, self._name_spans)
         return out
 
-    def _digit_spans(self, value: str) -> list[tuple[int, int]]:
-        return [m.span() for m in _DIGIT_RUN.finditer(_unescaped(value)) if self._digit_hit(m.group(0))]
-
-    def _scrub_digits(self, value: str) -> str:
-        for s, e in reversed(self._digit_spans(value)):
-            value = value[:s] + self._count(REDACTED) + value[e:]
+    def _replace(self, value: str, find) -> str:
+        text, spans = decode_view(value)
+        found = find(text)
+        if not found:
+            return value
+        if spans is not None:
+            found = [(spans[s][0], spans[e - 1][1]) for s, e in found]
+        last = len(value) + 1
+        for s, e in reversed(found):
+            if e > last:
+                continue
+            value = value[:s] + REDACTED + value[e:]
+            last = s
+            self.hits += 1
         return value
 
-    def _count(self, s: str) -> str:
-        self.hits += 1
-        return s
+    def _digit_spans(self, text: str) -> list[tuple[int, int]]:
+        return [m.span() for m in _DIGIT_RUN.finditer(text) if self._digit_hit(m.group(0))]
 
-    def _scrub_names(self, value: str) -> str:
-        toks = [(m.start(), m.end(), _fold(m.group(0))) for m in _TOKEN.finditer(_unescaped(value))]
+    def _name_spans(self, text: str) -> list[tuple[int, int]]:
+        toks = [(m.start(), m.end(), _fold(m.group(0))) for m in _TOKEN.finditer(text)]
         spans, i = [], 0
         while i < len(toks):
             for n in (4, 3, 2):
@@ -110,20 +114,16 @@ class LeakGate:
                     break
             else:
                 i += 1
-        for s, e in reversed(spans):
-            value = value[:s] + REDACTED + value[e:]
-            self.hits += 1
-        return value
+        return spans
 
     # ------------------------------------------------------------------ verification
     def contains_leak(self, text: str) -> bool:
-        if self.digits and self._digit_spans(text):
+        """True when a known identifier is in `text`, also inside escapes and inside a base64 run of readable text."""
+        view = decode_view(text)[0]
+        if self.digits and self._digit_spans(view):
             return True
-        if self._literal_rx is not None and self._literal_rx.search(text):
+        if self._literal_rx is not None and self._literal_rx.search(view):
             return True
-        if self.names:
-            before = self.hits
-            scrubbed = self._scrub_names(text)
-            self.hits = before
-            return scrubbed != text
-        return False
+        if self.names and self._name_spans(view):
+            return True
+        return any(self.contains_leak(dec) for _a, _b, dec, _f in find_runs(text))

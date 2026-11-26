@@ -28,7 +28,7 @@ Contract it provides: [detect](../../contracts/detect.md). Shapes: [types](../..
 | `address.py` | house, locality, landmark, village, district, PIN |
 | `names.py` | name cues in free text, protected spans, medical / stop words |
 | `gazetteer.py` | surname list and the rules for a name with no cue; `looks_like_person_cell` (whole-column check) |
-| `normalize.py` | Devanagari digits, Devanagari -> Latin |
+| `normalize.py` | Devanagari digits, Devanagari -> Latin, `decode_view` (URL escapes, `\uXXXX`, HTML entities with a position map) |
 | `evidence.py` | identity clues for `link` |
 | `spans.py` | candidate type and overlap priority |
 | `selftest.py` | made-up cases not from practice data (never imported by `main.py`) |
@@ -215,3 +215,15 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   lowercase names with an unlisted surname; a person used as a JSON key outside the tables above;
    a zero-width character used in place of the space between two names.
 3. The 1 lost medical value and 1 wrong merge on practice data (find which module causes each).
+
+## Hidden payloads, R2b (2026-11-27, branch of `judge/integration`)
+- **Escapes written out in text are read.** `engine._view` now uses `normalize.decode_view`: `%XX` (as before), `\uXXXX` / `\u{...}`
+  (surrogate pairs joined; control characters left alone) and HTML entities (`&amp;`, `&#74;`, `&#x4A;`), up to three layers
+  (`%5Cu0932`). Each character of the decoded text remembers the stretch of the original it came from, so a finding covers the
+  whole escaped name and `start`/`end`/`text` still point into the original value. `unquote_view` is unchanged in behaviour.
+- **Base64 inside a value is done by io**, not here: io hands detect the decoded text as a field of its own
+  (`<path>#b64:<n>`; the engine reads such a JSON path like its parent key, `_segments`), so roles, cues and propagation work on it.
+- **A cue word followed by a Devanagari name** (`attendant लता बैरवा`, `informed by ...`): `names._cue` with `_DEVA_FUNCTION` (Hindi
+  function words such as `के`, `को`, `साथ` are not names). Before, only the Latin name after a cue was found.
+- Checks: selftest 184/184 (6 new cases, 4 of them fail before); committed sets: outputs byte-identical to the base, no run
+  found in any of the 268 parseable committed input files (no false positive from the base64 rule).

@@ -17,7 +17,7 @@ import re
 
 from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
 from aegis.detect.labels import category_column, classify, extra_checks, names_a_relative, tokens
-from aegis.detect.normalize import DEVA, fold, norm_name, unquote_view, visible
+from aegis.detect.normalize import DEVA, decode_view, fold, norm_name, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
 from aegis.types import DIRECT_TYPES, QUASI_TYPES, STRONG_ID_TYPES, Record, RecordResult, empty_evidence
 
@@ -34,7 +34,8 @@ _NAME_LABEL_WORDS = frozenset(("name", "naam", "nm", "नाम"))
 # ---------------------------------------------------------------- 1. roles
 
 def _segments(path: str) -> list[str]:
-    return [p.replace("~1", "/").replace("~0", "~") for p in path.split("/")[1:]]
+    # "/note#b64:0" is the text inside a base64 run of "/note" (made by io): it reads like its parent field
+    return [p.replace("~1", "/").replace("~0", "~") for p in path.partition("#b64:")[0].split("/")[1:]]
 
 
 def _json_label(path: str) -> tuple[str, tuple[str, ...]]:
@@ -493,19 +494,19 @@ def _propagate(records: list[Record], per_field: dict) -> None:
 # ---------------------------------------------------------------- 4. results
 
 def _view(value: str) -> tuple[str, list[tuple[int, int]] | None]:
-    """The text detect reads: hidden characters removed and URL escapes decoded. For each of its characters, the
-    (start, end) it covers in `value` (None: the text is unchanged)."""
+    """The text detect reads: hidden characters removed and URL escapes, "\\uXXXX" sequences and HTML entities
+    decoded. For each of its characters, the (start, end) it covers in `value` (None: the text is unchanged)."""
     text, kept = visible(value)
     spans = None if kept is None else [(k, k + 1) for k in kept]
-    text, inner = unquote_view(text)
+    text, inner = decode_view(text)
     if inner is not None:
         spans = inner if spans is None else [(spans[s][0], spans[e - 1][1]) for s, e in inner]
     return text, spans
 
 
 def detect_file(records: list[Record]) -> list[RecordResult]:
-    """Hidden characters are removed and URL escapes decoded before detection; findings point back into the
-    original values."""
+    """Hidden characters are removed and URL escapes, \\uXXXX sequences and HTML entities decoded before detection;
+    findings point back into the original values."""
     originals: dict[tuple[str, str], tuple[str, list[tuple[int, int]]]] = {}
     cleaned = []
     for r in records:

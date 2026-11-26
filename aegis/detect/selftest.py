@@ -12,6 +12,8 @@ import sys
 
 from aegis.detect import detect_file
 
+_BS = chr(92)
+
 # (line, strings that MUST be found, strings that MUST survive)
 CASES = [
     # medical and staff text that only looks like a name
@@ -163,6 +165,17 @@ CASES = [
      ["Ra\u200bhul\u200d Chatur\u200bvedi", "73053\u200b31651", "Dеvikа Rаo"], []),
     ("URL ref: https://portal.example/view?patient=Priyanka%20Sengupta&tel=%2B91%207759130735",
      ["Priyanka%20Sengupta", "%2B91%207759130735"], []),
+    # escapes written out as text: "\uXXXX" sequences and HTML entities (the whole escaped name is the finding)
+    (f"Attendant: {_BS}u0053unita Mishra, tel {_BS}u0039811100041, Tab Telmisartan 40 mg OD.",
+     [f"{_BS}u0053unita Mishra", f"{_BS}u0039811100041"], ["Telmisartan 40 mg"]),
+    ("Attendant: &#83;unita Mishra &amp; son, BP 142/90 &amp; HR 78, Tab Amlodipine 5 mg &lt; 6 weeks.",
+     ["&#83;unita Mishra"], ["142/90", "Amlodipine 5 mg"]),
+    ("attendant " + "".join(f"{_BS}u{ord(c):04x}" if ord(c) > 127 else c for c in "लता बैरवा आयी"),
+     ["".join(f"{_BS}u{ord(c):04x}" for c in "लता")], []),
+    ("Drip 5%DEXTROSE at 40%20 ml/hr, folder C:" + _BS + "users" + _BS + "x, e.g. R&D; team.", [], ["5%DEXTROSE", "users", "R&D;"]),
+    # a cue word in an English line followed by a name written in Devanagari; Hindi function words are not names
+    ("attendant लता बैरवा came with her", ["लता बैरवा"], []),
+    ("wife के साथ आये, father को sugar है", [], ["के साथ"]),
     ("Satyendra discharged in stable condition on Tab Azithromycin 500 mg.",
      ["Satyendra"], ["Azithromycin 500 mg"]),
     ("Priyanka ne sign kiya aur Rohan ko chhutti mili; BP 120/80.",

@@ -186,6 +186,10 @@ _cue(rf"(?<![A-Za-z/])(?i:[fmg]/o)\b[.:]? *(?:(?:{_TITLE}|Baby) )?(?P<name>{LATI
 # "Attendant: X", "called by X", "witnessed by X"
 _cue(rf"\b(?i:{_PERSON_WORD}|informed by|called by|witnessed by|accompanied by|brought by|raised by|reported by)"
      rf"(?: *\([^)\n]{{0,30}}\))?(?:\s*[:\-] *| +)(?P<name>{LATIN_NAME})", "relative")
+# the same cue words in an English line followed by a name written in Devanagari ("attendant <name>")
+_DEVA_FUNCTION = r"(?:के|का|की|को|से|ने|में|पर|है|हैं|था|थे|और|साथ|नहीं|भी|ही|तक|यह|वह)(?![ऀ-ॿ])"
+_cue(rf"\b(?i:{_PERSON_WORD}|informed by|called by|witnessed by|accompanied by|brought by|reported by)"
+     rf"(?:\s*[:\-] *| +)(?!{_DEVA_FUNCTION})(?P<name>{DEVA_NAME})", "relative")
 _cue(rf"(?P<name>{LATIN_NAME})'s +(?i:{_PERSON_WORD})", "patient")
 _cue(rf"(?P<name>{LATIN_NAME}) *\( *(?i:{_PERSON_WORD})", "relative")
 # More family words, and "<relation> = <name>". Kept apart from the cue above, so that the first-word check below can
