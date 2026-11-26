@@ -162,3 +162,64 @@ unshare -rn .venv/bin/python -B fresh_causes.py fresh          # the one-change-
 
 The cases are invented. The worker's original copy is in its clone under `holdout4/` (untracked).
 Because the worker can read that folder, do not treat it as blind if it is later asked to fix these misses.
+
+---
+
+# Second fresh test (batch 5, 2026-11-27)
+
+**Everything above is about batch 4.** This section was written from counts only: **no batch 5 case text or failure
+has been read by the person who wrote the fixes.**
+
+## How it was kept blind
+- Writer: a new Claude agent (the same model as the author of the fixes) that did not get the conversation. It got the
+  task (`fresh_task.md`, plus its folder path, a no-web rule and "do not quote cases in your reply") and an empty folder.
+- Its tool log shows writes and commands only in that folder, and no outside paths in tool inputs. Claude Code gave it
+  git details automatically at startup: the branch, one untracked file name, five commit titles and the repository
+  name. The titles show that earlier tests existed, not rules, failures or fixes.
+- Versions and scorer were fixed before the writer started. Scored once, offline, with `score_versions.sh`.
+- SHA-256 starts: `lines.jsonl` `6658c3ec`, `files.jsonl` `cfd99cdc`.
+- **Limits:** one writer and one batch; the same model as me, so it may share my blind spots. **Labels have not been
+  checked.** The writer said it left "Dr" out of doctor strings, usually put cities, districts and non-doctor staff in
+  neither list, and edited some of its own address values and one name before finishing.
+
+## Results
+
+| | `a7faabf` | `c05e814` (my fixes) | `cb90eb4` | `main` `3e8818d` |
+|---|---|---|---|---|
+| Lines: personal data covered (121) | 53.7% | 53.7% | 53.7% | **53.7%** |
+| Lines: medical / staff text kept (76) | 98.7% | 98.7% | 98.7% | **98.7%** |
+| Exports: personal data covered (513) | 71.0% | 71.0% | 71.0% | **71.0%** |
+| Exports: medical / staff text kept (237) | 99.6% | 99.6% | 99.6% | **99.6%** |
+
+95% range from resampling cases: lines 44-62%, exports 57-83%.
+
+## What it says about the fixes: nothing either way
+`a7faabf` and `c05e814` produce **identical findings on every case**. The batch hardly contains what the fixes are for:
+
+| Situation | Batch 4 | Batch 5 |
+|---|---|---|
+| lowercase `h.no` / `hno` | 8 | 0 |
+| `r/o` | 1 | 1 |
+| address cell under a "pin" header | 42 | 0 |
+| header mixing patient with ward / bed | 6 | 0 |
+| value starting with a bed / ward number | 6 | 0 |
+
+So the fixes still have **no evidence of helping on unseen data**. They changed nothing here, good or bad.
+(`cb90eb4` and `main` differ from `a7faabf` in the findings of one case, with no change to any scored item.)
+
+## What it says about detect: much weaker than batch 4 suggested
+The same `main` scores 92.0% / 99.0% on batch 4 (seen) and 53.7% / 71.0% here. Batch 4's first, unseen score on older
+code was 88.7% / 87.2%. The batches have different writers, so this does **not** mean detect got worse. It means
+**one batch is a poor estimate**: the result depends heavily on who wrote the cases. Earlier figures (README 82-85%,
+batch 4 about 88%) should not be quoted as what to expect.
+
+Values made only of words (names or places; the counts cannot tell which) are most of the misses: 39 of 56 in lines
+and 106 of 149 in exports. Finding causes needs reading the failures. After that, batch 5 is "seen".
+
+## Rerun
+```bash
+bash experiments/presidio/score_versions.sh experiments/presidio/fresh5 a7faabf c05e814 cb90eb4 3e8818d
+cd experiments/presidio && unshare -rn .venv/bin/python -B compare_blind.py fresh5 a7faabf c05e814 cb90eb4 3e8818d
+python3 -I count_fix_formats.py fresh5
+```
+
