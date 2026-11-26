@@ -62,6 +62,17 @@ def extra_checks(label: str) -> str | None:
         return "student"
     return None
 _PLACE_IN_HOSPITAL = _words("ward bed")
+# headers of columns that hold a category, trade or place, never a person: the values of an otherwise unknown
+# column are not read as a column of names under one of these
+_CATEGORY = _words("occupation job profession employer religion caste community language scheme category class source "
+                   "mode reason outcome institution school branch speciality specialty cadre designation role title "
+                   "nationality ethnicity education qualification relation relationship place location city town "
+                   "region origin destination remark remarks medication medicine drug drugs diagnosis disease symptom "
+                   "symptoms complaint treatment procedure advice investigation")
+
+
+def category_column(label: str) -> bool:
+    return bool(set(tokens(label)) & (_CATEGORY | _KEEP | _NOT_PERSON | _DOCTOR | _AREA))
 _CONTACT = _words("contact contacts caller")
 _NOT_MRN = _words("visit bill invoice sample claim policy ticket trip report order txn receipt encounter")
 _FREE = _words("notes note remarks remark comment comments complaints complaint history narrative advice summary")

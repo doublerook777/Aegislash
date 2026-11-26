@@ -16,7 +16,7 @@ import binascii
 import re
 
 from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
-from aegis.detect.labels import classify, extra_checks, names_a_relative, tokens
+from aegis.detect.labels import category_column, classify, extra_checks, names_a_relative, tokens
 from aegis.detect.normalize import DEVA, fold, norm_name, unquote_view, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
 from aegis.types import DIRECT_TYPES, QUASI_TYPES, STRONG_ID_TYPES, Record, RecordResult, empty_evidence
@@ -98,6 +98,7 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
     roles: dict[tuple[str, str], str | None] = {}
     by_path = {f["path"]: f["value"] for r in records for f in r["fields"] if f["path"].startswith("/")}
     columns: dict[str, list[tuple[str, str]]] = {}
+    col_label: dict[str, str] = {}      # table columns only: path -> header
     for r in records:
         for f in r["fields"]:
             key = (r["record_id"], f["path"])
@@ -106,6 +107,7 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
             if f["path"].startswith("col:"):
                 role = classify(f["context"] or "")
                 columns.setdefault(f["path"], []).append(key)
+                col_label[f["path"]] = f["context"] or ""
             else:
                 label, parents = _json_label(f["path"])
                 role = classify(label, parents)
@@ -121,7 +123,8 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
     has_name = any(role in ("patient_name", "name", "first_name") for role in roles.values())
     for keys in columns.values():
         if roles[keys[0]] is None:
-            guess = _guess_role([values[k] for k in keys if values[k].strip()])
+            guess = _guess_role([values[k] for k in keys if values[k].strip()], col_label.get(keys[0][1], ""),
+                                keys[0][1] in col_label)
             if guess == "patient_name":
                 filled = [values[k] for k in keys if values[k].strip()]
                 # most of the column, never a single match: one patient who shares a doctor's name must not
@@ -148,7 +151,7 @@ def _is_mobile(value: str) -> bool:
     return len(d) == 10 and d[0] in "6789"
 
 
-def _guess_role(vals: list[str]) -> str | None:
+def _guess_role(vals: list[str], label: str = "", column: bool = False) -> str | None:
     if len(vals) < 3:
         return None
     if all(re.fullmatch(r"[1-9]\d{2}(?!000)\d{3}", v.strip()) for v in vals):
@@ -173,6 +176,13 @@ def _guess_role(vals: list[str]) -> str | None:
     with_surname = [v for v in people if set(v.casefold().replace(",", " ").split()) & gazetteer.SURNAMES]
     if len(people) >= 0.7 * len(vals) and len(with_surname) >= 0.4 * len(vals):
         return "patient_name"
+    # a table column whose cells nearly all read as 2-3 word person names, surnames listed or not: the whole
+    # column is a name column (the cells that happen to carry a listed surname must not be the only ones removed)
+    if column and not category_column(label):
+        persons = [v for v in folded if gazetteer.looks_like_person_cell(v, names.STOP | names.ORG)
+                   and v.casefold() not in address._UP_DISTRICTS]
+        if len(persons) >= 0.8 * len(vals) and len(set(folded)) >= max(3, 0.3 * len(vals)):
+            return "patient_name"
     return None
 
 

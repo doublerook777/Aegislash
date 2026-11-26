@@ -27,7 +27,7 @@ Contract it provides: [detect](../../contracts/detect.md). Shapes: [types](../..
 | `dates.py` | dates (day/month order decided per file), date of birth, age |
 | `address.py` | house, locality, landmark, village, district, PIN |
 | `names.py` | name cues in free text, protected spans, medical / stop words |
-| `gazetteer.py` | surname list and the rules for a name with no cue |
+| `gazetteer.py` | surname list and the rules for a name with no cue; `looks_like_person_cell` (whole-column check) |
 | `normalize.py` | Devanagari digits, Devanagari -> Latin |
 | `evidence.py` | identity clues for `link` |
 | `spans.py` | candidate type and overlap priority |
@@ -182,6 +182,29 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   cue (a bare name with no cue is still found by the surname list). `<place> के निवासी`, Hinglish `<place> se laye`,
   and `मास्टर / सरदार` are not cues. A district written in Devanagari is removed like a village (there is no Devanagari
   district list).
+
+## Column-level name inference and dotted Aadhaar (finding F2)
+- **Cause.** A table column whose header the label rules do not know (`Applicant`, `Escort`, `Enrollee`, `Accompanied By`) was
+  searched cell by cell, so a cell was removed only when its own text looked like a name (a listed surname). Other rows of the same
+  column kept their full names. `engine._guess_role` did judge such a column from its values, but only for Latin cells and only when
+  40% of them carried a listed surname; Devanagari columns were never judged.
+- **Change.** For a CSV/TSV column with no role: if at least 80% of its non-empty cells (3 or more) read as a 2-3 word person name
+  (TitleCase Latin or Devanagari words, no digit or punctuation, none of the place / hospital / ward / staff / trade / diagnosis /
+  medicine words: `gazetteer.looks_like_person_cell`), at least 3 values and 30% of the cells are distinct, and the header is not
+  a category, medical, hospital or doctor header (`labels.category_column`), the whole column is a name column. The first such column
+  in a file is the patient, a later one the relative (the existing rule). A listed-surname cell is never needed.
+  Medical columns are never turned into names: their header already says so, and their cells fail the word lists, the diagnosis
+  endings (`-itis`, `-osis`, `-pathy` ...) or the repeat check.
+- **Dotted Aadhaar.** `ids.AADHAAR` allowed only `-`, space or no separator. `1234.5678.9012` (4-4-4 with dots) is now matched,
+  unless it reads as `year.monthday.hourminute` (`2024.0115.1030`). Dotted shapes with a fourth group (`1.2345.6789.0123`), versions
+  and lab values (`4.2.1`, `7.5000`) are still not matched (checked in the selftest).
+- **Limits.** A file with fewer than 3 filled cells in the column, or with names mixed with other text in the column, is still read
+  cell by cell. A name column whose header is an unknown *category-like* word (`Occupation`) is left alone on purpose. An unknown
+  header holding 2-3 word TitleCase trade or status values that are not in the word lists (`Govt Employee`) can still be read as names
+  when all the rows are different; the veto list in `labels._CATEGORY` is where such headers are added.
+- Checks: selftest 164/164 (4 new tables and 1 new line; 19 problems and 1 case fail on the previous code); `dev/` sanitized output,
+  `records.jsonl` and every `tests/` set are byte-identical to before (the committed sets already had labelled name columns or listed
+  surnames). Dev with every CSV/TSV header replaced by an unreadable one: 86 of 3230 leaked and 4824 of 4825 medical kept, both before and after.
 
 ## Next (generalisation)
 1. Another round of fresh unseen cases; fix general causes, never single sentences.

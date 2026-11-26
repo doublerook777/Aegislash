@@ -129,6 +129,7 @@ CASES = [
     # dotted and "+91/" phones, mixed Aadhaar separators
     ("Call 97.31.20.45.88 or +91/8123/004455; Na 138.5", ["97.31.20.45.88", "+91/8123/004455"], ["138.5"]),
     ("ID seen 5821-7734 9012 at desk, HbA1c 7.2", ["5821-7734 9012"], ["HbA1c 7.2"]),
+    ("Card 8831.0057.2294 on file; build 2024.0115.1030, HbA1c 7.2, Hb 11.4.2", ["8831.0057.2294"], ["2024.0115.1030", "HbA1c 7.2"]),
     # zero-width characters, look-alike letters, accents (typed whole or as separate marks)
     ("Patient: Bar\u200bnali Then\u200dgal, mob 97312\u200b04588", ["Bar\u200bnali Then\u200dgal", "97312\u200b04588"], []),
     ("Patient: B\u0430rn\u0430li Thengal (44/F)", ["B\u0430rn\u0430li Thengal"], []),
@@ -280,6 +281,31 @@ TABLES = [
      [["31145549", "31147001", "31149002", "Neha Kapoor", "Farhan Qureshi", "4000-11000", "226010", "880123"]],
      {"case_sheet_ref": "MRN", "patient_ref": "MRN", "mrn_ref": "MRN", "ref_by": None, "ref_doctor": None,
       "ref_range": None, "dak_code": "PIN", "sample_code": None}),
+    # a column of people under headers the label rules do not know: every row is flagged, whether or not its surname
+    # is on the list; diagnosis, medicine, ward and trade columns beside it keep their text
+    (["Enrollee", "Chaperone", "Working Impression", "Planned Test", "Treatment Given", "Occupation", "Ward Allotted"],
+     [["Tarun Wadhwani", "Hemant Wadhwani", "Iron Deficiency", "Lipid Profile", "Inj. Ceftriaxone 1 g IV BD", "Daily Wager", "Lotus Care"],
+      ["Meera Ghanekar", "Sunita Ghanekar", "Viral Hepatitis", "Liver Function Test", "Tab. Telmisartan 40 mg OD", "Home Maker", "Lakeview Ward"],
+      ["Siddharth Shirodkar", "Rekha Shirodkar", "Renal Colic", "Complete Blood Count", "Syp. Cetirizine 5 ml HS", "Govt Employee", "Lotus Care"],
+      ["Anjali Tendulkar", "Vivek Chaudhry", "Dengue Fever", "Chest Xray", "Tab. Metformin 500 mg BD", "Daily Wager", "Lakeview Ward"]],
+     {"Enrollee": "PATIENT_NAME", "Chaperone": "RELATIVE_NAME", "Working Impression": None, "Planned Test": None,
+      "Treatment Given": None, "Occupation": None, "Ward Allotted": None}),
+    # the same in Devanagari, with a Hindi diagnosis column and a drug column that must survive
+    (["आवेदक", "सहचर", "प्रारंभिक आकलन", "औषधि"],
+     [["कमला नागपाल", "रमेश नागपाल", "तीव्र बुखार", "पैरासिटामोल गोली"],
+      ["दीपक सहगल", "सुनीता सहगल", "उच्च रक्तचाप", "मेटफॉर्मिन टैबलेट"],
+      ["रेखा ठाकरे", "मोहन ठाकरे", "मधुमेह रोग", "एमलोडिपिन गोली"],
+      ["अमन वाघमारे", "पूजा वाघमारे", "निमोनिया संक्रमण", "सिरप सेटिरिजिन"]],
+     {"आवेदक": "PATIENT_NAME", "सहचर": "RELATIVE_NAME", "प्रारंभिक आकलन": None, "औषधि": None}),
+    # a column of repeated two-word categories is not a column of people
+    (["Care Route", "Pickup"], [["Walk In", "Open Camp"], ["Open Camp", "Walk In"], ["Walk In", "Walk In"],
+                                ["Walk In", "Open Camp"], ["Open Camp", "Open Camp"]],
+     {"Care Route": None, "Pickup": None}),
+    # twelve digits grouped 4-4-4 with dots are an Aadhaar number; a date-time stamp, a version and lab values are not
+    (["KYC Number", "Log Stamp", "Build", "Result"],
+     [["3540.4903.0424", "2024.0115.1030", "4.2.1", "1.0234"], ["6472.2828.3610", "2025.1130.0905", "4.2.2", "7.5000"],
+      ["8831.0057.2294", "2023.0302.2350", "4.3.0", "0.9981"]],
+     {"KYC Number": "AADHAAR", "Log Stamp": None, "Build": None, "Result": None}),
     # an unreadable header over phone numbers written with odd spacing; other long numbers are not phones
     (["zz_reach", "zz_bill"], [["9412 7 30518", "4500.00"], ["70112-904-18", "1200.50"], ["8800 41 2276", "980.00"]],
      {"zz_reach": "PHONE", "zz_bill": None}),
