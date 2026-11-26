@@ -1,4 +1,7 @@
-# Your privacy rules. main.py reads simple "key: value" lines.
-age_band_years: 5          # ages become bands like 45-49 (the band must contain the true age)
-date_shift_max_days: 180   # every date of one patient moves by the same secret offset
-min_group_size: 5          # TODO: suppress or widen quasi-identifier combos rarer than this (k-anonymity)
+# Privacy policy rules for Aegislash (read by config loader & main.py).
+age_band_years: 5              # default 5-year age bands (e.g. 45-49)
+wide_age_band_years: 10        # widened band for small k-anonymity cells
+elderly_age_threshold: 85      # top-code ages >= threshold as 85+
+date_shift_max_days: 180       # max per-patient secret date offset in days (+/-)
+min_group_size: 5              # minimum k-anonymity cell size on (age_band, gender, district)
+rare_condition_threshold: 3    # conditions shared by <= N profiles trigger QI coarsening

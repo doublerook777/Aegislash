@@ -1,20 +1,86 @@
-# Aegislash: privacy firewall for Track 3 "Secret Wards"
+# Aegislash: Privacy Firewall for Track 3 "Secret Wards"
 
-Offline, CPU-only, LLM-free de-identification of multi-hospital records (English, Hindi, Hinglish).
+Offline, CPU-only, LLM-free de-identification and re-identification risk firewall for multi-hospital Indian healthcare records across **English, Devanagari Hindi, and Hinglish** (CSV, TSV, JSON, FHIR R4 Bundles, and free-text notes; UTF-8/BOM, UTF-16, and cp1252).
 
-> Work in progress. Plan: [SPEC.md](SPEC.md). Contracts: [contracts/](contracts/). Team rules: [CONVENTIONS.md](CONVENTIONS.md).
+> Plan & module ownership: [SPEC.md](SPEC.md) · Module contracts: [contracts/](contracts/) · Team conventions: [CONVENTIONS.md](CONVENTIONS.md)
 
-## Run
+## Setup & Usage
+
 ```bash
-pip install -r requirements.txt
-RAKSHA_SECRET=<secret> python main.py --input <input dir> --output <empty output dir>
-python3 validate_output.py --input dev/input --output <output dir>   # must print CONTRACT OK
-python3 check_dev.py --output <output dir>                            # practice self-check
+python -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+
+# Run the pipeline (RAKSHA_SECRET must be set per release)
+RAKSHA_SECRET=<secret> .venv/bin/python main.py --input dev/input --output out
+
+# Verify output format & contract compliance (must print CONTRACT OK)
+.venv/bin/python validate_output.py --input dev/input --output out
+
+# Measure leaks, clinical utility preservation, and linkage F0.5 on practice data
+.venv/bin/python check_dev.py --output out
+
+# Measure k-anonymity equivalence classes & simulated A2/A4 registry linkage risk
+.venv/bin/python scripts/risk_report.py --output out --registry dev/attacker/registry.csv
+
+# Validate all in-process Python module contracts
+.venv/bin/python scripts/check_contracts.py
 ```
 
-## Models
-None. Rules, gazetteers and transliteration only (no LLMs, no pretrained transformers).
+## Architecture
 
-## Credits
-`dev/`, `docs/kit/`, `validate_output.py`, `check_dev.py`, `check_submission.py`, `scoring.toml`, `brief/` and the
-starting skeleton of `main.py` come from the organizers' Secret Wards ToolKit (MIT).
+Aegislash runs an in-memory, two-pass pipeline designed around four strict contract boundaries ([aegis/types.py](aegis/types.py)):
+
+```text
+Input tree (CSV / TSV / JSON / FHIR / TXT)
+  │
+  ▼
+1. io (main.py, aegis/io/)
+   Walks files deterministically, decodes UTF-8/BOM/UTF-16/cp1252, quarantines
+   malformed or unsupported files (.xml, .pdf, .jpg, 1500-deep JSON), splits into Records
+  │
+  ▼
+2. detect (aegis/detect/)
+   Context-aware column/key classification, regex + checksum IDs, Latin/Devanagari/Hinglish
+   name cues, clinical trap protection (doctors, doses, vitals, C/O complaints, eponyms),
+   and hidden-channel scanning (headers, JSON keys, filenames, base64, \u escapes)
+  │
+  ▼
+3. link (aegis/link/)
+   Cross-script name normalization, strong-ID and name + second-clue blocking/clustering
+   without transitive over-merge, keyed HMAC-SHA256 pseudonyms (PSN-XXXXXX)
+  │
+  ▼
+4. privacy (aegis/privacy/, config/policy.yaml)
+   Per-patient secret date shifting, truthful age bands, PIN/village generalization,
+   k-anonymity & rare-condition small-cell suppression
+  │
+  ▼
+Export: sanitized/ + report.json + records.jsonl (verified by final leak gate)
+```
+
+## How Each Part Works
+
+- **Ingestion & Export (`io`):** Preserves input relative paths, CSV delimiters/headers, JSON key schemas/types, and valid FHIR R4 Bundle references; renames PII-containing filenames and declares mappings by `input_sha256` in `report.json`.
+- **Detection (`detect`):** Combines header/key context with pattern + checksum rules (Aadhaar Verhoeff, ABHA, PAN, phone, MRN) and multilingual context cues (`S/o`, `D/o`, `W/o`, `ji`, `sahab`) while explicitly exempting medical values (`Dr. <name>`, `1-0-1`, `mg/dL`, `C/O <complaint>`).
+- **Linkage & Pseudonyms (`link`):** Normalizes names across Latin, Devanagari, and Hinglish to link only on strong IDs or unique secondary clues, keeping homonyms apart. `aegis.link.pseudonym()` generates Crockford base32 `PSN-XXXXXX` tokens via `HMAC-SHA256(RAKSHA_SECRET, "psn|" + patient_key)`.
+- **Privacy Layer (`privacy`):**
+  - **Per-patient secret date shifting ([aegis/privacy/dates.py](aegis/privacy/dates.py)):** Computes a non-zero offset in `[-180, +180]` days via `HMAC-SHA256(RAKSHA_SECRET, "shift|" + key)` so all events of one patient (or unlinked record) shift together, preserving lengths of stay and visit intervals while preventing global-shift recovery and cross-release linkability. Preserves original formats (`DD/MM/YYYY`, `MM/DD/YYYY`, ISO datetimes with timezones, month-name dates, and Devanagari digits), failing closed to `[DATE]` if unparseable.
+  - **Quasi-identifier generalization ([aegis/privacy/generalize.py](aegis/privacy/generalize.py)):** Converts ages into truthful 5-year bands (`48/M` -> `45-49/M`, `47 वर्ष` -> `45-49 वर्ष`) with `85+` top-coding for elderly patients; generalizes 6-digit PINs to `XXX***` and villages to district names.
+  - **k-Anonymity & rare-condition defense ([aegis/privacy/engine.py](aegis/privacy/engine.py)):** Counts equivalence class sizes on `(age_band, gender, district)` and condition frequencies across the full dataset ([config/policy.yaml](config/policy.yaml)). Small cells (`k < 5`) trigger 10-year age widening and PIN/village suppression; rare conditions (`<= 3` profiles) in small cells trigger 20-year age widening (or `80+`) and district suppression while keeping diagnoses and ICD codes intact for clinical utility.
+
+## Declared Models
+
+**None.** Aegislash uses deterministic rules, gazetteers, checksums, and transliteration only (no LLMs, no generative AI, no pretrained transformers, and zero network calls during execution).
+
+## Security Design
+
+- **In-memory processing:** Raw PII is never written to temporary directories (`TMPDIR`, `HOME`), logs, or error messages.
+- **Key separation & hygiene:** `RAKSHA_SECRET` is read from the environment only, domain-separated between pseudonyms (`psn|`) and date shifts (`shift|`), and never logged or written to output artifacts.
+- **Fail-closed behavior:** Unknown finding types map to `[REDACTED]`; unparseable dates map to `[DATE]`; broken/unsupported files are quarantined rather than copied raw.
+- **Determinism:** Records and profiles are processed in sorted order with no set-iteration ordering dependence, ensuring byte-identical outputs for identical inputs and secrets.
+
+## Known Limitations
+
+- Cross-module integration between `io`, `detect`, and `link` is in progress across team branches (`main.py` still runs the starter skeleton until modules merge).
+- K-anonymity risk mitigation relies on `detect` emitting `CONDITION`, `DISTRICT`, `GENDER`, and `AGE` findings/evidence consistently across formats, including unseen layouts.
+- Unlinked records that lack strong IDs or matching secondary clues receive per-record date shifts rather than cross-file patient shifts, preserving intra-record LOS but not cross-document intervals.
