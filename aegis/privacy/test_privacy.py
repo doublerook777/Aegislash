@@ -83,7 +83,11 @@ class PrivacyTests(unittest.TestCase):
     def test_ages_pins_villages_and_direct_identifiers(self) -> None:
         r1 = _rec("r1#row:0", district="rae bareli")
         r2 = _rec("r2#doc")
-        p = plan([r1, r2], {"r1#row:0": "k:1", "r2#doc": None})
+        # nine more patients in r1's cell, so the release is not "small" and r1 stays in the normal tier:
+        # this test is about the replacement formats, not about k-anonymity
+        fillers = [_rec(f"fill#row:{i}", district="rae bareli") for i in range(9)]
+        p = plan([r1, r2] + fillers,
+                 {"r1#row:0": "k:1", "r2#doc": None, **{f"fill#row:{i}": f"k:fill{i}" for i in range(9)}})
 
         self.assertEqual(replace(p, "r1#row:0", {"path": "c", "start": 0, "end": 2, "type": "AGE", "text": "48", "norm": "48", "role": "patient"}), {"text": "45-49", "status": "generalized"})
         self.assertEqual(replace(p, "r1#row:0", {"path": "c", "start": 0, "end": 4, "type": "AGE", "text": "48/M", "norm": "48", "role": "patient"}), {"text": "45-49/M", "status": "generalized"})
@@ -138,6 +142,50 @@ class PrivacyTests(unittest.TestCase):
         st = stats(p)
         self.assertEqual(st["records_generalized"], 10)
         self.assertEqual(st["records_suppressed"], 1)
+
+    def test_small_release_is_generalised_and_hides_rare_districts(self) -> None:
+        # 6 patients (below max(10, 2 * min_group_size)): 4 in one district, 1 each in two others, one shared condition
+        districts = ["sitapur", "sitapur", "sitapur", "sitapur", "hardoi", "gonda"]
+        ages = [42, 44, 47, 61, 33, 70]
+        results, keys = [], {}
+        for i, (d, a) in enumerate(zip(districts, ages)):
+            rid = f"small.csv#row:{i}"
+            fs = [
+                {"path": "col:0", "start": 0, "end": 2, "type": "AGE", "text": str(a), "norm": str(a), "role": "patient"},
+                {"path": "col:1", "start": 0, "end": 6, "type": "PIN", "text": "261001", "norm": "261001", "role": "patient"},
+                {"path": "col:2", "start": 0, "end": 7, "type": "VILLAGE", "text": "Bhitauli", "norm": "bhitauli", "role": "patient"},
+                {"path": "col:3", "start": 0, "end": len(d), "type": "DISTRICT", "text": d.title(), "norm": d, "role": "patient"},
+                {"path": "col:4", "start": 0, "end": 9, "type": "CONDITION", "text": "Kala-azar", "norm": "kala-azar", "role": None},
+            ]
+            results.append(_rec(rid, fs, age=a, gender="F", district=d))
+            keys[rid] = f"k:small{i}"
+        p = plan(results, keys)
+
+        def rep(i: int, j: int) -> dict:
+            return replace(p, f"small.csv#row:{i}", results[i]["findings"][j])
+
+        for i in range(6):
+            # every cell is smaller than min_group_size: wider age band, no PIN prefix, no village
+            band = rep(i, 0)["text"]
+            lo, _, hi = band.partition("-")
+            self.assertTrue(band.endswith("+") or int(hi) - int(lo) + 1 >= 10, band)
+            self.assertEqual(rep(i, 1), {"text": "[PIN]", "status": "suppressed"})
+            self.assertEqual(rep(i, 2), {"text": "[VILLAGE]", "status": "suppressed"})
+            # the shared condition is not rare and survives
+            self.assertEqual(rep(i, 4), {"text": None, "status": "sanitized"})
+        self.assertEqual(rep(0, 0)["text"], "40-49")
+        # Sitapur has 4 profiles (< 5): hidden; Hardoi and Gonda (1 each): hidden
+        for i in range(6):
+            self.assertEqual(rep(i, 3), {"text": "[DISTRICT]", "status": "suppressed"})
+
+        # the same 6 patients plus 4 more in Sitapur: no longer small, district kept (unchanged behaviour)
+        for i in range(6, 10):
+            rid = f"small.csv#row:{i}"
+            results.append(_rec(rid, [dict(results[0]["findings"][3])], age=45, gender="F", district="sitapur"))
+            keys[rid] = f"k:small{i}"
+        p = plan(results, keys)
+        self.assertEqual(replace(p, "small.csv#row:0", results[0]["findings"][3]), {"text": None, "status": "sanitized"})
+        self.assertEqual(replace(p, "small.csv#row:4", results[4]["findings"][3]), {"text": None, "status": "sanitized"})
 
     def test_risk_report_on_synthetic_release(self) -> None:
         import json

@@ -19,3 +19,11 @@ Implementation layout (`__init__.py` is wired to `engine.py`):
 `scripts/risk_report.py`: the attacker files are `dev/attacker/registry.csv` and `dev/attacker/known_facts.jsonl`. A
 `--registry` or `--known-facts` path that does not exist is an error (exit 2, message on stderr). Before, it was skipped
 without a word and the attack sections were simply missing from the report.
+
+Small releases (fewer than `max(10, 2 * min_group_size)` profiles): the k-anonymity tiers used to be switched off
+there, so every patient kept a 5-year band, a PIN prefix, the village (as its district) and the raw district, and was
+unique on them. Now the tiers run at any size, so a cell under `min_group_size` gets the wide band and no PIN or village.
+In a small release a district shared by fewer than `min_group_size` profiles is also replaced by `[DISTRICT]` (and the
+village is suppressed, not generalised to that district). Conditions, dates (shifted, intervals kept) and gender stay.
+Larger releases are unchanged: hiding a rare district there would cost generalisation utility on standard data, so it
+is left for a team decision (audit V1, point 2). Checked: dev and every committed set give byte-identical output.
