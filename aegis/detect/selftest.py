@@ -118,6 +118,26 @@ CASES = [
     ("Patient Name: H\u00e9ctor Pereira", ["H\u00e9ctor Pereira"], []),
     ("Patient Name: He\u0301ctor Pereira", ["He\u0301ctor Pereira"], []),
     ("TSH 2.1 \u03bcIU/mL, dose 50 \u00b5g, TNF-\u03b1 raised", [], ["\u03bcIU/mL", "50 \u00b5g", "TNF-\u03b1"]),
+    # years from 1800: the date is found and shifted; a 4-digit time of day is not a year
+    ("DOB 14/03/1893, seen 02 Feb 1895", ["14/03/1893", "02 Feb 1895"], []),
+    ("Born 1889-07-21; registered 1889/07/22", ["1889-07-21", "1889/07/22"], []),
+    ("Admitted 12 Mar 1830 hrs with BP 120/80, Tab Aspirin 75 mg 0-1-0", [], ["1830 hrs", "BP 120/80", "Aspirin 75 mg"]),
+    # URL escapes: found where they stand in the original text, and the words between them are not read as a name
+    ("Scan: https://his.example/files/Tarun%20Wadhwa%5Creport.pdf?tel=%2B91%2098765%2043210",
+     ["Tarun%20Wadhwa", "%2B91%2098765%2043210"], ["report.pdf"]),
+    ("file:///D%3A%5CRecords%5CKavya_Chaudhary%5Ccase_notes.pdf", ["Kavya_Chaudhary"], ["case_notes"]),
+    ("Open summary_Zubin_Pathak_2026.pdf and Lab_Reports_Singh_Block.csv", ["Zubin_Pathak"], ["Lab_Reports", "Singh_Block"]),
+    ("view?patient=Agust%C3%ADn%20Fonseca&visit=3", ["Agust%C3%ADn%20Fonseca"], ["visit=3"]),
+    ("log: patient=Zorawar Khetarpal ward=3 status=stable", ["Zorawar Khetarpal"], ["ward=3", "status=stable"]),
+    ("SpO2 96%, 5%DEXTROSE drip at 40%20 ml/hr, Tab Paracetamol 650 mg", [], ["96%", "5%DEXTROSE", "Paracetamol 650 mg"]),
+    ("Keep 100%25 oxygen; Hb 9.8 g/dL", [], ["Hb 9.8 g/dL"]),
+    # given names with no surname: only where the sentence says the person did something ("signed the", "took discharge")
+    ("Meenal signed the surgical consent form.", ["Meenal"], ["consent form"]),
+    ("Tarun took discharge against medical advice on 14/08/2026.", ["Tarun"], ["medical advice"]),
+    ("Consent signed by guardian. Nurse signed the form. Uncle signed the consent. Dr. Rao signed the order.", [],
+     ["Consent", "Nurse", "Uncle", "guardian"]),
+    ("Wheezing returned after 2 days. Itching signed off by physician. Pharmacy signed the bill.", [],
+     ["Wheezing", "Itching", "Pharmacy"]),
 ]
 
 

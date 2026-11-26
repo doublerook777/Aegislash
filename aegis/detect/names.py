@@ -160,6 +160,18 @@ _ABOUT_PATIENT = (r"(?:(?:ka|ki|ke|ko) +(?i:bp|blood pressure|pulse|temp|tempera
                   r"|ko +(?:[a-z0-9]+ +){0,4}(?:bukhar|chakkar|khansi|dard|ulti|kamzori|dast|sujan|takleef|saans)\b"
                   r"|ko +\d+ +(?:din|hafte|mahine|saal)\b)")
 _cue(rf"(?:^|\n|[.!?] |- )(?P<name>{_CAP}(?: {_CAP}){{0,2}}) +(?={_ABOUT_PATIENT})", "patient", None, True)
+# a sentence that starts with a bare name and then something only a person does: "<name> signed the consent form",
+# "<name> took discharge against medical advice". Not "Consent signed by ..." (passive) and never staff, family
+# words, organisations or medical words (checked in find_names).
+_PERSON_ACT = (r"(?i:signed +(?:the|a|an|his|her|their|this|consent|bond|undertaking|dama|lama)\b"
+               r"|took +(?:discharge|dama|lama)\b)")
+_cue(rf"(?:^|\n|[.!?] |- )(?P<name>{_CAP}(?: {_CAP}){{0,2}}) +(?={_PERSON_ACT})", "patient")
+_PERSON_ACT_INDEX = len(_CUES) - 1
+# family and helper words that may stand where a name does; they are not in STOP because they can be part of a name cue
+_NOT_THE_PATIENT = frozenset("uncle aunt aunty cousin neighbour neighbor grandfather grandmother grandson granddaughter "
+                             "nephew niece bua mausi chacha mama dada dadi nana nani counsellor counselor technician "
+                             "pharmacist dietician dietitian physiotherapist receptionist cashier driver".split())
+
 # Hindi titles: "श्रीमती <name>". A following particle (को, का, ने ...) is not part of the name.
 _HINDI_PARTICLE = r"(?:को|का|की|के|ने|से|है|में|पर|जी)(?![ऀ-ॿ])"
 _cue(rf"(?<![ऀ-ॿ])(?:श्रीमती|श्री|कुमारी|सुश्री) +(?P<name>{_DEVA_WORD}(?: (?!{_HINDI_PARTICLE}){_DEVA_WORD}){{0,2}})",
@@ -167,7 +179,7 @@ _cue(rf"(?<![ऀ-ॿ])(?:श्रीमती|श्री|कुमारी|�
 # titles and report headings
 _cue(rf"\b(?:Mr|Mrs|Ms|Smt|Shri|Km|Master)\b\.? +(?P<name>{LATIN_NAME})", "patient")
 _cue(rf"(?P<name>(?:Mohd|Md)\.? {LATIN_NAME})", "patient")
-_cue(rf"\b(?i:report of|note for|summary of|results? for|record of|patient|insured|claimant|policy ?holder) *:? +(?P<name>{LATIN_NAME})", "patient")
+_cue(rf"\b(?i:report of|note for|summary of|results? for|record of|patient|insured|claimant|policy ?holder)(?: *:? +| *= *)(?P<name>{LATIN_NAME})", "patient")
 # "14:00 - Brajesh Yadav - K/C/O typhoid"
 _cue(rf"(?P<name>{LATIN_NAME}) +- +(?:K/C/O|H/O|C/O)\b", "patient")
 # a Hindi sentence "<name> को 9 दिन से बुखार है"
@@ -232,6 +244,9 @@ def find_names(text: str) -> list[Cand]:
         for m in pattern.finditer(text):
             s, e = m.span("name")
             if index >= _PHONE_ADJACENT_FROM and set(text[s:e].casefold().split()) & (ORG | MEDICAL):
+                continue
+            if index == _PERSON_ACT_INDEX and set(text[s:e].casefold().replace(".", " ").split()) & (
+                    ORG | MEDICAL | STOP | _NOT_THE_PATIENT):
                 continue
             if relation == "C/O" and not text[s].isupper() and not DEVA.match(text[s]):
                 continue

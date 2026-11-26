@@ -57,6 +57,51 @@ def visible(s: str) -> tuple[str, list[int] | None]:
     return "".join(s[i] for i in kept), kept
 
 
+_PCT_RUN = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
+
+
+def unquote_view(s: str) -> tuple[str, list[tuple[int, int]] | None]:
+    """`s` with URL escapes read ("%20" -> " ", "%5C" -> "\\", "%C3%AD" -> "í"), and for every character of the
+    result the (start, end) it covers in `s` (None: nothing was decoded). An escape that is not valid UTF-8, or that
+    stands for a control character, is left as it is, so "5%DEX" and "%0A" are not touched."""
+    if "%" not in s or not _PCT_RUN.search(s):
+        return s, None
+    out: list[str] = []
+    spans: list[tuple[int, int]] = []
+    pos, changed = 0, False
+    for m in _PCT_RUN.finditer(s):
+        for k in range(pos, m.start()):
+            out.append(s[k])
+            spans.append((k, k + 1))
+        raw = bytes.fromhex(m.group(0).replace("%", ""))
+        i = 0
+        while i < len(raw):
+            b = raw[i]
+            n = 1 if b < 0x80 else 2 if 0xC2 <= b <= 0xDF else 3 if 0xE0 <= b <= 0xEF else 4 if 0xF0 <= b <= 0xF4 else 0
+            ch = None
+            if n and i + n <= len(raw):
+                try:
+                    ch = raw[i:i + n].decode("utf-8")
+                except UnicodeDecodeError:
+                    ch = None
+            first = m.start() + 3 * i
+            if ch is not None and (n > 1 or 0x20 <= b < 0x7F):
+                out.append(ch)
+                spans.append((first, first + 3 * n))
+                changed = True
+                i += n
+            else:
+                for k in range(first, first + 3):
+                    out.append(s[k])
+                    spans.append((k, k + 1))
+                i += 1
+        pos = m.end()
+    for k in range(pos, len(s)):
+        out.append(s[k])
+        spans.append((k, k + 1))
+    return ("".join(out), spans) if changed else (s, None)
+
+
 def digits(s: str) -> str:
     return re.sub(r"[^0-9]", "", fold(s))
 

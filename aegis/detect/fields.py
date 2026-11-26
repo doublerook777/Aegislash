@@ -133,7 +133,7 @@ def structured(text: str, s: int, e: int, role: str, dmy: bool) -> list[Cand]:
                 re.sub(r"[^A-Z0-9]", "", value.upper()) if kind in ("PAN", "INSURANCE_ID") else digits(value))
         return [Cand(s, e, kind, norm, "patient")]
 
-    if role == "dob" and re.fullmatch(r"(?:19|20)\d{2}", value):
+    if role == "dob" and re.fullmatch(r"(?:18|19|20)\d{2}", value):
         return [Cand(s, e, "DOB", None, "patient")]     # a birth year: no ISO date to give as norm
     if role in ("dob", "date"):
         return [c._replace(start=c.start + s, end=c.end + s)

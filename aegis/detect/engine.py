@@ -15,7 +15,7 @@ import re
 
 from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
 from aegis.detect.labels import classify, tokens
-from aegis.detect.normalize import DEVA, fold, norm_name, visible
+from aegis.detect.normalize import DEVA, fold, norm_name, unquote_view, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
 from aegis.types import STRONG_ID_TYPES, Record, RecordResult, empty_evidence
 
@@ -263,6 +263,8 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
         found += names.find_names(text)
         # in a file name "_" separates words
         found += gazetteer.find_listed_names(text.replace("_", " ") if kind == "filename" else text, names.STOP)
+        if kind != "filename":
+            found += gazetteer.find_joined_names(text, names.STOP)
         found += _labelled(text, dmy)
     found += names.find_path_names(text)
     if kind in ("header", "key", "filename"):
@@ -386,16 +388,28 @@ def _propagate(records: list[Record], per_field: dict) -> None:
 
 # ---------------------------------------------------------------- 4. results
 
+def _view(value: str) -> tuple[str, list[tuple[int, int]] | None]:
+    """The text detect reads: hidden characters removed and URL escapes decoded. For each of its characters, the
+    (start, end) it covers in `value` (None: the text is unchanged)."""
+    text, kept = visible(value)
+    spans = None if kept is None else [(k, k + 1) for k in kept]
+    text, inner = unquote_view(text)
+    if inner is not None:
+        spans = inner if spans is None else [(spans[s][0], spans[e - 1][1]) for s, e in inner]
+    return text, spans
+
+
 def detect_file(records: list[Record]) -> list[RecordResult]:
-    """Hidden characters are removed before detection; findings point back into the original values."""
-    originals: dict[tuple[str, str], tuple[str, list[int]]] = {}
+    """Hidden characters are removed and URL escapes decoded before detection; findings point back into the
+    original values."""
+    originals: dict[tuple[str, str], tuple[str, list[tuple[int, int]]]] = {}
     cleaned = []
     for r in records:
         fields_ = []
         for f in r["fields"]:
-            text, kept = visible(f["value"])
-            if kept is not None:
-                originals[(r["record_id"], f["path"])] = (f["value"], kept)
+            text, spans = _view(f["value"])
+            if spans is not None:
+                originals[(r["record_id"], f["path"])] = (f["value"], spans)
                 f = {**f, "value": text}
             fields_.append(f)
         cleaned.append({**r, "fields": fields_})
@@ -404,8 +418,8 @@ def detect_file(records: list[Record]) -> list[RecordResult]:
         for finding in result["findings"]:
             key = (result["record_id"], finding["path"])
             if key in originals:
-                value, kept = originals[key]
-                start, end = kept[finding["start"]], kept[finding["end"] - 1] + 1
+                value, spans = originals[key]
+                start, end = spans[finding["start"]][0], spans[finding["end"] - 1][1]
                 finding.update(start=start, end=end, text=value[start:end])
     return results
 
