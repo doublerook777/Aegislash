@@ -68,5 +68,7 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 1. Another round of fresh unseen cases; fix general causes, never single sentences.
 2. Known blind spots: one-word names with no clue (nicknames, "<name> signed"); full names whose surname is not in
    `gazetteer.py` and that have no cue; "Surname, Given" order; a doctor written without "Dr." in running text can be
-   removed as a patient name; year-of-birth fields; zero-width characters and look-alike letters.
+   removed as a patient name (also true for a doctor column with an unreadable header: it counts as doctors only if
+  more than half its names appear as `Dr. <name>` elsewhere, so that patients are never exposed by one shared name);
+  year-of-birth fields; zero-width characters and look-alike letters.
 3. The 1 lost medical value and 1 wrong merge on practice data (find which module causes each).

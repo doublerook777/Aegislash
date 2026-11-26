@@ -117,8 +117,12 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
     for keys in columns.values():
         if roles[keys[0]] is None:
             guess = _guess_role([values[k] for k in keys if values[k].strip()])
-            if guess == "patient_name" and any(" ".join(names.name_words(values[k])) in doctors for k in keys):
-                guess = "doctor"
+            if guess == "patient_name":
+                filled = [values[k] for k in keys if values[k].strip()]
+                # most of the column, never a single match: one patient who shares a doctor's name must not
+                # expose every other patient
+                if 2 * sum(" ".join(names.name_words(v)) in doctors for v in filled) > len(filled):
+                    guess = "doctor"
             if guess == "patient_name":
                 # a second column full of people is usually the relative
                 guess, has_name = ("relative_name" if has_name else "patient_name"), True
