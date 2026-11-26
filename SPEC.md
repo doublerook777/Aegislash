@@ -67,7 +67,7 @@ See CONVENTIONS.md. Branches `<module>/<topic>`, commits `<module>: <change>`, e
 Layout: `main.py` (entry, io) · `aegis/{io,detect,link,privacy}/` · `aegis/types.py` (shared shapes, part of the contract) · `contracts/` (md + json + examples) · `scripts/check_contracts.py` · `config/policy.yaml` · `dev/` + `validate_output.py` + `check_dev.py` + `check_submission.py` (kit) · `docs/kit/` · `brief/`.
 
 ## Status
-Planning stage: 3 approved
+Planning stage: 5 approved
 
 Assumptions:
 - Project root `Aegislash/` becomes the public GitHub submission repo (origin already set by the team).
@@ -75,6 +75,7 @@ Assumptions:
 - Rules + gazetteers + transliteration only (no CRF), custom linkage (no splink): chosen for the 24h window.
 - Contract checker is a Python-call version of the hammer-skill HTTP checker (`--mock` adds exact example answers and mock-only error cases).
 - Pseudonym HMAC input is prefixed `psn|` (domain separation from the date-shift key).
+- Kickoff prompts for each member: KICKOFF.md.
 
 | Module | Owner | Contract | State (mocked / in progress / real) | Last update |
 |---|---|---|---|---|
