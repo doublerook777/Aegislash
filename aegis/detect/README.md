@@ -172,7 +172,9 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   name (`पति रोज़ ...` stays text). `HI_NOT_NAME` is also part of `STOP`, so a kin word is never trimmed in as a name.
   `address._NIWASI` and `address._BROUGHT_FROM` add the two place cues (the place cannot be a `HI_NOT_NAME` word:
   घर, अस्पताल, वहाँ, कल ...). `gazetteer.DEVA_*` are public names for the existing Hindi lists (no new data).
-- **Checks.** selftest 175/175 (12 new cases, 8 fail on the base commit; the other 4 are medical text that must survive);
+- **Never across a line.** A Hindi cue reads its name only up to the end of the line, and a word followed by `:` is a label
+  (`उम्र:`), never part of a name. A first attempt read `पुत्र: <name>` into the next line's `उम्र:` label.
+- **Checks.** selftest 177/177 (14 new cases, 9 fail on the base commit; the others are medical text or labels that must survive);
   `dev/` sanitized output and `records.jsonl` byte-identical to the base; the committed sets (adversarial, three breaker
   sets) also byte-identical, so no recorded number changed. These sets do not contain the failing shapes, so this is
   **not** an unseen measurement.

@@ -239,12 +239,15 @@ _HI_RELATION = re.compile(
     r"भतीजा|भतीजी|भांजा|भांजी|भाँजा|भाँजी|चाचा|चाची|मामा|मामी|ताऊ|ताई|दादा|दादी|नाना|नानी|देवर|जेठ|जेठानी|जीजा|साला|साली|"
     rf"बुआ|मौसी|ननद|भाभी|परिचारक|पड़ोसी|अभिभावक){_HI_END}[ \t:=\-–]+")
 _HI_SKIP = frozenset("श्री श्रीमान श्रीमती सुश्री स्वर्गीय स्व स्व. मिस्टर मिसेज़".split())
-_HI_WORD = re.compile(r"([ऀ-ॣॱ-ॿ]+)([,।;:.)]*)")
+# a word followed by ":" is a label ("उम्र:"), never a name or the end of one
+_HI_WORD = re.compile(r"([ऀ-ॣॱ-ॿ]+)([,।;.)]*)")
 
 
 def _hindi_name_after(text: str, pos: int, strong: bool) -> tuple[int, int] | None:
     """The name that starts at `pos`, read as 1 to 3 Hindi words; None when there is none (see the note above)."""
-    tokens = [(m.start() + pos, m.end() + pos) for m in re.finditer(r"\S+", text[pos:pos + 160])]
+    # never past the end of the line: the next line starts with its own label
+    window = re.split(r"[\r\n]", text[pos:pos + 160], maxsplit=1)[0]
+    tokens = [(m.start() + pos, m.end() + pos) for m in re.finditer(r"\S+", window)]
     while tokens and text[tokens[0][0]:tokens[0][1]] in _HI_SKIP:
         tokens.pop(0)
     words = []   # (start, end, word, ended) for the plain Hindi words that may belong to the name
