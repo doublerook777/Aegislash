@@ -81,6 +81,6 @@ Export: sanitized/ + report.json + records.jsonl (verified by final leak gate)
 
 ## Known Limitations
 
-- Full-pipeline end-to-end integration and privacy-utility tuning await the `detect` module merge (`io`, `link`, and `privacy` are implemented; `main.py` already runs `io`'s two-pass pipeline).
+- All four modules (`io`, `detect`, `link`, `privacy`) are integrated on `main` (`1.1%` overall leak in `check_dev.py` driven by `35` filename leaks and `0.0%` content leaks; `100.0%` medical values kept; `0.97` linking F0.5). Some compact age strings (`54/F`, `97/M`, `Age: 0/F`) and filename tokens remain unflagged by `detect`, which elevates simulated A2/A4 registry uniqueness (`32.7%` est. `conf >= 0.5`).
 - K-anonymity risk mitigation relies on `detect` emitting `CONDITION`, `DISTRICT`, `GENDER`, and `AGE` findings/evidence consistently across formats, including unseen layouts.
 - Unlinked records that lack strong IDs or matching secondary clues receive per-record date shifts rather than cross-file patient shifts, preserving intra-record LOS but not cross-document intervals.

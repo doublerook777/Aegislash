@@ -45,17 +45,17 @@ sanitized/  +  report.json  +  records.jsonl
 
 | Measure | Value |
 |---|---|
-| personal data leaked (overall / Hindi / Hinglish) | *Pending full `io`/`detect`/`link` merge* |
-| medical values kept | *Pending full `io`/`detect`/`link` merge* |
-| linking precision / recall / F0.5 | *Pending full `io`/`detect`/`link` merge* |
-| re-identification risk (`scripts/risk_report.py`) | *Pending full merge (privacy contract: 6/6, unit tests: 4/4 passing)* |
-| run time / peak memory | *Pending full `io`/`detect`/`link` merge* |
-| on data you did not tune on | *Pending unseen-format evaluation* |
+| personal data leaked (overall / Hindi / Hinglish) | `1.1%` (`35/3230`; `latin 1.2%`, `deva 0.0%`, `hinglish 0.0%`; `content 0.0%`, `filename 72.9%`, `0/4` canaries) |
+| medical values kept | `100.0%` (`4496/4497`) |
+| linking precision / recall / F0.5 | `0.99 / 0.90 / 0.97` (`765/819` records linked, `1` wrong merge) |
+| re-identification risk (`scripts/risk_report.py`) | `35/49` (`71.4%`) unique on `(age_band, gender, district)`; `49/49` on `(age_band, district, adm_week, diagnosis)`; A2/A4 est. `conf >= 0.5`: `32.7%` (`10` unique / `240` registry); A5 rare+narrow-QI hits: `0/18` |
+| run time / peak memory | `6.05 s` (`dev/input`, 200 files, 819 records; Windows RSS fallback `0.0 MB`; byte-identical repeat runs & secret-keyed unlinkability verified) |
+| on data you did not tune on | Not yet measured on an unseen-format synthetic split (rules/gazetteers/column heuristics built for unseen labels) |
 
 By tuning `config/policy.yaml` (`age_band_years: 5`, `date_shift_max_days: 180`, `min_group_size: 5`, `rare_condition_threshold: 3`), standard patients retain 5-year age resolution, district geography, 3-digit PIN prefixes, and exact stay intervals, while only rare/small-cell patients sacrifice fine location and narrow age bands to block registry and known-facts re-identification.
 
 ## 6. Known limitations
 
-- **Dependency on upstream extraction:** Rare-condition k-anonymity depends on `detect` emitting `CONDITION`, `DISTRICT`, `GENDER`, and `AGE` consistently on unseen formats.
+- **Filename PII & compact age/sex detection gaps:** Current `check_dev.py` & `risk_report.py` runs show `35` filename-channel leaks (`MRN`/`PATIENT_NAME`/`PHONE` in filenames) and some unbanded compact ages (`54/F`, `97/M`, `Age: 0/F`) not yet emitted by `detect`, raising A2/A4 registry uniqueness (`32.7%` `conf >= 0.5`).
 - **Unlinked fragmentation:** Fragmentary notes that cannot be safely linked receive per-record date shifts rather than patient-level shifts, preserving intra-note intervals but not cross-document timelines.
 - **No encryption-at-rest layer:** Designed as a stateless in-memory pipeline; long-term archival of raw source dumps requires external encrypted storage with KMS-managed `RAKSHA_SECRET`.
