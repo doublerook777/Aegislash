@@ -129,3 +129,55 @@ After pulling and merging `origin/main` (`a7faabf`, including PR #12 `detect/bre
 - **`tests/breakers/breaker_ds1_io_formats` (`35` PII, `15` med):** `aegis_detect` **85.7%** recall (`5/35` leaked, `2/4` canaries, `15/15` med kept) vs. `scrubadub_full_en` **85.7%** recall (`5/35` leaked, `2/4` canaries, `9/15` med kept). Remaining Aegislash misses where Scrubadub caught PII: `Pradeep Joshi`, `Sakshi`.
 - **`tests/breakers/breaker_ds2_detect_bypass` (`40` PII, `19` med):** `aegis_detect` **80.0%** recall (`8/40` leaked, `2/2` canaries, `19/19` med kept) vs. `scrubadub_full_en` **57.5%** recall (`17/40` leaked, `2/2` canaries, `8/19` med kept). Remaining misses where Scrubadub caught PII: `+91/9788/002233`, `Hargobind Khorana`, `Vasundhara Raje`, `Keshav Dev`, `Suresh Pandey`.
 - **`tests/breakers/breaker_ds3_link_privacy` (`80` PII, `12` med):** `aegis_detect` **95.0%** recall (`4/80` leaked, `1/1` canary, `12/12` med kept, end-to-end linking F0.5 `0.71`) vs. `scrubadub_full_en` **51.2%** recall (`39/80` leaked, `1/1` canary, `6/12` med kept). Remaining misses where Scrubadub caught PII: `Pahari`, `Tindwari`.
+
+---
+
+## 7. Results After the Later Fixes (`main` at `c318b1e`, 2026-11-27)
+
+Section 6 was measured on `111efa9`, which merged `main` at `a7faabf`. Since then four PRs changed detect and io:
+#15 (retest fixes, merged before this branch), #17 (this branch), #18 (JSON Lines, base64 layouts, leak-gate names, URL
+escapes, years from 1800) and #16 (PIN and ward headers checked against their cells, lowercase `h.no`, `r/o` as rule out).
+The numbers below are from `main` with all four, on Linux, `RAKSHA_SECRET=practice`, scored with
+`check_dev.py --output OUT --truth SET/truth/truth.json`. Scrubadub was **not** rerun; its rows in sections 2 and 6 stand.
+
+### 7.1 End-to-end results (`main.py` + `check_dev.py`)
+
+| Set | Leaked / total (section 6 -> now) | Canaries (section 6 -> now) | Medical kept (end to end) | Linking F0.5 (now) |
+|---|---|---|---|---|
+| `dev/input` | 0 / 3,230 -> **0 / 3,230** | 0 / 4 -> 0 / 4 | 4,854 / 4,855 | 1.00 |
+| `tests/adversarial` | 21 / 157\* -> **0 / 157** | 3 / 8\* -> **0 / 8** | 48 / 50 | 0.94 |
+| `breaker_ds1_io_formats` | 5 / 35 -> **1 / 35** | 2 / 4 -> 2 / 4 | 15 / 15 | 0.00 (see note) |
+| `breaker_ds2_detect_bypass` | 8 / 40 -> **0 / 40** | 2 / 2 -> 2 / 2 | 18 / 19 | 0.00 (see note) |
+| `breaker_ds3_link_privacy` | 4 / 80 -> **2 / 80** | 1 / 1 -> 1 / 1 | 12 / 12 | 0.80 (was 0.71) |
+
+\*Section 2 numbers (before #17), as section 6 did not rerun `tests/adversarial`.
+
+- `dev/input` sanitized output and `records.jsonl` are byte-identical to `8d1e5ce` (after #15) and to every merge since, and two runs are byte-identical.
+- The remaining canaries in `ds1`, `ds2` and `ds3` are marker words (`CANARY_DS1_*` and so on) that the checker counts; they are not personal data.
+- **Medical kept** here is the end-to-end figure from `check_dev.py`; the detect-level figures in sections 2 and 6 (for example 19 / 19 on `ds2`) count only what detect leaves untouched. The one value lost on `dev`, and those on `adversarial` and `ds2`, were not investigated for this section.
+- **Linking on `ds1` and `ds2`** shows 0.00 because the checker has no pair to score: `ds1` has five patients who each appear once, and `ds2` has no units that need linking. It is not a regression.
+- Self-test 129 / 129, contracts 13 / 13, pytest 50 passed, `CONTRACT OK` on every set. Time and memory on `dev/input` are unchanged (about 6.3 s, 67 MB).
+
+### 7.2 The misses listed in section 6, one by one
+
+| Miss in section 6 | Now |
+|---|---|
+| `Pradeep Joshi` (JSON Lines inside a `.csv`) | removed (the file is read as one record per line) |
+| `Sakshi` (one name, no cue) | **still leaks** (see below) |
+| `+91/9788/002233`, `Hargobind Khorana`, `Vasundhara Raje`, `Keshav Dev`, `Suresh Pandey` | all removed (`ds2` is 0 / 40) |
+| `Pahari` | **still present, on purpose**: another patient's block column, kept by team decision |
+| `Tindwari` | **still leaks** (see below) |
+
+Misses not in section 6 that were fixed by #18: base64 behind a `data:` prefix or wrapped over lines (a name, an Aadhaar,
+a phone and a referral's name, phone and MRN), a base64 file name without padding, `Agustín Fonseca` learned from a file
+name, URL-escaped names and paths (`Priyanka%20Sengupta`, `Rukhsana_Bhattacharya`) and `01/01/1892`.
+
+### 7.3 What is left and why
+
+- **`Sakshi`** (`ds1`, `Follow-up note: Sakshi returned for headache review.`): a rule for "<word> returned" would also hit
+  symptoms (`Wheezing returned`), which are medical text.
+- **`Tindwari`** (`ds3`, `R. Mishra (32/M), Tindwari, copper low`): a bare word after age and sex is as often a diagnosis
+  (`(40/F), Migraine,`) as a village, and there is no village list.
+- **Not decoded:** base64 inside CSV cells or running text, and a data URI inside a longer string.
+- **These sets are seen.** The fixes were written from their failures, so these figures say nothing about new data. For a
+  real measurement, write fresh cases.
