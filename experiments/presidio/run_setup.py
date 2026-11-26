@@ -10,7 +10,6 @@ import json
 import logging
 import os
 import re
-import socket
 import sys
 import time
 
@@ -21,11 +20,10 @@ INFO_TYPES = ("CONDITION", "DISTRICT", "GENDER")  # ours: never replaced, so not
 
 
 def network_is_off() -> bool:
-    try:
-        socket.create_connection(("1.1.1.1", 443), timeout=3).close()
-        return False
-    except OSError:
-        return True
+    """True inside `unshare -n`: the only network interface left is loopback. Nothing is sent to find out."""
+    with open("/proc/net/dev", encoding="ascii") as fh:
+        interfaces = [line.split(":", 1)[0].strip() for line in fh if ":" in line]
+    return all(name == "lo" for name in interfaces)
 
 
 def peak_mb() -> float:
