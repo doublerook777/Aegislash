@@ -64,11 +64,24 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   count them as patient identifiers), and cue words inside the expected string ("Village <name>").
 - `check_contracts.py --mock` fails one detect case on purpose: only the mock raises for a file named "bad".
 
+## Fixes for the red-team set (`tests/test_results_and_observations.md`, Dataset 4)
+- Added: lowercase PAN; `(912) 455-7781`, `912/450/7781` and landline phones; `ref` no longer means doctor (`ref_by`
+  still does); `organization.patient.name` and `organization.contact.name` are people (nearest parent decides);
+  `caller=<Name>`; a full name run together or lowercase in a file name, if the file also holds that name.
+- Narrow, and chosen after seeing the failing cases: `case_sheet` = record number; `dak` = PIN (other `*_code`
+  columns are still kept untouched); JSON keys count as people only in `by_*` tables or in `*_map/_index/_lookup/
+  _directory` tables named for people or contacts. A looser key rule removed `Room Rent` and `Joint Stiffness`.
+- Lowercase names: only on lines with no capital letter, and only with a listed surname of 4+ letters.
+- Checks: selftest 81/81; dev output byte-identical to before; 810 lowercase-rule hits on lowercased dev data were
+  all words from real identifiers. Dataset 4 was **not** rerun (not in the repo), and is no longer unseen for detect.
+- Known false positive: `Lot no 0912-334455` reads as a landline.
+
 ## Next (generalisation)
 1. Another round of fresh unseen cases; fix general causes, never single sentences.
 2. Known blind spots: one-word names with no clue (nicknames, "<name> signed"); full names whose surname is not in
    `gazetteer.py` and that have no cue; "Surname, Given" order; a doctor written without "Dr." in running text can be
    removed as a patient name (also true for a doctor column with an unreadable header: it counts as doctors only if
   more than half its names appear as `Dr. <name>` elsewhere, so that patients are never exposed by one shared name);
-  year-of-birth fields; zero-width characters and look-alike letters.
+  lowercase names with an unlisted surname; a person used as a JSON key outside the tables above;
+   year-of-birth fields; zero-width characters and look-alike letters.
 3. The 1 lost medical value and 1 wrong merge on practice data (find which module causes each).

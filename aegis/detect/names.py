@@ -48,8 +48,8 @@ oxygen dengue malaria typhoid tuberculosis pneumonia anaemia anemia diabetes hyp
 covid dialysis haemodialysis echo ecg usg xray mri scan biopsy endoscopy antibiotic antacid vaccine
 """.split())
 # words that make "<Capitalised words> <phone number>" an organisation, not a person
-_ORG = frozenset("""
-city helpline emergency service services pharmacy counter care health life ambulance enquiry inquiry reception office
+ORG = frozenset("""
+city help helpline emergency service services pharmacy counter care health life ambulance enquiry inquiry reception office
 desk toll free centre center support booking appointment control room police station bank number manager billing
 insurance company limited ltd pvt chemist store medicals general government govt trust foundation society apollo
 """.split())
@@ -209,6 +209,8 @@ _STRICT_CUES: list[tuple[re.Pattern, str]] = [(re.compile(p), role) for p, role 
     (rf"\b(?:ke|ki|unke|unki|uske|uski) +{_KIN_HINDI} +(?P<name>{_FULL})", "relative"),
 )]
 _STRICT_CUES.append((re.compile(rf"(?<![A-Za-z])(?i:ptn|pt|patient|subj(?:ect)?|nok)[ ]?(?:->|[~#|])+ *(?P<name>{_FULL})"), "patient"))
+# call logs: "caller=<name>"
+_STRICT_CUES.append((re.compile(rf"(?<![A-Za-z])(?i:caller|callee) *[:=] *(?P<name>{_FULL})"), "relative"))
 _NEVER_IN_NAME = frozenset("under to into via through with without after before general emergency".split())
 
 
@@ -217,7 +219,7 @@ def _strict_names(text: str) -> list[Cand]:
     for pattern, role in _STRICT_CUES:
         for m in pattern.finditer(text):
             words = [w.strip(".").casefold() for w in m.group("name").split()]
-            if any(w in (STOP - {"asha"}) | _ORG | _NEVER_IN_NAME for w in words):
+            if any(w in (STOP - {"asha"}) | ORG | _NEVER_IN_NAME for w in words):
                 continue
             kind = "RELATIVE_NAME" if role == "relative" else "PATIENT_NAME"
             out.append(Cand(*m.span("name"), kind, None, role))
@@ -229,7 +231,7 @@ def find_names(text: str) -> list[Cand]:
     for index, (pattern, role, relation, hinglish) in enumerate(_CUES):
         for m in pattern.finditer(text):
             s, e = m.span("name")
-            if index >= _PHONE_ADJACENT_FROM and set(text[s:e].casefold().split()) & (_ORG | MEDICAL):
+            if index >= _PHONE_ADJACENT_FROM and set(text[s:e].casefold().split()) & (ORG | MEDICAL):
                 continue
             if relation == "C/O" and not text[s].isupper() and not DEVA.match(text[s]):
                 continue
