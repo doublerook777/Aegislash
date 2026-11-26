@@ -19,8 +19,8 @@ def _words(s: str) -> frozenset[str]:
     return frozenset(s.split())
 
 
-_DOCTOR = _words("doctor dr consultant physician surgeon nurse referred ref author practitioner डॉक्टर चिकित्सक")
-_RELATIVE = _words("guardian relative relatives kin nok father fathers husband husbands mother mothers spouse attendant informant careof pita "
+_DOCTOR = _words("doctor dr consultant physician surgeon nurse referred ref author practitioner clinician medico mo डॉक्टर चिकित्सक")
+_RELATIVE = _words("guardian relative relatives kin nok father fathers husband husbands mother mothers spouse attendant informant careof pita attender parivar sadasya gharwale gharwala gharwali "
                    "pati parent caregiver witness nominee पिता पति अभिभावक माता")
 _PHONE = _words("phone ph mobile mob tel telephone whatsapp cell callback contactno msisdn फ़ोन फोन मोबाइल दूरभाष")
 _MRN = _words("uhid mrn umr crno uid_h भर्ती_संख्या पंजीकरण आईपीडी")
@@ -32,9 +32,10 @@ _PIN = _words("pin pincode zip zipcode postal postalcode पिन")
 _DISTRICT = _words("district distt dist jila zila zilla जिला ज़िला")
 _TEHSIL = _words("tehsil taluk taluka tahsil block तहसील")
 _VILLAGE = _words("village vill gaon gaanv gaav gav gram city town गांव गाँव ग्राम")
-_ADDRESS = _words("address addr street pata residence mohalla locality area house पता निवास")
+_ADDRESS = _words("address addr adr street pata residence mohalla locality area house door doorno hno ghar makan "
+                  "पता निवास घर मकान मोहल्ला")
 _NAME = _words("name nm naam fname lname fullname नाम")
-_SUBJECT = _words("patient pt beneficiary member subject client person insured मरीज़ मरीज रोगी")
+_SUBJECT = _words("patient pt beneficiary member subject client person insured मरीज़ मरीज रोगी mareez marij rogi")
 # labels whose values are medical / administrative: never look for names in them
 _KEEP = _words("diagnosis dx drug drugs medicine medication test tests result results unit range loinc procedure "
                "department dept ward bed hospital facility lab package status category code display strength "
@@ -73,7 +74,7 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
         return "aadhaar"
     if "pan" in s or joined.endswith("panno"):
         return "pan"
-    if s & {"policy", "pmjay", "insurance", "ayushman", "tpa", "abpmjay"}:
+    if s & {"policy", "pol", "pmjay", "insurance", "ayushman", "tpa", "abpmjay"}:
         return "insurance"
     if s & _PHONE or re.search(r"(mobile|phone|contact(no|number|num))", joined):
         return "phone"
@@ -84,7 +85,7 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
     if s & _RELATIVE and (not s & _ADDRESS or s & _NAME):
         return "relative_name"
     if not s & _NOT_MRN and not s & _NAME:
-        if s & _MRN or "uhid" in joined or "पंजीकरण" in label or "आईपीडी" in label:
+        if s & (_MRN | {"rch", "parchi"}) or "uhid" in joined or "पंजीकरण" in label or "आईपीडी" in label:
             return "mrn"
         if s & {"reg", "regn", "registration", "ipd", "ip", "admission", "adm", "cr", "mr", "hospital"} and s & _ID_WORDS:
             return "mrn"
@@ -96,6 +97,9 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
         return "age"
     if s & _GENDER:
         return "gender"
+    # one column holding several address parts ("पता_ग्राम_पिन", "house, village and PIN")
+    if s & _PIN and s & (_ADDRESS | _VILLAGE):
+        return "address"
     if s & _PIN:
         return "pin"
     if s & _DISTRICT:

@@ -57,6 +57,42 @@ CASES = [
     ("Near: Lotus Temple, Diagnosis: Migraine.", ["Lotus Temple"], ["Migraine"]),
     ("श्रीमती अंजलि वर्मा को 10mg दवा दी गई।", ["अंजलि वर्मा"], ["10mg"]),
     ("Village: Rampur, Diagnosis: Malaria, WBC 12,000", ["Rampur"], ["Malaria", "WBC 12,000"]),
+    # round 2: names with no label, address chains, more ID shapes (all invented)
+    ("Discharged Gurleen Kaur Sandhu in stable condition on Tab. Metformin.", ["Gurleen Kaur Sandhu"], ["Metformin"]),
+    ("Handover: bed 4 given to Pallavi Hegde, afebrile overnight.", ["Pallavi Hegde"], ["afebrile"]),
+    ("History taken from Tshering Wangdi, 61 yrs, via phone.", ["Tshering Wangdi"], []),
+    ("आज सुबह गोविंद नारायण शुक्ला को भर्ती किया गया।", ["गोविंद नारायण शुक्ला"], ["भर्ती"]),
+    ("Harbans Lal ki patni Kiran Bala dawa lene aayi.", ["Harbans Lal", "Kiran Bala"], ["dawa"]),
+    ("F/o Ishani Ghosh signed the consent form.", ["Ishani Ghosh"], ["consent form"]),
+    ("Flat 14, Teynampet, 600018; Tab. Dapsone 100mg", ["Flat 14", "Teynampet", "600018"], ["Dapsone 100mg"]),
+    ("Seen at home, Kothapet, 522001. Gopal Naidu was resting.", ["Kothapet", "522001", "Gopal Naidu"], []),
+    ("Ref MRN-GWL-55210-C and IPD#25/66120 today", ["MRN-GWL-55210-C", "IPD#25/66120"], []),
+    ("MRN IPD-2025-061 reviewed", ["IPD-2025-061"], ["reviewed"]),
+    ("Mob 97 31 20 45 88, Door No. 12-3-45, Opp. Water Tanki", ["97 31 20 45 88", "12-3-45", "Opp. Water Tanki"], []),
+    ("Claim ref NIVA-POL-7731204 approved", ["NIVA-POL-7731204"], ["approved"]),
+    # round 2 traps: places, staff and report text that hold surname-like or capitalised words
+    ("Referred to Ram Manohar Lohia Hospital for further care.", [], ["Ram Manohar Lohia"]),
+    ("Treated at Sharma Nursing Home, report from Gupta Diagnostics.", [], ["Sharma", "Gupta"]),
+    ("Seen by Nurse Mary Thomas and Sister Anita Nair.", [], ["Mary Thomas", "Anita Nair"]),
+    ("पाटलिपुत्र केयर अस्पताल में जांच हुई।", [], ["केयर"]),
+    ("Platelet Count, 150000, WBC, 11000, normal.", [], ["150000", "11000"]),
+    ("Total bill, 148500, paid in cash.", [], ["148500"]),
+    ("Review at Village Health Nutrition Day camp.", [], ["Health Nutrition"]),
+    ("रात को नींद की दवा दी गई।", [], ["रात"]),
+    # round 3: whole stretches of medical text must not disappear with a nearby ID or address label
+    ("PAN QWXPE4412L: BP 122/80 mmHg, Amoxyclav 625mg 1-0-1.", ["QWXPE4412L"], ["BP 122/80", "Amoxyclav 625mg", "1-0-1"]),
+    ("मरीज (पता: शिवाजी पेठ, 411030) को डॉ. नीलम राव ने एस्प्रिन 75mg 0-1-0 दी, कुल खर्च रु. 6,100 रहा।",
+     ["शिवाजी पेठ", "411030"], ["एस्प्रिन 75mg", "0-1-0", "रु. 6,100"]),
+    ("आशा दीदी रजनी के साथ आई।", [], ["आशा"]),
+    ("Seen at Sardar Patel PHC today.", [], ["Sardar Patel"]),
+    ("Platelets, 245100 and WBC, 118200 today.", [], ["245100", "118200"]),
+    # round 3: more shapes
+    ("Joseph D'Mello D/o Peter D'Mello admitted.", ["Joseph D'Mello", "Peter D'Mello"], []),
+    ("Ref IP#NICU-25-771 and NGP/CHW/25/40021", ["NICU-25-771", "NGP/CHW/25/40021"], []),
+    ("यूएचआईडी KDR/7714 दर्ज", ["KDR/7714"], []),
+    ("Claim TPA-MEDI-771204 under PMJAY-MH-25-884210", ["TPA-MEDI-771204", "PMJAY-MH-25-884210"], []),
+    ("Collected from Shastri Ward area, Nehru Nagar, 440012 yesterday.", ["Nehru Nagar", "440012"], []),
+    ("सुखदेव उइके को भर्ती किया।", ["सुखदेव उइके"], []),
 ]
 
 
@@ -65,6 +101,36 @@ def _run_line(line: str) -> list[str]:
               "fields": [{"path": "text", "kind": "text", "context": None, "value": line}]}
     return [f["text"] for f in detect_file([record])[0]["findings"]
             if f["type"] not in ("CONDITION", "DISTRICT", "GENDER")]
+
+
+# whole-column cases: (headers, rows, header -> expected finding type for every row, or None = nothing flagged)
+TABLES = [
+    (["P_NOM", "K_SUP", "M_RXR", "Q_LOC", "Z_6D", "N_MEMO"],
+     [["Anirban Sen", "Mitali Sen", "Farhan Qureshi", "21A Lake Road, Near City Park", "700029", "seen by Dr. Farhan Qureshi"],
+      ["Lalita Oraon", "Birsu Oraon", "Neha Kapoor", "H.No. 4, Station Road, Ranchi", "834001", "Dr. Neha Kapoor advised rest"],
+      ["Joseph Kurien", "Anna Kurien", "Farhan Qureshi", "Flat 9, Gandhi Nagar, Near Bus Stand", "682020", "stable"]],
+     {"P_NOM": "PATIENT_NAME", "K_SUP": "RELATIVE_NAME", "M_RXR": None, "Q_LOC": "HOUSE", "Z_6D": "PIN"}),
+    (["fullName", "familyHeadRelation", "orderingClinician", "labRchId", "Village/Mohalla"],
+     [["Renu Bhagat", "Father Suraj Bhagat", "Gautam Pillai", "RCH-JH-25-11902", "Rampur Kalan"]],
+     {"familyHeadRelation": "RELATIVE_NAME", "orderingClinician": None, "labRchId": "MRN", "Village/Mohalla": "VILLAGE"}),
+    (["पता_ग्राम_पिन", "वार्ड"], [["मकान नं. 5/ए, ग्राम रामपुर, 263139", "कस्तूरबा वार्ड"]],
+     {"पता_ग्राम_पिन": "HOUSE", "वार्ड": None}),
+]
+
+
+def _run_tables() -> int:
+    failed = 0
+    for headers, rows, expected in TABLES:
+        records = [{"record_id": f"t.csv#row:{n}", "file": "t.csv", "loc": f"row:{n}", "fmt": "csv",
+                    "fields": [{"path": f"col:{i}", "kind": "value", "context": h, "value": v}
+                               for i, (h, v) in enumerate(zip(headers, row))]} for n, row in enumerate(rows, 1)]
+        for n, result in enumerate(detect_file(records)):
+            for header, kind in expected.items():
+                found = [f["type"] for f in result["findings"] if f["path"] == f"col:{headers.index(header)}"]
+                if (kind is None and found) or (kind is not None and kind not in found):
+                    failed += 1
+                    print(f"FAIL  column {header} row {n + 1}: expected {kind}, got {found}")
+    return failed
 
 
 def main() -> int:
@@ -76,8 +142,10 @@ def main() -> int:
         if missed or eaten:
             failed += 1
             print(f"FAIL  {line}\n      missed={missed} wrongly_removed={eaten}")
-    print(f"{len(CASES) - failed}/{len(CASES)} cases passed")
-    return 1 if failed else 0
+    table_failures = _run_tables()
+    print(f"{len(TABLES)} column tables checked, {table_failures} problems")
+    print(f"{len(CASES) - failed}/{len(CASES)} cases passed")  # keep last: tools read the last line
+    return 1 if failed or table_failures else 0
 
 
 if __name__ == "__main__":

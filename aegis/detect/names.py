@@ -29,10 +29,11 @@ asha anm worker staff sister nurse
 january february march april may june july august september october november december
 jan feb mar apr jun jul aug sep sept oct nov dec monday tuesday wednesday thursday friday saturday sunday
 village vill gram tehsil distt uttar pradesh india road gali mohalla nagar near opp behind house makan flat plot
-low salt diabetic diet rest fluids continue stop start same
+low salt diabetic diet care rest fluids continue stop start same
 dawai dawa marij mareez bukhar khana pet sir dard ulti neend raat aaj kal subah shaam doctor test usko uska uski
 unko unka inka iska aap hum ghar sab koi kuch abhi phir dobara sugar pressure thyroid saans khoon
 export exports data file files patients records visits backup
+रात सुबह शाम दोपहर आज कल बच्चे बच्चा माँ दवा मरीज मरीज़ रोगी
 education counselling counseling instructions information walk haan namaste theek achha accha ok okay hello thank thanks
 """.split())
 # common drug, disease and test words: never a person (general medical vocabulary, not taken from any file)
@@ -54,13 +55,14 @@ insurance company limited ltd pvt chemist store medicals general government govt
 """.split())
 STOP = STOP | MEDICAL
 # "asha" is both a common first name and the community health worker: names rules decide by context.
-_ASHA_WORKER = re.compile(r"\bASHA\b(?! +[A-Z]{2,})|\b(?i:asha)\b(?=\s+(?i:worker|volunteer))")
+_ASHA_WORKER = re.compile(r"\bASHA\b(?! +[A-Z]{2,})|\b(?i:asha)\b(?=\s+(?i:worker|volunteer|didi))"
+                          r"|(?<![ऀ-ॿ])आशा(?= (?:दीदी|कार्यकर्ता|कार्यकर्त्री|वर्कर|बहू|सहयोगिनी))")
 
 # Name parts that do not identify anyone on their own.
 GENERIC = frozenset("devi kumar kumari singh md mohd mohammad mohammed shri smt kaur bai lal ji prasad ram".split())
 
 _TITLE = r"(?:Mr|Mrs|Ms|Smt|Shri|Sri|Km|Kumari|Master|Baby|Late|Mohd|Md|श्री|श्रीमती|कुमारी|स्व)\b\.?"
-_CAP = r"(?:[A-Z][a-z]+(?:'[a-z]+)?|[A-Z]{2,}(?![A-Za-z])|[A-Z]\.(?= ?[A-Z]))"
+_CAP = r"(?:[A-Z]'[A-Z][a-z]+|[A-Z][a-z]+(?:'[a-z]+)?|[A-Z]{2,}(?![A-Za-z])|[A-Z]\.(?= ?[A-Z]))"
 _DEVA_WORD = r"[ऀ-ॣॱ-ॿ]+"
 LATIN_NAME = rf"(?:(?:Mohd|Md)\.? )?{_CAP}(?: {_CAP}){{0,3}}"
 DEVA_NAME = rf"{_DEVA_WORD}(?: {_DEVA_WORD}){{0,2}}"
@@ -70,6 +72,19 @@ _DOCTOR = re.compile(
     rf"(?:\bDr\b\.?|\bDOCTOR\b|\bDoctor\b|\bProf\b\.?|डॉ\.?|डा\.|डॉक्टर)\s*(?:{LATIN_NAME}|{DEVA_NAME})"
     rf"(?:\s*\([^)\n]*\))?")
 _EPONYM = re.compile(rf"\b{_CAP}(?:'s)?(?= (?:[Dd]isease|[Ss]yndrome|[Pp]alsy|[Ss]ign|[Pp]rocedure)\b)")
+
+
+def name_words(value: str) -> list[str]:
+    return [w for w in re.split(r"[ .]+", value.casefold()) if w]
+
+
+def doctor_mentions(text: str) -> list[str]:
+    return [m.group(0) for m in _DOCTOR.finditer(text)]
+
+
+def doctor_name(mention: str) -> list[str]:
+    """The words after the title: "Dr. R. Mehta (MD)" -> ["r", "mehta"]."""
+    return name_words(re.sub(r"^(?:Dr\b\.?|DOCTOR|Doctor|Prof\b\.?|डॉ\.?|डा\.|डॉक्टर)|\(.*$", "", mention))
 
 
 def protected_spans(text: str) -> list[tuple[int, int]]:
@@ -82,7 +97,8 @@ def trim_name(text: str, start: int, end: int) -> tuple[int, int] | None:
     words = [(m.start() + start, m.end() + start) for m in re.finditer(r"[^\s]+", text[start:end])]
     def bad(span):
         w = text[span[0]:span[1]].strip(".,'’:;()-")
-        return not w or w.casefold() in STOP - {"asha"} or re.fullmatch(_TITLE, text[span[0]:span[1]]) is not None
+        title = re.fullmatch(_TITLE, text[span[0]:span[1]]) is not None and w not in ("Md", "Mohd")  # part of a name
+        return not w or w.casefold() in STOP - {"asha"} or title
     while words and bad(words[0]):
         words.pop(0)
     # stop at the first stop word inside ("Fatima Bano Age" -> "Fatima Bano")
@@ -109,6 +125,7 @@ _DEVA_HON = "जी|साहब|साहिब|बहन|बहनजी|भ�
 # "sister" is left out on purpose: "Sister Mary" is usually a nurse
 _PERSON_WORD = (r"(?:attendant|attender|relative|informant|caretaker|care ?giver|guardian|neighbou?r|son-in-law|"
                 r"daughter-in-law|grand(?:son|daughter|father|mother)|nephew|niece|uncle|aunt|bua|mausi|chacha|"
+                r"(?:brother|sister|father|mother)-in-law|cousin|spouse|sasur|"
                 r"son|daughter|wife|husband|brother|father|mother)")
 
 # (regex with group "name", role, relation, hinglish?)
@@ -125,7 +142,8 @@ for _rel in ("S/o", "D/o", "W/o"):
     _cue(rf"(?P<name>{NAME}) *,? *\(?(?<![A-Za-z])(?i:{_rel[0]}/o)\b", "patient")
 _cue(rf"(?<![A-Za-z/])[Cc]/[Oo]\b *(?:(?:{_TITLE}) )?(?P<name>{NAME})", "relative", "C/O")
 _cue(rf"\b(?i:son|daughter|wife|husband|father|mother) (?:of|name:?) (?:(?:{_TITLE}) )?(?P<name>{NAME})", "relative")
-_cue(rf"(?:पुत्र|पुत्री|पत्नी|सुपुत्र)[ :]+(?:श्री )?(?P<name>{DEVA_NAME})", "relative")
+_cue(rf"(?<![ऀ-ॿ])(?:पुत्र|पुत्री|पत्नी|सुपुत्र)[ :]+(?:श्री )?(?P<name>{DEVA_NAME})", "relative")
+_cue(rf"(?<![A-Za-z/])(?i:[fmg]/o)\b[.:]? *(?:(?:{_TITLE}|Baby) )?(?P<name>{LATIN_NAME})", "patient")
 # "Attendant: X", "called by X", "witnessed by X"
 _cue(rf"\b(?i:{_PERSON_WORD}|informed by|called by|witnessed by|accompanied by|brought by|raised by|reported by)"
      rf"(?: *\([^)\n]{{0,30}}\))?(?:\s*[:\-] *| +)(?P<name>{LATIN_NAME})", "relative")
@@ -178,6 +196,34 @@ def find_path_names(text: str) -> list[Cand]:
     return out
 
 
+# Cues that are weaker than a label, so every word of the name must look like a name (two words or more).
+_FULL = rf"{_CAP}(?: {_CAP}){{1,3}}"
+_KIN_HINDI = r"(?:bete|beta|beti|patni|pati|dharmapatni|maa|mata|pita|bhai|behen|chacha|mama|mausi|bua)"
+_STRICT_CUES: list[tuple[re.Pattern, str]] = [(re.compile(p), role) for p, role in (
+    # "Tenzing Lepcha, 54 yrs", "Harpreet Gill (46 yrs)"
+    (rf"(?P<name>{_FULL}) *[,(] *\d{{1,3}} *(?i:yrs?|years?|y/o|saal)\b", "patient"),
+    (rf"\b(?i:admitted|discharged|belongs to|signed by|allocated to|history (?:was )?taken from|workup for|"
+     rf"follow[- ]?up (?:visit )?of|consent (?:signed |given )?by|referral letter *:) +(?P<name>{_FULL})", "patient"),
+    # "<name> ki patni <name>"
+    (rf"(?P<name>{_FULL}) +(?:ke|ki) +{_KIN_HINDI}\b", "patient"),
+    (rf"\b(?:ke|ki|unke|unki|uske|uski) +{_KIN_HINDI} +(?P<name>{_FULL})", "relative"),
+)]
+_STRICT_CUES.append((re.compile(rf"(?<![A-Za-z])(?i:ptn|pt|patient|subj(?:ect)?|nok)[ ]?(?:->|[~#|])+ *(?P<name>{_FULL})"), "patient"))
+_NEVER_IN_NAME = frozenset("under to into via through with without after before general emergency".split())
+
+
+def _strict_names(text: str) -> list[Cand]:
+    out = []
+    for pattern, role in _STRICT_CUES:
+        for m in pattern.finditer(text):
+            words = [w.strip(".").casefold() for w in m.group("name").split()]
+            if any(w in (STOP - {"asha"}) | _ORG | _NEVER_IN_NAME for w in words):
+                continue
+            kind = "RELATIVE_NAME" if role == "relative" else "PATIENT_NAME"
+            out.append(Cand(*m.span("name"), kind, None, role))
+    return out
+
+
 def find_names(text: str) -> list[Cand]:
     out = []
     for index, (pattern, role, relation, hinglish) in enumerate(_CUES):
@@ -196,4 +242,4 @@ def find_names(text: str) -> list[Cand]:
             s, e = span
             kind = "RELATIVE_NAME" if role == "relative" else "PATIENT_NAME"
             out.append(Cand(s, e, kind, None, role, relation=relation, hinglish=hinglish))
-    return out
+    return out + _strict_names(text)

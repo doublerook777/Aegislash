@@ -80,7 +80,7 @@ Assumptions:
 | Module | Owner | Contract | State (mocked / in progress / real) | Last update |
 |---|---|---|---|---|
 | io | Member-1 | calls detect, link, privacy | real (`aegis/io/`); runs end-to-end on the 3 mocks, CONTRACT OK, READY TO SUBMIT | 2026-11-26 |
-| detect | Member-2 | contracts/detect.md | real (`aegis/detect/`); next: generalisation to unseen formats | 2026-11-26 |
+| detect | Member-2 | contracts/detect.md | real (`aegis/detect/`); unseen-format rounds 2-3 done, see its README | 2026-11-26 |
 | link | Member-3 | contracts/link.md | real (`aegis/link/`) | 2026-11-26 |
 | privacy | Member-4 | contracts/privacy.md | real (`aegis/privacy/`, `config/policy.yaml`, `scripts/risk_report.py`, `README.md`, `brief/`); full-pipeline `CONTRACT OK`, `check_dev.py` + `risk_report.py` measured in brief | 2026-11-26 |
 
@@ -91,6 +91,8 @@ io notes (2026-11-26):
 
 detect notes (2026-11-26):
 - Done: real engine; practice 0/3230 leaks, 0 canaries, 4855/4855 medical kept (link, privacy still mocked). Practice score is optimistic; own cases: `python -m aegis.detect.selftest`. Next steps: aegis/detect/README.md.
+- Rounds 2-3: names without a label (surname list), address chains, more ID shapes and column names. On fresh cases personal data covered went 54-63% -> 82-85% (measured before fixing them); practice results unchanged.
+- For link (no shape change): "Mohd."/"Md." now stays part of a name, so `text`/`norm` can start with "mohd"/"md".
 - Contract notes (no shape change): MRN `norm` is the digits only; evidence `gender` may be implied by S/o, D/o, W/o or an honorific. `check_contracts.py --mock` fails detect's mock-only "bad file" case by design.
 
 link notes (2026-11-26):

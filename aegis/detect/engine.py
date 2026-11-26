@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-from aegis.detect import address, dates, evidence, fields, ids, names
+from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
 from aegis.detect.labels import classify, tokens
 from aegis.detect.normalize import DEVA, fold, norm_name
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
@@ -111,24 +111,34 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
             roles[key] = role
     # unknown column: decide from its values (hidden data renames headers)
     values = {(r["record_id"], f["path"]): f["value"] for r in records for f in r["fields"]}
+    # a doctor column without "Dr." in it: the same people are written "Dr. X" somewhere else in the file
+    doctors = {" ".join(names.doctor_name(m)) for text in values.values() for m in names.doctor_mentions(text)}
+    has_name = any(role in ("patient_name", "name", "first_name") for role in roles.values())
     for keys in columns.values():
         if roles[keys[0]] is None:
             guess = _guess_role([values[k] for k in keys if values[k].strip()])
+            if guess == "patient_name" and any(" ".join(names.name_words(values[k])) in doctors for k in keys):
+                guess = "doctor"
+            if guess == "patient_name":
+                # a second column full of people is usually the relative
+                guess, has_name = ("relative_name" if has_name else "patient_name"), True
             for k in keys:
                 roles[k] = guess
     return roles
 
 
-_COMMON_SURNAMES = frozenset("""kumar singh devi yadav sharma verma gupta mishra tiwari pandey patel ansari khan bano
-siddiqui qureshi chauhan chaudhary choudhary paswan nishad lodhi maurya rajput thakur shukla dubey srivastava kaur
-masih ahmed ali begum prasad lal ram das""".split())
-
-
 def _guess_role(vals: list[str]) -> str | None:
     if len(vals) < 3:
         return None
+    if all(re.fullmatch(r"[1-9]\d{2}(?!000)\d{3}", v.strip()) for v in vals):
+        return "pin"
+    # addresses: most values carry a house number, landmark or PIN together with a comma
+    addresses = [v for v in vals if "," in v and any(c.type in ("HOUSE", "LANDMARK", "LOCALITY", "PIN")
+                                                     for c in address.find_places(fold(v)))]
+    if len(addresses) >= 0.6 * len(vals) and all(len(v) <= 90 for v in vals):
+        return "address"
     people = [v for v in vals if re.fullmatch(r"[A-Z][A-Za-z.']*(?: [A-Z][A-Za-z.']*){1,3}", v.strip())]
-    with_surname = [v for v in people if set(v.casefold().split()) & _COMMON_SURNAMES]
+    with_surname = [v for v in people if set(v.casefold().split()) & gazetteer.SURNAMES]
     if len(people) >= 0.7 * len(vals) and len(with_surname) >= 0.4 * len(vals):
         return "patient_name"
     return None
@@ -148,6 +158,8 @@ def _labelled(text: str, dmy: bool) -> list[Cand]:
             if not lab:
                 continue
             label = lab.group("label")
+            if re.search(r"\d{4}", label):
+                continue  # "PAN ABCDE1234F: BP 118/76": the "label" holds the number itself
             dashed = not re.match(r"\s*[:=]", m.group(0)[lab.end("label"):])
             # a dash is a weak separator ("Ward 4 - ..."): require the label to be short and digit-free
             if dashed and (len(label.split()) > 5 or any(ch.isdigit() for ch in label)):
@@ -156,7 +168,11 @@ def _labelled(text: str, dmy: bool) -> list[Cand]:
             if role in (None, "free", "keep", "doctor", "date", "relation", "tehsil"):
                 continue
             base = pos + m.start()
-            found = fields.structured(text, base + lab.start("value"), base + lab.end("value"), role, dmy)
+            end = base + lab.end("value")
+            if role in ("address", "village", "district"):
+                stop = re.search(r"।|\)(?![^(]*\()", lab.group("value"))  # not ".": "Vill. X", "Distt. Y"
+                end = base + lab.start("value") + stop.start() if stop else end
+            found = fields.structured(text, base + lab.start("value"), end, role, dmy)
             if role in fields.NAME_ROLES:
                 relation = fields.relation_of(label)
                 father = re.search(r"father|पिता", label, re.I)
@@ -204,6 +220,8 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
     else:
         extra = dates.find_dates(text, dmy, is_dob_field=role == "dob")
     found += extra
+    if role == "relation":
+        found += fields.kin_and_name(text)
     if role not in (None, "free"):
         found += fields.structured(text, 0, len(text), role, dmy)
 
@@ -211,6 +229,7 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
         found += dates.find_ages(text)
         found += address.find_places(text)
         found += names.find_names(text)
+        found += gazetteer.find_listed_names(text, names.STOP)
         found += _labelled(text, dmy)
     found += names.find_path_names(text)
     if kind in ("header", "key", "filename"):
@@ -221,6 +240,10 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
         if classify(holder.replace("by_", "")) in ("patient_name", "name") and holder.startswith("by_"):
             found += fields.name_value(text, 0, len(text), "name")
     found += _conditions(text, role, label, parents)
+
+    # "Door No. 18-4-22" is a house number, not a date
+    houses = [c for c in found if c.type == "HOUSE"]
+    found = [c for c in found if not (c.type == "DATE" and any(h.start <= c.start and c.end <= h.end for h in houses))]
 
     blocked = names.protected_spans(text)
     return [c for c in found
