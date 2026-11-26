@@ -9,5 +9,6 @@ rename PII file names, final leak gate, `report.json`, `records.jsonl`, determin
 
 Contracts it calls: [detect](../../contracts/detect.md), [link](../../contracts/link.md), [privacy](../../contracts/privacy.md). Shapes: [types](../../contracts/types.md).
 
-Starting point: root `main.py` is the kit starter (already CONTRACT OK). Move its logic into
-`aegis/io/` and call the three modules; keep `main.py` as a thin entry point.
+Files: `decode.py` (bytes → text), `formats.py` (parse into Records, write back in the same
+structure, base64 attachments), `leakgate.py` (final scrub + verify), `pipeline.py` (orchestration,
+report, records). `main.py` is a thin entry point.
