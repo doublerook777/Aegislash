@@ -1,0 +1,6 @@
+DISCHARGE SUMMARY - Rare Disease Registry
+Name: Kavya Shukla (0/F)   UHID: KGH/2026/9009
+Village: Keshavpur, District: Gorakhpur, PIN: 273209
+Admission: 29/02/2024   Discharge: 2024-03-14T23:55:00+05:30   Follow-up: Nov 2026
+Diagnosis: Wilson's disease (E83.01)
+Procedure: Deep brain stimulation

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "x9",
+  "records": [
+    {
+      "recRef": "CR.No. 771/26",
+      "subjectFullName": "Pema Choden",
+      "kinGuardian": "Dorje Wangchuk",
+      "birthYear": 1998,
+      "postal6": "734203",
+      "contactDigits": "98.45.01.12.23",
+      "extensions": [
+        {
+          "url": "https://example.org/ext/mothers-maiden-handle",
+          "valueString": "Choden Wangmo"
+        }
+      ],
+      "wardEncounterDate": "2026-09-14",
+      "clinicalSummary": "K/C/O Essential (primary) hypertension; Tab Metformin 500 mg 1-0-1"
+    }
+  ]
+}

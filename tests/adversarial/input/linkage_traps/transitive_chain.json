@@ -1,0 +1,21 @@
+{
+  "entries": [
+    {
+      "name": "Ramesh",
+      "phone": "8035650168",
+      "note": "Admitted with fever"
+    },
+    {
+      "name": "Ramesh Kumar",
+      "phone": "8035650168",
+      "relative": "S/o Suresh Kumar",
+      "dob": "1984-05-22"
+    },
+    {
+      "name": "Ramesh Kumar",
+      "phone": "9504955683",
+      "relative": "S/o Suresh Kumar",
+      "dob": "1997-11-01"
+    }
+  ]
+}

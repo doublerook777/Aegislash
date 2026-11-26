@@ -1,0 +1,7 @@
+id,name,uid_text
+1,PatientA,"1234 5678 9012"
+2,PatientB,"1234-5678-9012"
+3,PatientC,"123456789012"
+4,PatientD,"Aadhaar: 1234 5678 9013"
+5,PatientE,"UID: 123456789014"
+6,PatientF,"आधार: 1234 5678 9015"

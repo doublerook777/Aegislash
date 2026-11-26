@@ -93,6 +93,90 @@ CASES = [
     ("Claim TPA-MEDI-771204 under PMJAY-MH-25-884210", ["TPA-MEDI-771204", "PMJAY-MH-25-884210"], []),
     ("Collected from Shastri Ward area, Nehru Nagar, 440012 yesterday.", ["Nehru Nagar", "440012"], []),
     ("सुखदेव उइके को भर्ती किया।", ["सुखदेव उइके"], []),
+    # lowercase PAN, more phone layouts, key=value logs, lowercase names
+    ("billing: pan mkrpd4821q noted, Tab. Cefixime 200 mg", ["mkrpd4821q"], ["Cefixime 200 mg"]),
+    ("Reach on (912) 455-7781 or 934/221/6650; SpO2 97%", ["(912) 455-7781", "934/221/6650"], ["SpO2 97%"]),
+    ("Landline 0512-2345678, alt (0581) 456789 and 022 2567 8901.",
+     ["0512-2345678", "(0581) 456789", "022 2567 8901"], []),
+    ("Ward office 0591-245566 open till 5; lot 0042-118, batch 0007-123456789",
+     ["0591-245566"], ["0042-118", "0007-123456789"]),
+    ("BP 130/80/72, counts 150/900/1100, ref range 4000-11000, dose 0.5-1.0 mg", [], ["130/80/72", "4000-11000", "0.5-1.0"]),
+    ("caller=devika ranganathan dial=912/450/7781", ["devika ranganathan", "912/450/7781"], []),
+    ("caller=Barnali Thengal status=resolved", ["Barnali Thengal"], ["resolved"]),
+    ("patient=stable name=unknown pt=afebrile", [], ["stable", "unknown", "afebrile"]),
+    ("pt devika ranganathan ko do din se bukhar hai", ["devika ranganathan"], ["bukhar"]),
+    ("mahesh tripathi s/o ramnaresh tripathi admitted kal raat", ["mahesh tripathi", "ramnaresh tripathi"], ["admitted"]),
+    ("pichle das din se pet dard, lal chakte, x ray normal, khan pan theek", [],
+     ["das din", "pet dard", "lal chakte", "x ray normal", "khan pan"]),
+    ("patient has chest pain and mild fever, advised rest at home", [], ["chest pain", "mild fever", "rest at home"]),
+    # lowercase "h.no"; "q4h no 2" is a dose schedule, not a house
+    ("Lives at h.no 58/C, since 2019.", ["h.no 58/C"], []),
+    ("Old record says hno. 212 only.", ["hno. 212"], []),
+    ("Syrup q4h no 2 more doses today.", [], ["q4h no 2"]),
+    # "r/o" also means "rule out": a disease after it is not a village
+    ("Tremor, r/o Parkinson's disease, advise MRI.", [], ["Parkinson"]),
+    ("Fever 3 days, r/o Dengue.", [], ["Dengue"]),
+    ("Chest pain, r/o MI.", [], ["MI"]),
+    ("Persistent cough, R/O TB.", [], ["TB"]),
+    ("Weakness, r/o Guillain Barre syndrome.", [], ["Guillain"]),
+    ("RLQ pain, r/o Appendicitis.", [], ["Appendicitis"]),
+    ("65 yr male R/o Barhalganj, seen in OPD.", ["Barhalganj"], []),
+    ("Pt r/o Sikandarpur fever since 3 days.", ["Sikandarpur"], []),
+    # a real village must still go, whatever follows it or however its name ends
+    ("R/o Barhalganj Patient stable today.", ["Barhalganj"], []),
+    ("Woman r/o Sikandarpur heart disease on treatment.", ["Sikandarpur"], []),
+    ("Man r/o Phuluria for ten years.", ["Phuluria"], []),
+    # dotted and "+91/" phones, mixed Aadhaar separators
+    ("Call 97.31.20.45.88 or +91/8123/004455; Na 138.5", ["97.31.20.45.88", "+91/8123/004455"], ["138.5"]),
+    ("ID seen 5821-7734 9012 at desk, HbA1c 7.2", ["5821-7734 9012"], ["HbA1c 7.2"]),
+    # zero-width characters, look-alike letters, accents (typed whole or as separate marks)
+    ("Patient: Bar\u200bnali Then\u200dgal, mob 97312\u200b04588", ["Bar\u200bnali Then\u200dgal", "97312\u200b04588"], []),
+    ("Patient: B\u0430rn\u0430li Thengal (44/F)", ["B\u0430rn\u0430li Thengal"], []),
+    ("Patient Name: H\u00e9ctor Pereira", ["H\u00e9ctor Pereira"], []),
+    ("Patient Name: He\u0301ctor Pereira", ["He\u0301ctor Pereira"], []),
+    ("TSH 2.1 \u03bcIU/mL, dose 50 \u00b5g, TNF-\u03b1 raised", [], ["\u03bcIU/mL", "50 \u00b5g", "TNF-\u03b1"]),
+    # years from 1800: the date is found and shifted; a 4-digit time of day is not a year
+    ("DOB 14/03/1893, seen 02 Feb 1895", ["14/03/1893", "02 Feb 1895"], []),
+    ("Born 1889-07-21; registered 1889/07/22", ["1889-07-21", "1889/07/22"], []),
+    ("Admitted 12 Mar 1830 hrs with BP 120/80, Tab Aspirin 75 mg 0-1-0", [], ["1830 hrs", "BP 120/80", "Aspirin 75 mg"]),
+    # URL escapes: found where they stand in the original text, and the words between them are not read as a name
+    ("Scan: https://his.example/files/Tarun%20Wadhwa%5Creport.pdf?tel=%2B91%2098765%2043210",
+     ["Tarun%20Wadhwa", "%2B91%2098765%2043210"], ["report.pdf"]),
+    ("file:///D%3A%5CRecords%5CKavya_Chaudhary%5Ccase_notes.pdf", ["Kavya_Chaudhary"], ["case_notes"]),
+    ("Open summary_Zubin_Pathak_2026.pdf and Lab_Reports_Singh_Block.csv", ["Zubin_Pathak"], ["Lab_Reports", "Singh_Block"]),
+    ("view?patient=Agust%C3%ADn%20Fonseca&visit=3", ["Agust%C3%ADn%20Fonseca"], ["visit=3"]),
+    ("log: patient=Zorawar Khetarpal ward=3 status=stable", ["Zorawar Khetarpal"], ["ward=3", "status=stable"]),
+    ("SpO2 96%, 5%DEXTROSE drip at 40%20 ml/hr, Tab Paracetamol 650 mg", [], ["96%", "5%DEXTROSE", "Paracetamol 650 mg"]),
+    ("Keep 100%25 oxygen; Hb 9.8 g/dL", [], ["Hb 9.8 g/dL"]),
+    # given names with no surname: only where the sentence says the person did something ("signed the", "took discharge")
+    ("Meenal signed the surgical consent form.", ["Meenal"], ["consent form"]),
+    ("Tarun took discharge against medical advice on 14/08/2026.", ["Tarun"], ["medical advice"]),
+    ("Consent signed by guardian. Nurse signed the form. Uncle signed the consent. Dr. Rao signed the order.", [],
+     ["Consent", "Nurse", "Uncle", "guardian"]),
+    ("Wheezing returned after 2 days. Itching signed off by physician. Pharmacy signed the bill.", [],
+     ["Wheezing", "Itching", "Pharmacy"]),
+    # Scrubadub-inspired improvements + English/Hindi/Hinglish translations
+    ("Contact ramesh.verma at gmail dot com or ph 98.45.01.12.23; BP 118/76.",
+     ["ramesh.verma at gmail dot com", "98.45.01.12.23"], ["118/76"]),
+    ("Patient: Ra\u200bhul\u200d Chatur\u200bvedi, Mob: 73053\u200b31651, Co-admitted: Dеvikа Rаo.",
+     ["Ra\u200bhul\u200d Chatur\u200bvedi", "73053\u200b31651", "Dеvikа Rаo"], []),
+    ("URL ref: https://portal.example/view?patient=Priyanka%20Sengupta&tel=%2B91%207759130735",
+     ["Priyanka%20Sengupta", "%2B91%207759130735"], []),
+    ("Satyendra discharged in stable condition on Tab Azithromycin 500 mg.",
+     ["Satyendra"], ["Azithromycin 500 mg"]),
+    ("Priyanka ne sign kiya aur Rohan ko chhutti mili; BP 120/80.",
+     ["Priyanka", "Rohan"], ["120/80"]),
+    ("रमेश ने हस्ताक्षर किए और प्रिया को छुट्टी दी गई; पैरासिटामोल 500mg जारी।",
+     ["रमेश", "प्रिया"], ["पैरासिटामोल 500mg"]),
+    ("Follow up with Pema Choden and Agustín Fonseca; PAN gxlpv2692s.",
+     ["Pema Choden", "Agustín Fonseca", "gxlpv2692s"], []),
+    # the same new rules must leave report and ward text alone
+    ("Culture verified, Repeat CBC signed.", [], ["Culture", "Repeat CBC"]),
+    ("Troponin, Negative called to physician.", [], ["Negative"]),
+    ("Seen at 10 at AIIMS dot in OPD.", [], ["AIIMS"]),
+    ("Lobsang verified the payment receipt at the counter.", ["Lobsang"], []),
+    ("Culture verified the organism; Smear signed out by pathologist.", [], ["Culture", "Smear"]),
+    ("Janam tithi 14/05/1988, जन्मतिथि 12-08-1992.", ["14/05/1988", "12-08-1992"], []),
 ]
 
 
@@ -105,6 +189,14 @@ def _run_line(line: str) -> list[str]:
 
 # whole-column cases: (headers, rows, header -> expected finding type for every row, or None = nothing flagged)
 TABLES = [
+    # recent years under an unreadable header are events, not birth years
+    (["Q_YR"], [["2009"], ["2014"], ["2021"], ["2024"]], {"Q_YR": None}),
+    # "Surname, Given" in an unreadable column, a birth-year column, Hindi-in-Latin headers
+    (["PX_LBL", "X_YOB", "CLIN_TXT"], [["Thengal, Barnali", "1968", "stable"], ["Pereira, Hector", "1981", "afebrile"],
+                                       ["Oraon, Suraj", "2003", "review"]],
+     {"PX_LBL": "PATIENT_NAME", "X_YOB": "DOB", "CLIN_TXT": None}),
+    (["rogee", "pehchaan_sankhya", "postal6", "nidan"], [["Barnali Thengal", "1234 5678 9012", "781001", "Anemia"]],
+     {"rogee": "PATIENT_NAME", "pehchaan_sankhya": "AADHAAR", "postal6": "PIN", "nidan": None}),
     (["P_NOM", "K_SUP", "M_RXR", "Q_LOC", "Z_6D", "N_MEMO"],
      [["Anirban Sen", "Mitali Sen", "Farhan Qureshi", "21A Lake Road, Near City Park", "700029", "seen by Dr. Farhan Qureshi"],
       ["Lalita Oraon", "Birsu Oraon", "Neha Kapoor", "H.No. 4, Station Road, Ranchi", "834001", "Dr. Neha Kapoor advised rest"],
@@ -118,6 +210,11 @@ TABLES = [
      {"familyHeadRelation": "RELATIVE_NAME", "orderingClinician": None, "labRchId": "MRN", "Village/Mohalla": "VILLAGE"}),
     (["पता_ग्राम_पिन", "वार्ड"], [["मकान नं. 5/ए, ग्राम रामपुर, 263139", "कस्तूरबा वार्ड"]],
      {"पता_ग्राम_पिन": "HOUSE", "वार्ड": None}),
+    # "ref" does not mean doctor; real referrer and reference-range columns are still kept
+    (["case_sheet_ref", "patient_ref", "mrn_ref", "ref_by", "ref_doctor", "ref_range", "dak_code", "sample_code"],
+     [["31145549", "31147001", "31149002", "Neha Kapoor", "Farhan Qureshi", "4000-11000", "226010", "880123"]],
+     {"case_sheet_ref": "MRN", "patient_ref": "MRN", "mrn_ref": "MRN", "ref_by": None, "ref_doctor": None,
+      "ref_range": None, "dak_code": "PIN", "sample_code": None}),
 ]
 
 
@@ -136,6 +233,114 @@ def _run_tables() -> int:
     return failed
 
 
+# one column: (header, cell, strings that MUST be found, strings that MUST survive). The header is only a hint:
+# a "PIN" column may hold the whole address, and "Ward / Patient" holds a bed number and a person
+CELLS = [
+    ("res_pin", "7/21, Teliarganj, 211004", ["7/21", "Teliarganj", "211004"], []),
+    ("Postal Entry", "Flat 6-C, Ulubari, 781007", ["Flat 6-C", "Ulubari", "781007"], []),
+    ("Dwelling/PIN", "Kachhi Basti, opp. Water Tank, 302016", ["Kachhi Basti", "opp. Water Tank", "302016"], []),
+    ("PIN Code", "211004", ["211004"], []),
+    ("pin_code", "PIN 211004", ["211004"], ["PIN"]),
+    ("Pincode", "not recorded, ask later", [], ["not recorded", "ask later"]),
+    ("Ward / Patient", "Bed 21 - Ishrat Jahan Ansari", ["Ishrat Jahan Ansari"], ["Bed 21"]),
+    ("bed_patient", "Cot 3: Thangkhal Haokip", ["Thangkhal Haokip"], ["Cot 3"]),
+    ("Patient", "Bed 8 - Devika Ranganathan", ["Devika Ranganathan"], ["Bed 8"]),
+    ("Patient", "Ward 3 Bed 8 - Devika Ranganathan", ["Devika Ranganathan"], ["Ward 3", "Bed 8"]),
+    ("Ward / Patient", "Female Medical Ward", [], ["Female Medical Ward"]),
+    ("Ward / Patient", "Surgical Ward B", [], ["Surgical Ward"]),
+    ("bed_patient", "Bed 14", [], ["Bed 14"]),
+    ("Ward / Patient", "Ward 4 - Male Surgical", [], ["Male Surgical"]),
+    ("Ward / Patient", "Ishrat Jahan Ansari", ["Ishrat Jahan Ansari"], []),
+    ("patient_ward", "Maternity", [], ["Maternity"]),
+]
+
+
+def _run_cells() -> int:
+    failed = 0
+    for header, value, must_find, must_keep in CELLS:
+        record = {"record_id": "t.csv#row:1", "file": "t.csv", "loc": "row:1", "fmt": "csv",
+                  "fields": [{"path": "col:0", "kind": "value", "context": header, "value": value}]}
+        found = [f["text"] for f in detect_file([record])[0]["findings"]
+                 if f["type"] not in ("CONDITION", "DISTRICT", "GENDER")]
+        missed = [x for x in must_find if not any(x in f for f in found)]
+        eaten = [x for x in must_keep if any(x in f or f in x for f in found)]
+        if missed or eaten:
+            failed += 1
+            print(f"FAIL  {header}: {value}\n      missed={missed} wrongly_removed={eaten}")
+    return failed
+
+
+# JSON cases: (pointer -> value or key, strings that MUST be found, strings that MUST survive)
+DOCS = [
+    # an unlisted two-word value is a person only when its label says so
+    ({"organism": "Escherichia Coli", "sign": "Murphy Positive", "reviewer": "Tshering Wangdi"},
+     ["Tshering Wangdi"], ["Escherichia Coli", "Murphy Positive"]),
+    # lookup tables keyed by people, whatever the table is called
+    ({"on_call_map": {"Barnali Thengal": "bed 3"}}, ["Barnali Thengal"], ["bed 3"]),
+    ({"drug_index": {"Amlodipine Besylate": "5 mg"}, "ward_map": {"General Ward": "2"},
+      "vital_signs": {"Heart Rate": "88", "Chief Complaint": "cough"}},
+     [], ["Amlodipine Besylate", "General Ward", "Heart Rate", "Chief Complaint"]),
+    ({"column_map": {"Referral Source": "ref_src"}, "patient_tests": [{"name": "Lipid Profile"}]},
+     [], ["Referral Source", "Lipid Profile"]),
+    # a table whose name says nothing about people keeps its keys
+    ({"billing_map": {"Room Rent": "1200"}, "symptom_index": {"Joint Stiffness": "1"}, "discount_map": {"Senior Citizen": "10"},
+      "organization": {"contact": {"name": "Help Desk"}}}, [], ["Room Rent", "Joint Stiffness", "Senior Citizen", "Help Desk"]),
+    # the closest parent decides whose name it is
+    ({"organization": {"patient": {"name": "Barnali Thengal"}, "contact": {"name": "Devika Ranganathan"}}},
+     ["Barnali Thengal", "Devika Ranganathan"], []),
+    ({"organization": {"name": "Sunrise Care Centre", "department": {"name": "Cardiology"}},
+      "patient": {"insurer": {"name": "Star Health"}}}, [], ["Sunrise Care Centre", "Cardiology", "Star Health"]),
+]
+
+
+def _walk(node, ptr=""):
+    items = node.items() if isinstance(node, dict) else enumerate(node)
+    for k, v in items:
+        child = f"{ptr}/{k}"
+        if isinstance(node, dict):
+            yield {"path": f"key:{child}", "kind": "key", "context": None, "value": k}
+        if isinstance(v, (dict, list)):
+            yield from _walk(v, child)
+        else:
+            yield {"path": child, "kind": "value", "context": str(k), "value": str(v)}
+
+
+def _run_docs() -> int:
+    failed = 0
+    for data, must_find, must_keep in DOCS:
+        record = {"record_id": "t.json#doc", "file": "t.json", "loc": "doc", "fmt": "json", "fields": list(_walk(data))}
+        found = [f["text"] for f in detect_file([record])[0]["findings"]
+                 if f["type"] not in ("CONDITION", "DISTRICT", "GENDER")]
+        missed = [x for x in must_find if x not in found]
+        eaten = [x for x in must_keep if any(x in f or f in x for f in found)]
+        if missed or eaten:
+            failed += 1
+            print(f"FAIL  {data}\n      missed={missed} wrongly_removed={eaten}")
+    return failed
+
+
+# a name run together or in lowercase inside a file name: (file name, text, expected pieces found in the file name)
+FILENAMES = [
+    ("बरनाली_शर्मा_पर्चा.txt", "BP 110/70\n", ["बरनाली_शर्मा"]),
+    ("ds-barnalithengal-31145549.txt", "Patient Name: Barnali Thengal\n", ["barnalithengal"]),
+    ("ds_devika_ranganathan.txt", "Patient Name: Devika Ranganathan\n", ["devika_ranganathan"]),
+]
+
+
+def _run_filenames() -> int:
+    failed = 0
+    for name, text, expected in FILENAMES:
+        records = [{"record_id": f"{name}#@file", "file": name, "loc": "@file", "fmt": "text",
+                    "fields": [{"path": "filename", "kind": "filename", "context": None, "value": name}]},
+                   {"record_id": f"{name}#doc", "file": name, "loc": "doc", "fmt": "text",
+                    "fields": [{"path": "text", "kind": "text", "context": None, "value": text}]}]
+        found = [f["text"] for f in detect_file(records)[0]["findings"]]
+        if not all(any(x in f for f in found) for x in expected):
+            failed += 1
+            print(f"FAIL  file name {name}: found {found}")
+    return failed
+
+
 def main() -> int:
     failed = 0
     for line, must_find, must_keep in CASES:
@@ -147,8 +352,13 @@ def main() -> int:
             print(f"FAIL  {line}\n      missed={missed} wrongly_removed={eaten}")
     table_failures = _run_tables()
     print(f"{len(TABLES)} column tables checked, {table_failures} problems")
+    cell_failures = _run_cells()
+    print(f"{len(CELLS)} single cells checked, {cell_failures} problems")
+    table_failures += cell_failures
+    doc_failures = _run_docs() + _run_filenames()
+    print(f"{len(DOCS)} JSON documents and {len(FILENAMES)} file names checked, {doc_failures} problems")
     print(f"{len(CASES) - failed}/{len(CASES)} cases passed")  # keep last: tools read the last line
-    return 1 if failed or table_failures else 0
+    return 1 if failed or table_failures or doc_failures else 0
 
 
 if __name__ == "__main__":

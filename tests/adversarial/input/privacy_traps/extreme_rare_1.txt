@@ -1,0 +1,6 @@
+DISCHARGE SUMMARY - Rare Disease Registry
+Name: Bhagwan Das (97/M)   UHID: KGH/2026/9010
+Village: Sohawal, District: Ayodhya, PIN: 224188
+Admission: 10/04/2026   Discharge: 2026-05-01T23:55:00+05:30   Follow-up: Nov 2026
+Diagnosis: Visceral leishmaniasis (kala-azar) (B55.0)
+Procedure: Deep brain stimulation

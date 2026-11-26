@@ -1,0 +1,465 @@
+{
+  "schema": "raksha-truth/1",
+  "dataset": "breaker_ds1_io_formats",
+  "description": "IO boundary, decoding (>4KB NUL), JSONL fallback, JSON wrapper split collapse, base64 wrapping, LeakGate limits",
+  "files": {
+    "notes/late_binary_after_4kb.txt": {
+      "path": "notes/late_binary_after_4kb.txt",
+      "expect": "either",
+      "sha256": "9eadd96da74015f65fb191cac6fc863badae157f7570d3df8cab95a1e1b48d00",
+      "units": {
+        "doc": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Harishankar Tiwari",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9811223344",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "CANARY",
+              "surface": "CANARY_DS1_LATEBIN",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "118/76"
+            },
+            {
+              "text": "98%"
+            }
+          ]
+        }
+      }
+    },
+    "lab/stream_export_jsonl.csv": {
+      "path": "lab/stream_export_jsonl.csv",
+      "expect": "sanitize",
+      "sha256": "81abc1ec5d4a57aa990b7976cb3609d50164a4c47a87eddedf9c76956b85d9f3",
+      "units": {
+        "row:0": {
+          "patient": "P101",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Kavita Rawat",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9711223344",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 1234 8901",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Hypothyroidism"
+            },
+            {
+              "text": "9.4 mIU/L"
+            }
+          ]
+        },
+        "row:1": {
+          "patient": "P102",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Pradeep Joshi",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9711223345",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 1234 8902",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Hypertension"
+            },
+            {
+              "text": "148/92"
+            }
+          ]
+        }
+      }
+    },
+    "registration/wrapped_multi_patient.json": {
+      "path": "registration/wrapped_multi_patient.json",
+      "expect": "sanitize",
+      "sha256": "70cd98a5431c76171da56a2037d19dbf40b8de5a11f335165fc8e9f07a0042e9",
+      "units": {
+        "/visits/0": {
+          "patient": "P103",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Anwar Ansari",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9833001101",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Type 2 Diabetes"
+            }
+          ]
+        },
+        "/visits/1": {
+          "patient": "P104",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Rehana Parveen",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9833001102",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Asthma"
+            }
+          ]
+        },
+        "/visits/2": {
+          "patient": "P105",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Yogesh Shukla",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9833001103",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Coronary Artery Disease"
+            }
+          ]
+        }
+      }
+    },
+    "attachments/wrapped_b64_consent.json": {
+      "path": "attachments/wrapped_b64_consent.json",
+      "expect": "sanitize",
+      "sha256": "d2d1031207fd01511275f29d55578d8f42a56ad1dad8fa0aebc6e83fc307e752",
+      "units": {
+        "doc": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Farzana Begum",
+              "script": "latin",
+              "channel": "base64"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 8901 2345",
+              "script": "latin",
+              "channel": "base64"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9822334455",
+              "script": "latin",
+              "channel": "base64"
+            },
+            {
+              "type": "CANARY",
+              "surface": "CANARY_DS1_B64URI",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Mahendra Singh Rawat",
+              "script": "latin",
+              "channel": "base64"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9822334466",
+              "script": "latin",
+              "channel": "base64"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Cholecystectomy"
+            }
+          ]
+        }
+      }
+    },
+    "legacy/depth_950_nested.json": {
+      "path": "legacy/depth_950_nested.json",
+      "expect": "sanitize",
+      "sha256": "4f086e669b2336ee287ecf21598effd067570f800e77d45c9c1252f345a79cd6",
+      "units": {
+        "doc": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Deepak Chaturvedi",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9933445566",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Dengue Fever"
+            }
+          ]
+        }
+      }
+    },
+    "corrupt/depth_1500_bomb.json": {
+      "path": "corrupt/depth_1500_bomb.json",
+      "expect": "either",
+      "sha256": "a0c76c3764933e7c2de265eba10060a5688cf13c8d8fc21559c9d98679110ace",
+      "units": {
+        "doc": {
+          "entities": [
+            {
+              "type": "CANARY",
+              "surface": "CANARY_DS1_DEPTH1500",
+              "script": "latin",
+              "channel": "content"
+            }
+          ]
+        }
+      }
+    },
+    "opd/single_and_five_token_names.csv": {
+      "path": "opd/single_and_five_token_names.csv",
+      "expect": "sanitize",
+      "sha256": "9d4eb9e01145a350dd3457b6a36ddd44570ea0d672de99c199f1f4b745ec9df7",
+      "units": {
+        "row:0": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Sakshi",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9844001122",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Migraine"
+            }
+          ]
+        },
+        "row:1": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Thakur Bhanu Pratap Singh Chauhan",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9844001123",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Asthma"
+            }
+          ]
+        }
+      }
+    },
+    "notes/followup_unlabelled_tokens.txt": {
+      "path": "notes/followup_unlabelled_tokens.txt",
+      "expect": "sanitize",
+      "sha256": "f506a88c471775020c477fc87ffc1af9666289e486767e2b41cd4c513f26131c",
+      "units": {
+        "doc": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Sakshi",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Thakur Bhanu Pratap Singh Chauhan",
+              "script": "latin",
+              "channel": "content"
+            }
+          ]
+        }
+      }
+    },
+    "legacy/mixed_delim_cp1252.csv": {
+      "path": "legacy/mixed_delim_cp1252.csv",
+      "expect": "sanitize",
+      "sha256": "2a94a590c6c0f8964a6ccd1a06d1e17fd5e6d9f25c995472a478671c05fb7ce5",
+      "units": {
+        "row:0": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Ritu Saxena",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9855112233",
+              "script": "latin",
+              "channel": "content"
+            }
+          ]
+        },
+        "row:1": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Alok Dubey",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9855112234",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "132/84"
+            }
+          ]
+        }
+      }
+    },
+    "fhir/bundle_query_ref.json": {
+      "path": "fhir/bundle_query_ref.json",
+      "expect": "sanitize",
+      "sha256": "53d7dda14e3f6228b9d69523f34919c7c63f452910ad97234b19581c4774c58a",
+      "units": {
+        "/entry/0/resource": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Ashok",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Kulkarni",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9866778899",
+              "script": "latin",
+              "channel": "content"
+            }
+          ]
+        },
+        "/entry/1/resource": {
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Ashok Narayan Kulkarni",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "182"
+            }
+          ]
+        }
+      }
+    },
+    "corrupt/xml_as_json.json": {
+      "path": "corrupt/xml_as_json.json",
+      "expect": "either",
+      "sha256": "5e0d79c40dc99e3935291d6992e7d53af40772407656199e4b2b68bfe258031e",
+      "units": {
+        "doc": {
+          "entities": [
+            {
+              "type": "CANARY",
+              "surface": "CANARY_DS1_XML",
+              "script": "latin",
+              "channel": "content"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

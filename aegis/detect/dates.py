@@ -15,13 +15,20 @@ _MONTHS = {m: i for i, m in enumerate(
 _MONTH_RE = (r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|"
              r"Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)")
 
-ISO = re.compile(r"(?<![\d])((?:19|20)\d{2})-(\d{1,2})-(\d{1,2})(?!\d)")
-YMD_SLASH = re.compile(r"(?<![\d/])((?:19|20)\d{2})([/.])(\d{1,2})\2(\d{1,2})(?![\d/])")
-NUMERIC = re.compile(r"(?<![\d./-])(\d{1,2})([/.-])(\d{1,2})\2((?:19|20)\d{2}|\d{2})(?![\d/-]|\.\d)")
-TEXT_DMY = re.compile(r"(?<![\d])(\d{1,2})(?:st|nd|rd|th)?[ -](" + _MONTH_RE + r")\b\.?(?:[ ,-]+((?:19|20)\d{2}|'?\d{2})(?!\d))?", re.I)
-TEXT_MDY = re.compile(r"\b(" + _MONTH_RE + r")\.? (\d{1,2})(?:st|nd|rd|th)?(?!\d)(?:,? ((?:19|20)\d{2}))?", re.I)
+_YEAR = r"(?:18|19|20)\d{2}"
+ISO = re.compile(r"(?<![\d])(" + _YEAR + r")-(\d{1,2})-(\d{1,2})(?!\d)")
+YMD_SLASH = re.compile(r"(?<![\d/])(" + _YEAR + r")([/.])(\d{1,2})\2(\d{1,2})(?![\d/])")
+NUMERIC = re.compile(r"(?<![\d./-])(\d{1,2})([/.-])(\d{1,2})\2(" + _YEAR + r"|\d{2})(?![\d/-]|\.\d)")
+# "12 Mar 1830 hrs" is a time of day, not the year 1830 (only the 18xx years need this guard: they never were dates here)
+_YEAR_WORDS = r"(?:(?:19|20)\d{2}|18\d{2}(?! ?(?:hrs?\b|hours|h\b))|'?\d{2})"
+TEXT_DMY = re.compile(r"(?<![\d])(\d{1,2})(?:st|nd|rd|th)?[ -](" + _MONTH_RE + r")\b\.?(?:[ ,-]+(" + _YEAR_WORDS + r")(?!\d))?", re.I)
+TEXT_MDY = re.compile(r"\b(" + _MONTH_RE + r")\.? (\d{1,2})(?:st|nd|rd|th)?(?!\d)(?:,? ((?:19|20)\d{2}|18\d{2}(?! ?(?:hrs?\b|hours|h\b))))?", re.I)
 
-_DOB_BEFORE = re.compile(r"(?:\bd\.?o\.?b\b|date of birth|birth ?date|\bborn(?: on)?\b|जन्म[^\n:]{0,20})\W{0,6}$", re.I)
+_DOB_BEFORE = re.compile(
+    r"(?:\bd\.?o\.?b\b|date of birth|birth ?date|birth ?year|\byob\b|\bborn(?: on)?\b"
+    r"|janam ?din(?:ank)?|janm ?(?:din|tithi|tarikh)|janam ?tithi|जन्म[^\n:]{0,20})\W{0,6}$",
+    re.I,
+)
 
 
 def _iso(y: int, m: int, d: int) -> str | None:

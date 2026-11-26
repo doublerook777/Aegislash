@@ -1,0 +1,6 @@
+DISCHARGE SUMMARY - Rare Disease Registry
+Name: Rukmani Devi (Age: 89 Yrs)   UHID: KGH/2026/9013
+Village: Haidergarh, District: Barabanki, PIN: 225124
+Admission: १०/०७/२०२६   Discharge: 2026-07-24T23:55:00+05:30   Follow-up: Nov 2026
+Diagnosis: Addison's disease (E27.1)
+Procedure: Deep brain stimulation

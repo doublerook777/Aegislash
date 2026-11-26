@@ -1,0 +1,103 @@
+{
+  "schema": "raksha-report/1",
+  "files": [
+    {
+      "input_sha256": "2c9b8a2de17e36689d1ecc5e9c87d7a89dc6983b4714330436993c34c5ea3e4c",
+      "output": "sanitized/00_manifest.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "4998fa026980b5b26408a274b20e002d7fb8ac84f936408b53c47dbb9e92175e",
+      "output": "sanitized/01_base64_hidden_pii.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "50147d2c8d10d95dc5c8d31c433cb45f0b7df6b0a457ecf1be4ebc1a0d10763f",
+      "output": "sanitized/02_unicode_escape_name.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "0d000ff0519f3e9d663138f2e900b4cb2989b04c5cd4a05c3b2b6bec2423564f",
+      "output": "sanitized/03_zero_width_chars.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "70e942170dbfd95fa961184de2813b21b47ee535b95020dfe5470ca049b10fbf",
+      "output": "sanitized/05_pii_in_header.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "cd1c27742fee5c55d50d1c4943c08e03a456014f5c5883a41469a5104d43aa0e",
+      "output": "sanitized/06_deep_nested.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "f65eec572cb5a44136f216d66642bf6045e2ea51e61f3001068b5d1c65b15e03",
+      "output": "sanitized/07_mixed_delimiters.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "1168d2cfa7fb0eacba901df509cd5a3810a06473f995b678c33b6bd7ca715f7a",
+      "output": "sanitized/08_phone_formats.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "3c98e90ff8bd7df15c75991df31c65a25207e7ff413c1441899b6aa06b79313d",
+      "output": "sanitized/09_aadhaar_formats.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "cdd58dd0932907a9bf1a76ad88cf96787d0a241dc660984ce172c6844f21125b",
+      "output": "sanitized/10_split_name.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "b8f50164ab6706cfe95069da58b648675d005090a4c0703f9c0effe221ebd974",
+      "output": "sanitized/11_medical_confusion.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "1730efeff2fc9f8a2988a50bccf38f4bdf253cff7a35f1c2dd4f36bf1bf1309e",
+      "output": "sanitized/12_homoglyphs.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a35e162b140aed2c0cbf51d32029dfe4e4578e2e693ae4887803b5a38c34a6fd",
+      "output": "sanitized/13_large_5000_records.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "11a7d4e784e0a370205dc277cfb266b389b9cb1f3975e75aadcfbcba4778e7ea",
+      "output": "sanitized/14_k_anon_violator.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a38e33b4f57b48e0036640ab9a387f9b40abe32b882323605da18cf591fbce9d",
+      "output": "sanitized/15_pii_in_json_keys.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e8a67ff3b8e72a680ad60dd247b670d5e428b34f8833d80fdea27febf19822c7",
+      "output": "sanitized/Zubair_Hussain_Dialysis_2024.csv",
+      "status": "sanitized"
+    }
+  ],
+  "counts": {
+    "files_total": 16,
+    "files_sanitized": 16,
+    "files_quarantined": 0,
+    "records_processed": 10040,
+    "identifiers_detected": 0,
+    "records_linked": 0,
+    "records_generalized": 0,
+    "records_suppressed": 0,
+    "records_quarantined": 0
+  },
+  "entities": {},
+  "timing": {
+    "seconds": 0.17
+  },
+  "resources": {
+    "peak_rss_mb": 0.0
+  }
+}

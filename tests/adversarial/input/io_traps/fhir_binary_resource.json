@@ -1,0 +1,29 @@
+{
+  "resourceType": "Bundle",
+  "id": "d8836b21-02cc-0d79-d1cb-2d1958dfd75a",
+  "type": "collection",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:pat-1",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "pat-1",
+        "name": [
+          {
+            "text": "Radhika Kulkarni"
+          }
+        ],
+        "birthDate": "1972-10-17"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:bin-1",
+      "resource": {
+        "resourceType": "Binary",
+        "id": "bin-1",
+        "contentType": "text/plain",
+        "data": "RGlzY2hhcmdlIGF0dGFjaG1lbnQgZm9yIFJhZGhpa2EgS3Vsa2FybmkgKDk2NTIwMjc2Nzkp"
+      }
+    }
+  ]
+}

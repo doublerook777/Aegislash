@@ -6,7 +6,7 @@ import re
 from aegis.detect.address import parse_address
 from aegis.detect.dates import find_dates
 from aegis.detect.ids import find_ids, phone_norm
-from aegis.detect.names import _TITLE, DEVA_NAME, STOP, trim_name
+from aegis.detect.names import _TITLE, DEVA_NAME, ORG, STOP, trim_name
 from aegis.detect.normalize import DEVA, digits, norm_name
 from aegis.detect.spans import PRIORITY, Cand
 
@@ -14,6 +14,13 @@ NAME_ROLES = ("patient_name", "relative_name", "name", "first_name", "last_name"
 ID_ROLES = {"phone": "PHONE", "aadhaar": "AADHAAR", "abha": "ABHA_NUMBER", "abha_address": "ABHA_ADDRESS",
             "email": "EMAIL", "pan": "PAN", "insurance": "INSURANCE_ID", "mrn": "MRN"}
 _RELATION_PREFIX = re.compile(r"^\s*(?P<rel>[SDWCsdwc]/[Oo])\b[.:]?\s*")
+# "Bed 4 - <name>": the bed is not part of the name (and its number must not cut the name off)
+_BED_PREFIX = re.compile(r"^\s*(?:(?i:bed|cot|room|ward)(?: (?i:no|number))?|बेड|बिस्तर)\.? ?[#:-]? ?[A-Z]?\d+[A-Z]?(?![A-Za-z0-9])"
+                         r"[ \-–—:|,/).]*")
+# what a ward is called, so "Ward 4 - Male Surgical" is not read as a person
+_WARD_WORDS = frozenset("male female general medical surgical surgery medicine maternity paediatric pediatric labour "
+                        "labor isolation private semi special ortho orthopaedic gynae obstetric neonatal burns icu nicu "
+                        "picu hdu ccu ward unit wing".split())
 _TITLES = re.compile(rf"^\s*(?:(?!Mohd\b|Md\b){_TITLE}\s*)+")
 _NOT_A_NAME = re.compile(r"^(?:n/?a|na|nil|none|null|unknown|-+|self|same|test)$", re.I)
 
@@ -53,11 +60,23 @@ def kin_and_name(text: str) -> list[Cand]:
     return name_value(text, m.start("n"), m.end("n"), "relative_name")
 
 
+# "Surname, Given [Middle]": the comma belongs to the name. Degrees are upper case and do not match.
+_SURNAME_FIRST = re.compile(r"[A-Z][a-z'-]+, ?[A-Z][a-z'-]+(?: [A-Z](?![A-Za-z])\.?| [A-Z][a-z'-]+)?")
+_NOT_GIVEN = frozenset("male female other nurse sister doctor staff patient self son daughter wife husband father mother".split())
+
+
+def surname_first(value: str) -> bool:
+    words = re.findall(r"[a-z]+", value.casefold())
+    return bool(_SURNAME_FIRST.fullmatch(value)) and not set(words) & (_NOT_GIVEN | (STOP - {"asha"}) | ORG)
+
+
 def name_value(text: str, s: int, e: int, role: str) -> list[Cand]:
     """The value of a name column. `role` decides patient vs relative."""
     kind = "RELATIVE_NAME" if role == "relative_name" else "PATIENT_NAME"
     who = "relative" if role == "relative_name" else "patient"
     relation = None
+    while m := _BED_PREFIX.match(text[s:e]):   # "Ward 3 Bed 8 - <name>"
+        s += m.end()
     m = _RELATION_PREFIX.match(text[s:e])
     if m:
         relation = relation_of(m.group("rel"))
@@ -66,7 +85,8 @@ def name_value(text: str, s: int, e: int, role: str) -> list[Cand]:
     m = _TITLES.match(text[s:e])
     if m:
         s += m.end()
-    cut = re.search(r"[,(\[|;:/]| - |\s{2,}|\d|\n", text[s:e])
+    whole = surname_first(text[s:e].strip(" \t\r\n\"'.;|"))
+    cut = re.search(r"[(\[|;:/]| - |\s{2,}|\d|\n" if whole else r"[,(\[|;:/]| - |\s{2,}|\d|\n", text[s:e])
     if cut:
         e = s + cut.start()
     s, e = _strip(text, s, e)
@@ -74,15 +94,15 @@ def name_value(text: str, s: int, e: int, role: str) -> list[Cand]:
     words = value.split()
     if not value or len(words) > 5 or _NOT_A_NAME.match(value) or re.match(r"(?:Dr\b|डॉ|ASHA\b(?! [A-Z]))", value):
         return []
-    if not (DEVA.search(value) or re.fullmatch(r"[A-Za-z][A-Za-z.' -]*", value)):
+    if not (DEVA.search(value) or whole or re.fullmatch(r"[A-Za-z][A-Za-z.' -]*", value)):
         return []
     if role == "name":
         # a bare "name" label: only accept values that really look like a person
-        if all(w.strip(".").casefold() in STOP - {"asha"} for w in words):
+        if all(w.strip(".").casefold() in (STOP | ORG) - {"asha"} for w in words):
             return []
         if not (re.fullmatch(DEVA_NAME, value) or all(w[0].isupper() for w in words)):
             return []
-    if not DEVA.search(value):
+    if not DEVA.search(value) and not whole:
         span = trim_name(text, s, e) if role == "name" else (s, e)
         if not span:
             return []
@@ -98,6 +118,12 @@ def structured(text: str, s: int, e: int, role: str, dmy: bool) -> list[Cand]:
     value = text[s:e]
     if role in NAME_ROLES:
         return name_value(text, s, e, role)
+    if role == "bed_patient":
+        # a name right after a bed number is the patient. Anything else ("Female Medical Ward") is read like free text
+        bed = _BED_PREFIX.match(value)
+        if not bed or set(re.findall(r"[a-z]+", value[bed.end():].casefold())) & _WARD_WORDS:
+            return []
+        return name_value(text, s, e, "name")
 
     if role in ID_ROLES:
         kind = ID_ROLES[role]
@@ -122,6 +148,8 @@ def structured(text: str, s: int, e: int, role: str, dmy: bool) -> list[Cand]:
                 re.sub(r"[^A-Z0-9]", "", value.upper()) if kind in ("PAN", "INSURANCE_ID") else digits(value))
         return [Cand(s, e, kind, norm, "patient")]
 
+    if role == "dob" and re.fullmatch(r"(?:18|19|20)\d{2}", value):
+        return [Cand(s, e, "DOB", None, "patient")]     # a birth year: no ISO date to give as norm
     if role in ("dob", "date"):
         return [c._replace(start=c.start + s, end=c.end + s)
                 for c in find_dates(value, dmy, is_dob_field=role == "dob")]

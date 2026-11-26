@@ -93,6 +93,7 @@ detect notes (2026-11-26):
 - Done: real engine; practice 0/3230 leaks, 0 canaries, 4855/4855 medical kept (link, privacy still mocked). Practice score is optimistic; own cases: `python -m aegis.detect.selftest`. Next steps: aegis/detect/README.md.
 - Rounds 2-3: names without a label (surname list), address chains, more ID shapes and column names. On fresh cases personal data covered went 54-63% -> 82-85% (measured before fixing them); practice results unchanged.
 - For link (no shape change): "Mohd."/"Md." now stays part of a name, so `text`/`norm` can start with "mohd"/"md".
+- Red-team fixes (branch `detect/breaker-fixes`): lowercase PAN, more phone layouts, `ref` labels, parent keys, some lowercase and run-together names. No shape change. Limits and checks: aegis/detect/README.md. For io: `data:` / line-wrapped base64 and URL-encoded names still leak.
 - Contract notes (no shape change): MRN `norm` is the digits only; evidence `gender` may be implied by S/o, D/o, W/o or an honorific. `check_contracts.py --mock` fails detect's mock-only "bad file" case by design.
 
 link notes (2026-11-26):

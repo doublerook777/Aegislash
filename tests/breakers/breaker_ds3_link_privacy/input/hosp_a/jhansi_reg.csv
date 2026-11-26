@@ -1,0 +1,9 @@
+mrn,patient_name,relation,relative_name,age,gender,dob,village,tehsil,block,district,pin,phone,aadhaar,diagnosis
+JHS/26/1001,Shailendra Tiwari,S/o,Mahesh Tiwari,48,M,12/05/1978,Raniyapur,Mauranipur,Bangra,Jhansi,284204,9810001001,4567 8901 2345,CKD Stage 3
+JHS/26/1002,Govind Prasad,S/o,Bhola Prasad,89,M,04/02/1937,Pahari,Mauranipur,Bangra,Jhansi,284204,9810001002,4567 8901 2346,Visceral leishmaniasis
+JHS/26/1003,Shanti Devi,W/o,Rajesh Verma,42,F,19/08/1984,Katera,Mauranipur,Gursarai,Jhansi,284205,9810001003,4567 8901 2347,Hypertension
+JHS/26/1004,Shanti Devi,W/o,Mohan Verma,42,F,22/11/1984,Baruasagar,Jhansi,Babina,Jhansi,284201,9810001004,4567 8901 2348,Diabetes
+JHS/26/1005,Kausalya Bai,W/o,Hari Singh,92,F,10/01/1934,Naraini,Karwi,Pahari,Banda,210205,9810001005,4567 8901 2349,Huntington's chorea
+JHS/26/1006,Raghavendra Mishra,S/o,Sitaram Mishra,31,M,05/07/1995,Tindwari,Baberu,Tindwari,Banda,210128,9810001006,4567 8901 2350,Wilson's disease
+JHS/26/1007,Salma Begum,W/o,Imran Khan,54,F,14/03/1972,Moth,Moth,Chirgaon,Jhansi,284303,9810001007,4567 8901 2351,Hypothyroidism
+JHS/26/1008,Balram Yadav,S/o,Ramu Yadav,134,M,01/01/1892,Bindki,Bindki,Khajuha,Fatehpur,212635,9810001008,4567 8901 2352,Anemia
