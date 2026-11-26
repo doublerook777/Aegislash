@@ -142,9 +142,9 @@ def main() -> int:
         if missed or eaten:
             failed += 1
             print(f"FAIL  {line}\n      missed={missed} wrongly_removed={eaten}")
-    print(f"{len(CASES) - failed}/{len(CASES)} cases passed")
     table_failures = _run_tables()
     print(f"{len(TABLES)} column tables checked, {table_failures} problems")
+    print(f"{len(CASES) - failed}/{len(CASES)} cases passed")  # keep last: tools read the last line
     return 1 if failed or table_failures else 0
 
 
