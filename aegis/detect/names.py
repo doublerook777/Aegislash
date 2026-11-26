@@ -3,9 +3,11 @@ plus the "meaning traps" that protect text which only looks like a name."""
 from __future__ import annotations
 
 import re
+import urllib.parse
 
-from aegis.detect.normalize import DEVA
-from aegis.detect.spans import Cand
+from aegis.detect.labels import classify
+from aegis.detect.normalize import DEVA, digits, norm_name
+from aegis.detect.spans import PRIORITY, Cand
 
 # Words that are capitalised but are not part of a person's name.
 STOP = frozenset("""
@@ -181,7 +183,8 @@ _cue(rf"(?P<name>{_CAP}(?: {_CAP}){{1,2}}) *, *(?i:mob|mobile|ph|phone|contact|t
 
 # export paths and file names: "...\\Sunita_Patel_084999\\...", "Summary_Sunita_Patel_ABC-12345"
 _PATH_NAME = re.compile(
-    r"(?<![A-Za-z])(?P<name>[A-Z][a-z]+(?:_[A-Z][a-z]+){0,3})(?:_(?:NA|na))?_(?=(?:[A-Z]{2,5}[-_]?)?(?:\d{2}[-_]\d{2}|\d{5,}))")
+    r"(?<![A-Za-z])(?P<name>[A-Z][a-z]+(?:_[A-Z][a-z]+){0,3})(?:_(?:NA|na))?_(?P<mrn>(?:[A-Z]{2,5}[-_]?)?(?:\d{2}[-_]\d{2}|\d{5,}))(?=$|[\\/_.-])"
+)
 
 
 def find_path_names(text: str) -> list[Cand]:
@@ -193,11 +196,65 @@ def find_path_names(text: str) -> list[Cand]:
             words.pop(0)
         if words and text[words[-1][0]:words[-1][1]].casefold() not in STOP - {"asha"}:
             out.append(Cand(words[0][0], words[-1][1], "PATIENT_NAME", None, "patient"))
+        mrn_raw = m.group("mrn")
+        mrn_dig = digits(mrn_raw)
+        # 5-8 digit suffix (not a 10-digit phone or 12-digit Aadhaar) in an export path
+        if 5 <= len(mrn_dig) <= 8:
+            out.append(Cand(m.start("mrn"), m.end("mrn"), "MRN", mrn_dig, "patient"))
+    return out
+
+
+_URL_HINT = re.compile(r"://|\bwww\.|%[0-9A-Fa-f]{2}")
+_URL_PARAM = re.compile(r"(?<=[?&])(?P<k>[A-Za-z0-9_ऀ-ॿ]{2,24})=(?P<v>[^&\s\n#\"']{2,120})")
+_URL_ENC_PATH = re.compile(r"[A-Za-z]%3A(?:%5[Cc]|%2[Ff])[^\s\n\"'<>]{6,120}")
+
+
+def find_url_pii(text: str) -> list[Cand]:
+    """Detect PII inside URL query parameters and percent-encoded file paths."""
+    if not _URL_HINT.search(text):
+        return []
+    out: list[Cand] = []
+    for m in _URL_PARAM.finditer(text):
+        role = classify(m.group("k"))
+        if not role:
+            continue
+        raw_v = m.group("v")
+        dec = urllib.parse.unquote_plus(raw_v).strip()
+        if not dec:
+            continue
+        if role in ("patient_name", "relative_name", "name"):
+            kind = "RELATIVE_NAME" if role == "relative_name" else "PATIENT_NAME"
+            who = "relative" if role == "relative_name" else "patient"
+            out.append(Cand(m.start("v"), m.end("v"), kind, norm_name(dec) or None, who, prio=PRIORITY[kind] + 3))
+        elif role == "phone":
+            d = digits(dec)
+            if len(d) >= 7:
+                out.append(Cand(m.start("v"), m.end("v"), "PHONE", d[-10:] if len(d) > 10 else d, "patient", prio=PRIORITY["PHONE"] + 3))
+        elif role in ("aadhaar", "email", "mrn", "dob", "pin", "pan", "insurance"):
+            tmap = {"aadhaar": "AADHAAR", "email": "EMAIL", "mrn": "MRN", "dob": "DOB",
+                    "pin": "PIN", "pan": "PAN", "insurance": "INSURANCE_ID"}
+            kind = tmap[role]
+            norm_v = dec.casefold() if role == "email" else (dec.upper() if role == "pan" else digits(dec) or dec)
+            out.append(Cand(m.start("v"), m.end("v"), kind, norm_v, "patient", prio=PRIORITY[kind] + 3))
+    for m in _URL_ENC_PATH.finditer(text):
+        dec = urllib.parse.unquote(m.group(0))
+        if "_" in dec:
+            for pm in _PATH_NAME.finditer(dec):
+                # Find the raw name segment inside the original text
+                raw_name = pm.group("name")
+                enc_name = urllib.parse.quote(raw_name)
+                for needle in (raw_name, enc_name):
+                    idx = text.find(needle, m.start(), m.end())
+                    if idx != -1:
+                        out.append(Cand(idx, idx + len(needle), "PATIENT_NAME", norm_name(raw_name) or None, "patient", prio=PRIORITY["PATIENT_NAME"] + 2))
+                        break
     return out
 
 
 # Cues that are weaker than a label, so every word of the name must look like a name (two words or more).
 _FULL = rf"{_CAP}(?: {_CAP}){{1,3}}"
+_ONE_OR_MORE = rf"{_CAP}(?: {_CAP}){{0,3}}"
+_DEVA_ONE_OR_MORE = rf"{_DEVA_WORD}(?: {_DEVA_WORD}){{0,2}}"
 _KIN_HINDI = r"(?:bete|beta|beti|patni|pati|dharmapatni|maa|mata|pita|bhai|behen|chacha|mama|mausi|bua)"
 _STRICT_CUES: list[tuple[re.Pattern, str]] = [(re.compile(p), role) for p, role in (
     # "Tenzing Lepcha, 54 yrs", "Harpreet Gill (46 yrs)"
@@ -211,7 +268,45 @@ _STRICT_CUES: list[tuple[re.Pattern, str]] = [(re.compile(p), role) for p, role 
 _STRICT_CUES.append((re.compile(rf"(?<![A-Za-z])(?i:ptn|pt|patient|subj(?:ect)?|nok)[ ]?(?:->|[~#|])+ *(?P<name>{_FULL})"), "patient"))
 # call logs: "caller=<name>"
 _STRICT_CUES.append((re.compile(rf"(?<![A-Za-z])(?i:caller|callee) *[:=] *(?P<name>{_FULL})"), "relative"))
+# Action-cue person patterns across English, Hinglish, and Devanagari Hindi (handles 1-word & unlisted names)
+_CLAUSE_START = r"(?:^|\n|[।.!?]\s+|:\s+|,\s+|\b(?:and|aur)\s+|(?:और|तथा)\s+)"
+# A verb alone is not enough: reports are also "verified" and "signed", and insurance "expired". The words after
+# the verb must be something that only happens to, or is done by, a person.
+_PERSON_DOES = (
+    r"discharged +(?:home|on request|against|from (?:the )?(?:hospital|ward)|in +(?:a +)?(?:[a-z]+ +)?condition)"
+    r"|took discharge|absconded"
+    r"|(?:signed|verified) +(?:(?:the|a|his|her) +)?(?:[a-z]+ +){0,2}(?:consent|form|bond|undertaking|declaration|identity|signature|address"
+    r"|bills?|slip|receipt|voucher|register|documents?|paperwork|papers)"
+    r"|called +(?:up|back|to +(?:ask|enquire|inquire|inform|confirm|request))"
+    r"|expired +(?:despite|during +(?:treatment|admission))"
+)
+_ACTION_CUES: list[tuple[re.Pattern, str]] = [(re.compile(p), role) for p, role in (
+    # English clinical subject-verb: "Satyendra discharged in stable condition", "Priyanka signed the surgical consent form"
+    (rf"{_CLAUSE_START}(?P<name>{_ONE_OR_MORE}) +(?:was )?(?:{_PERSON_DOES})\b", "patient"),
+    # English person-object cues: "given to Devika", "Follow up with Pema Choden", "Co-admitted: Devika Rao"
+    (rf"(?:\b(?i:given to|handed over to|handover to|follow[- ]?up with|spoke (?:to|with)|discussed with|verified by|co-admitted)\s*[:\-]?\s*)(?P<name>{_ONE_OR_MORE})", "patient"),
+    # Hinglish action cues: "Satyendra ko chhutti mili", "Priyanka ne sign kiya"
+    (rf"{_CLAUSE_START}(?P<name>{_ONE_OR_MORE}) +(?:ko +(?:chhutti|discharge|admit|ward|bed|ilaj)|ne +(?:sign|hastakshar|call|phone|verify|bulaya|bulaaya))\b", "patient"),
+    # Devanagari Hindi action cues: "रमेश को छुट्टी दी गई", "प्रिया ने हस्ताक्षर किए"
+    (rf"{_CLAUSE_START}(?P<name>{_DEVA_ONE_OR_MORE}) +(?:को +(?:छुट्टी|भर्ती|दवा|बेड|वार्ड|इलाज)|ने +(?:हस्ताक्षर|साइन|फ़ोन|फोन|कॉल|सत्यापित|बताया))(?![ऀ-ॿ])", "patient"),
+)]
+_FOLLOWUP_AND = re.compile(rf" +(?:and|aur) +(?P<name>{_ONE_OR_MORE})| +(?:और|तथा) +(?P<name_hi>{_DEVA_ONE_OR_MORE})")
 _NEVER_IN_NAME = frozenset("under to into via through with without after before general emergency".split())
+_PRONOUNS = frozenset("""
+he she they we i you it who this that these those someone anyone everyone nobody somebody anybody everybody
+both all none each other another there here
+child baby infant neonate boy girl male female man woman lady gentleman
+woh wo yeh ye unhone inhone maine humne koi sabhi वह यह उन्होंने इन्होंने मैंने हमने कोई सभी
+""".split())
+
+
+def _valid_action_name(raw: str) -> bool:
+    words = [w.strip(".,").casefold() for w in raw.split()]
+    if not words or any(w in (STOP - {"asha"}) | ORG | _NEVER_IN_NAME | _PRONOUNS for w in words):
+        return False
+    # "Repeat CBC": a lab or test short form next to ordinary words is not a name
+    shouted = [w.isascii() and len(w.strip(".")) > 1 and w.strip(".").isupper() for w in raw.split()]
+    return not any(shouted) or all(shouted)
 
 
 def _strict_names(text: str) -> list[Cand]:
@@ -223,7 +318,28 @@ def _strict_names(text: str) -> list[Cand]:
                 continue
             kind = "RELATIVE_NAME" if role == "relative" else "PATIENT_NAME"
             out.append(Cand(*m.span("name"), kind, None, role))
+    for pattern, role in _ACTION_CUES:
+        for m in pattern.finditer(text):
+            s, e = m.span("name")
+            if _STAFF_BEFORE_SIMPLE.search(text[max(0, s - 20):s]):
+                continue
+            if not _valid_action_name(m.group("name")):
+                continue
+            kind = "RELATIVE_NAME" if role == "relative" else "PATIENT_NAME"
+            out.append(Cand(s, e, kind, None, role))
+            # Handle "Follow up with Pema Choden and Agustín Fonseca" (or Hinglish/Hindi "aur"/"और")
+            m2 = _FOLLOWUP_AND.match(text, e)
+            if m2:
+                grp = "name" if m2.group("name") else "name_hi"
+                if _valid_action_name(m2.group(grp)):
+                    out.append(Cand(m2.start(grp), m2.end(grp), kind, None, role))
     return out
+
+
+_STAFF_BEFORE_SIMPLE = re.compile(
+    r"(?:\b(?i:dr|doctor|prof|nurse|sister|asha|anm|pharmacist|technician|surgeon|consultant|"
+    r"physician|resident|counsellor)\b\.?|डॉ\.?|डा\.|डॉक्टर|नर्स|आशा|सिस्टर)[ :\-]*$"
+)
 
 
 def find_names(text: str) -> list[Cand]:
