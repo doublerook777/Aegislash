@@ -43,6 +43,7 @@ _KEEP = _words("diagnosis dx drug drugs medicine medication test tests result re
                "coding schema profile निदान विभाग दवा")
 _NOT_PERSON = _words("hospital facility lab test tests drug medicine panel panels coding file organization org "
                      "department ward package scheme insurer company payer_org user username device software")
+_PLACE_IN_HOSPITAL = _words("ward bed")
 _CONTACT = _words("contact contacts caller")
 _NOT_MRN = _words("visit bill invoice sample claim policy ticket trip report order txn receipt encounter")
 _FREE = _words("notes note remarks remark comment comments complaints complaint history narrative advice summary")
@@ -71,7 +72,7 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
 
     Returns one of: doctor, relation, relative_name, email, abha_address, abha, aadhaar, pan,
     insurance, phone, mrn, dob, age_sex, age, gender, pin, district, tehsil, village, address,
-    first_name, last_name, patient_name, name, free, date, keep, or None (unknown).
+    first_name, last_name, patient_name, bed_patient, name, free, date, keep, or None (unknown).
     """
     t = tokens(label)
     if not t:
@@ -158,6 +159,9 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
         return owner or "name"
     if s & _SUBJECT and not s & _ID_WORDS and not s & _KEEP:
         return "patient_name"
+    # "Bed & Patient", "ward_patient": where the person lies and who they are, in one column
+    if s & _SUBJECT and not s & _ID_WORDS and s & _KEEP and s & _KEEP <= _PLACE_IN_HOSPITAL:
+        return "bed_patient"
     if s & _KEEP:
         return "keep"
     return None

@@ -14,6 +14,13 @@ NAME_ROLES = ("patient_name", "relative_name", "name", "first_name", "last_name"
 ID_ROLES = {"phone": "PHONE", "aadhaar": "AADHAAR", "abha": "ABHA_NUMBER", "abha_address": "ABHA_ADDRESS",
             "email": "EMAIL", "pan": "PAN", "insurance": "INSURANCE_ID", "mrn": "MRN"}
 _RELATION_PREFIX = re.compile(r"^\s*(?P<rel>[SDWCsdwc]/[Oo])\b[.:]?\s*")
+# "Bed 4 - <name>": the bed is not part of the name (and its number must not cut the name off)
+_BED_PREFIX = re.compile(r"^\s*(?:(?i:bed|cot|room|ward)(?: (?i:no|number))?|बेड|बिस्तर)\.? ?[#:-]? ?[A-Z]?\d+[A-Z]?(?![A-Za-z0-9])"
+                         r"[ \-–—:|,/).]*")
+# what a ward is called, so "Ward 4 - Male Surgical" is not read as a person
+_WARD_WORDS = frozenset("male female general medical surgical surgery medicine maternity paediatric pediatric labour "
+                        "labor isolation private semi special ortho orthopaedic gynae obstetric neonatal burns icu nicu "
+                        "picu hdu ccu ward unit wing".split())
 _TITLES = re.compile(rf"^\s*(?:(?!Mohd\b|Md\b){_TITLE}\s*)+")
 _NOT_A_NAME = re.compile(r"^(?:n/?a|na|nil|none|null|unknown|-+|self|same|test)$", re.I)
 
@@ -58,6 +65,8 @@ def name_value(text: str, s: int, e: int, role: str) -> list[Cand]:
     kind = "RELATIVE_NAME" if role == "relative_name" else "PATIENT_NAME"
     who = "relative" if role == "relative_name" else "patient"
     relation = None
+    while m := _BED_PREFIX.match(text[s:e]):   # "Ward 3 Bed 8 - <name>"
+        s += m.end()
     m = _RELATION_PREFIX.match(text[s:e])
     if m:
         relation = relation_of(m.group("rel"))
@@ -98,6 +107,12 @@ def structured(text: str, s: int, e: int, role: str, dmy: bool) -> list[Cand]:
     value = text[s:e]
     if role in NAME_ROLES:
         return name_value(text, s, e, role)
+    if role == "bed_patient":
+        # a name right after a bed number is the patient. Anything else ("Female Medical Ward") is read like free text
+        bed = _BED_PREFIX.match(value)
+        if not bed or set(re.findall(r"[a-z]+", value[bed.end():].casefold())) & _WARD_WORDS:
+            return []
+        return name_value(text, s, e, "name")
 
     if role in ID_ROLES:
         kind = ID_ROLES[role]

@@ -15,7 +15,10 @@ from aegis.detect.spans import PRIORITY, Cand
 
 _NUM = r"[A-Z]?[-/]?\d+(?:[-/]?[A-Z0-9]+)*(?:/[ऀ-ॿ](?![ऀ-ॿ]))?"
 HOUSE = re.compile(
-    rf"(?<![A-Za-z])(?:(?:H|Hno|HNo)\.? ?(?:No\.?|Number)? ?|(?i:house|makan|flat|plot|door|quarter|qtr|kothi)(?: (?i:no|number))?\.? ?"
+    rf"(?<![A-Za-z])(?:(?:H|Hno|HNo)\.? ?(?:No\.?|Number)? ?"
+    # lowercase needs the dot or no space: "q4h no 2" is a dose schedule
+    rf"|(?i:h\. ?no|h[-/]no|hno)(?![A-Za-z])\.? ?"
+    rf"|(?i:house|makan|flat|plot|door|quarter|qtr|kothi)(?: (?i:no|number))?\.? ?"
     rf"|(?:मकान|घर|प्लॉट) ?(?:नं|नंबर|संख्या)?\.? ?)[:#-]? ?{_NUM}")
 _PLACE_WORD = r"(?:St\.|[A-Z][a-z]+|[A-Z]{2,})"
 _DEVA_W = r"[ऀ-ॣॱ-ॿ]+"
@@ -77,6 +80,32 @@ _LOCALITY_TAIL = re.compile(r"(?:Nagar|Colony|Tola|Basti|Purwa|Mohalla|Enclave|V
                             r"(?:नगर|कॉलोनी|टोला|बस्ती|गली|मार्ग|रोड)")
 
 
+# "r/o" is "resident of" or "rule out". It stays a village unless something shows that an illness follows.
+# The illness word must come straight after: "<village> heart disease" is still a village
+_ILLNESS_AFTER = re.compile(r"['’]s\b|(?:-[A-Za-z]+)?[ -](?i:disease|syndrome|palsy|disorder|fracture)\b")
+# no "-uria": many village names end that way
+_ILLNESS_ENDING = re.compile(r"(?:itis|osis|aemia|emia|pathy|penia)$", re.I)
+
+
+def _rules_out(value: str, after: str) -> bool:
+    words = value.split()
+    if value.isupper() and len(value) <= 4:       # MI, TB, DVT, COPD
+        return True
+    # only the first word: "r/o <village> Patient stable" also captures the word after the village
+    if words[0].casefold() in STOP - _PLACE_STOP or _ILLNESS_ENDING.search(words[0]):
+        return True
+    return bool(_ILLNESS_AFTER.match(after))
+
+
+_PIN_LABEL_WORDS = re.compile(r"(?i)\b(?:pin(?: ?code)?|zip|postal(?: ?code)?)\b|पिन(?: कोड)?")
+
+
+def holds_address(text: str) -> bool:
+    """More than a PIN code: a six-digit code plus comma-separated words that are not just its label."""
+    rest = _PIN_LABEL_WORDS.sub("", text)
+    return "," in text and bool(_PIN_ANY.search(text)) and bool(re.search(r"[A-Za-z]{3,}|[ऀ-ॿ]{2,}", rest))
+
+
 _CARE_OF_ADDRESS = re.compile(r"(?<![A-Za-z/])(?i:c/o)[ :.-]+(?P<a>\d{1,4}[A-Z]?(?:/\d+)?, *[^;\n|]{5,120})")
 
 
@@ -89,6 +118,8 @@ def find_places(text: str, care_of: bool = True) -> list[Cand]:
     for m in VILLAGE_CUE.finditer(text):
         if set(m.group("v").casefold().split()) & _NOT_PLACE:
             continue  # "Village Health Nutrition Day"
+        if m.group(0)[:3].casefold() == "r/o" and _rules_out(m.group("v"), text[m.end("v"):]):
+            continue
         out.append(Cand(m.start("v"), m.end("v"), "VILLAGE", norm_name(m.group("v")), "patient"))
     for pattern in (_LIVES_IN, _THEN_VILLAGE):
         for m in pattern.finditer(text):
