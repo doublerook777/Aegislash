@@ -24,10 +24,10 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-_AGE_BAND_RX = re.compile(r"\b(\d{1,3})\s*-\s*(\d{1,3})\b")
-_AGE_PLUS_RX = re.compile(r"\b(\d{2,3})\+")
+_AGE_BAND_RX = re.compile(r"(?<![\d/-])\b(\d{1,3})\s*-\s*(\d{1,3})\b(?![\d/-])")
+_AGE_PLUS_RX = re.compile(r"(?<![\d/.-])\b(\d{2,3})\+")
 _AGE_EXACT_RX = re.compile(
-    r"(?:(?:age|umar|आयु|उम्र)\s*[:=-]?\s*|\b)(\d{1,3})\s*(?:/[MF]|yrs?|years?|y/o|वर्ष|साल)",
+    r"(?:(?:age|umar|आयु|उम्र)\s*[:=-]?\s*|\b)(?<!x\s)(\d{1,3})\s*(?:/[MF]\b|(?:yrs?|years?|y/o|वर्ष|साल)\b(?!\s*back))",
     re.I,
 )
 _PIN_PREFIX_RX = re.compile(r"\b(\d{3})\*{3}\b")
@@ -47,17 +47,22 @@ def _norm(s: str) -> str:
 
 
 def _extract_age_range(text: str) -> tuple[int, int] | None:
-    m = _AGE_BAND_RX.search(text)
+    if re.search(r"\bx\s+\d+\s*(?:yrs?|years?)|\b\d+\s*(?:yrs?|years?)\s+back\b", text, re.I):
+        # Skip clinical duration strings unless an explicit age band/label is also present
+        cleaned = re.sub(r"\bx\s+\d+\s*(?:yrs?|years?)|\b\d+\s*(?:yrs?|years?)\s+back\b", "", text, flags=re.I)
+    else:
+        cleaned = text
+    m = _AGE_BAND_RX.search(cleaned)
     if m:
         lo, hi = int(m.group(1)), int(m.group(2))
-        if 0 <= lo <= hi <= 130:
+        if 0 <= lo <= hi <= 130 and (hi - lo) <= 40:
             return (lo, hi)
-    m = _AGE_PLUS_RX.search(text)
+    m = _AGE_PLUS_RX.search(cleaned)
     if m:
         lo = int(m.group(1))
         if 50 <= lo <= 120:
             return (lo, 130)
-    m = _AGE_EXACT_RX.search(text)
+    m = _AGE_EXACT_RX.search(cleaned)
     if m:
         a = int(m.group(1))
         if 0 <= a <= 130:
