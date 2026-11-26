@@ -223,3 +223,47 @@ cd experiments/presidio && unshare -rn .venv/bin/python -B compare_blind.py fres
 python3 -I count_fix_formats.py fresh5
 ```
 
+---
+
+# Batch 5 fixes, checked on batch 6 (2026-11-27)
+
+After the section above, the batch 5 failures **were read** and fixed (batch 5 is now "seen"). Batch 6 was written by
+another new Claude agent in an empty folder. Its tool log showed no file access outside that folder. **Its automatic
+git details included the title of the fix commit**, "fix header, relation, ID, date and phone gaps...", so it knew
+which areas had changed, though no rules or values. Same model as the author of the fixes. Labels not checked.
+No batch 6 case or failure text has been read by the author of the fixes.
+
+| Batch 6, personal data covered | previous (`2f3cb86`) | first run (`d53c05f`) | final (`6e027f9`) |
+|---|---|---|---|
+| Lines (116) | 56.9% | 60.3% | 59.5% |
+| Exports (504) | 60.5% | 63.5% | 61.9% |
+
+Medical / staff text kept was the same for all three: lines 100%, exports 97.3%. Nothing that passed before fails now.
+
+**The final column is not a first run.** After the first score (totals only), a generated comparison showed that
+`d53c05f` could leak names, and the code was changed. Part of the first run's gain came from the unsafe rules.
+
+On batch 5, which the fixes were built from, the same code goes from 53.7% / 71.0% to 66.9% / 80.3%. **About 13 and 9
+points on the data it was built from, about 1-3 points on new data.** That is the size of the memorisation gap.
+
+## The leaks that tests and data did not catch
+Hand-written tests, the practice data, the repo's test inputs and all the batches passed while the code could:
+
+- hide a patient behind doctor protection: "SEEN BY DR <x> PT NAME <patient>" (introduced by my broader "DR" rule);
+  "Ref Dr <x> Patient <patient>" already did this on `main`;
+- stop searching a column for names because its header had gained a meaning ("P.I.N.", "Landmark", "Student", "fon");
+- drop a whole finding because the captured text began with a word like "Witness" or "Admitted";
+- stop searching a mostly-phones column, including its one cell that named a relative.
+
+`differential.py` generates inputs from titles, relation words, headers and cell shapes, runs the old and new code,
+and lists names the new code no longer covers. On the final code it lists 4: address cells reading
+"<name> came with <new relation word> <name>", where only the second name is removed. The old code does the same with
+older words such as "wife". It also lists 57 inputs with extra medical text flagged: artificial cells (a diagnosis
+under "Student" or "Landmark") or medical words after a new relation word, mostly ones the old code already flags after
+"son:". It only knows the shapes it was written with.
+
+```bash
+git archive 2f3cb86 aegis | tar -x -C <empty folder>
+python3 experiments/presidio/differential.py <that folder> <this repository>
+```
+

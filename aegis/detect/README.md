@@ -148,7 +148,7 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 
   | batch | status | previous | now |
   |---|---|---|---|
-  | 5 | its failures were fixed | 53.7% / 71.0% | 66.9% / 80.2% |
+  | 5 | its failures were fixed | 53.7% / 71.0% | 66.9% / 80.3% |
   | 6 | never read | 56.9% / 60.5% | 59.5% / 61.9% |
 
   **Expect the batch 6 gain, about 1-3 points, not the batch 5 one.** (An earlier draft scored 60.3% / 63.5% on its
