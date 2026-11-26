@@ -2,6 +2,10 @@
 
 Date: 2026-11-26. Branch: `detect/presidio-lab`. Research only: nothing in `aegis/` was changed.
 
+**Update:** a fresh unseen test was run after this report, including Presidio. See
+[FRESH_TEST.md](FRESH_TEST.md). It answers the "not run on fresh text" points below and puts a
+column-header fix ahead of the recommendations here.
+
 ## Short answer
 
 - **Do not add Presidio or spaCy.** Out of the box they find much less than our rules, flag a lot of
