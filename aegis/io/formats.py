@@ -42,22 +42,99 @@ class ParsedFile:
     leaf_refs: dict = dc_field(default_factory=dict)   # pointer -> (container, key, original value)
     key_refs: dict = dc_field(default_factory=dict)    # key path -> (object, key)
     doc_record_id: str | None = None                   # set when the file is a single document
-    b64_ptrs: set = dc_field(default_factory=set)      # leaves that were base64 text (re-encoded on write)
+    b64_ptrs: dict = dc_field(default_factory=dict)    # leaf pointer -> _B64Form (re-encoded the same way on write)
+    jsonl: bool = False                                # one JSON object per line (written back the same way)
 
 
 _B64_RX = re.compile(r"[A-Za-z0-9+/]{24,}={0,2}")
+_B64_LINE = re.compile(r"[A-Za-z0-9+/]+={0,2}")
+_DATA_URI = re.compile(r"data:[^,;\s]*(?:;[^,;\s]*)*;base64,", re.I)
+_B64_NAME = re.compile(r"[A-Za-z0-9+/_-]{16,}={0,2}")
 
 
-def _b64_text(v: str) -> str | None:
-    """Decoded text when the whole string is base64 of readable UTF-8 (FHIR attachments), else None."""
-    if len(v) < 24 or len(v) % 4 or not _B64_RX.fullmatch(v):
-        return None
+@dataclass(frozen=True)
+class _B64Form:
+    """How a base64 value was written, so the sanitized text is written back the same way."""
+    lead: str = ""          # whitespace before the value
+    prefix: str = ""        # "data:text/plain;base64,"
+    width: int = 0          # line length when the value was wrapped (0 = one line)
+    newline: str = "\n"
+    padded: bool = True
+    tail: str = ""          # whitespace (a final newline) after the value
+
+
+def _readable(raw: bytes) -> str | None:
     try:
-        text = base64.b64decode(v, validate=True).decode("utf-8")
-    except (binascii.Error, ValueError):
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
         return None
     printable = sum(c.isprintable() or c in "\n\r\t" for c in text)
     return text if text and printable >= 0.95 * len(text) else None
+
+
+def _b64_decode(v: str) -> tuple[str, _B64Form] | None:
+    """Readable text and layout when the whole string is base64 of UTF-8: one line, wrapped over several lines
+    (MIME style) and/or behind a "data:...;base64," prefix. None for anything else."""
+    stripped = v.strip()
+    lead, tail = v[:len(v) - len(v.lstrip())], v[len(v.rstrip()):]
+    m = _DATA_URI.match(stripped)
+    prefix = m.group(0) if m else ""
+    body = stripped[len(prefix):]
+    parts = re.split(r"\r\n|\n|\r", body)
+    newline = "\r\n" if "\r\n" in body else ("\r" if "\r" in body else "\n")
+    lines = [p.strip() for p in parts]
+    if not all(_B64_LINE.fullmatch(p) for p in lines):
+        return None
+    flat = "".join(lines)
+    wrapped = len(lines) > 1
+    if wrapped:
+        width = len(lines[0])
+        # a wrapped value has equal lines and a shorter last one; "=" may only close the last line
+        if width < 16 or any(len(p) != width for p in lines[:-1]) or len(lines[-1]) > width or any("=" in p for p in lines[:-1]):
+            return None
+    else:
+        width = 0
+    padded = len(flat) % 4 == 0
+    if not prefix and (len(flat) < 24 or not padded):
+        return None                 # without a prefix, only a properly padded, long value counts
+    if len(flat) % 4 == 1 or (prefix and len(flat) < 8):
+        return None
+    try:
+        text = _readable(base64.b64decode(flat + "=" * (-len(flat) % 4), validate=True))
+    except (binascii.Error, ValueError):
+        return None
+    if text is None:
+        return None
+    return text, _B64Form(lead, prefix, width, newline, padded, tail)
+
+
+def _b64_encode(text: str, form: _B64Form) -> str:
+    out = base64.b64encode(text.encode("utf-8")).decode("ascii")
+    if not form.padded:
+        out = out.rstrip("=")
+    if form.width:
+        out = form.newline.join(out[i:i + form.width] for i in range(0, len(out), form.width))
+    return form.lead + form.prefix + out + form.tail
+
+
+def _b64_filename(name: str) -> str | None:
+    """The text inside a file name whose stem is base64 (padding left off, URL-safe letters allowed), with the
+    extension put back; None when the stem is not base64 of readable text."""
+    stem, dot, ext = name.rpartition(".")
+    if not dot or not stem:
+        stem, ext = name, ""
+    if not _B64_NAME.fullmatch(stem) or ("+" in stem or "/" in stem) and ("-" in stem or "_" in stem):
+        return None
+    flat = stem.rstrip("=")
+    if len(flat) % 4 == 1:
+        return None
+    try:
+        text = _readable(base64.b64decode(flat.replace("-", "+").replace("_", "/") + "=" * (-len(flat) % 4), validate=True))
+    except (binascii.Error, ValueError):
+        return None
+    if text is None or "\n" in text or "\r" in text:
+        return None
+    return text + (dot + ext if ext else "")
 
 
 def _rid(rel: str, loc: str) -> str:
@@ -65,8 +142,10 @@ def _rid(rel: str, loc: str) -> str:
 
 
 def _file_record(rel: str, fmt: str) -> Record:
+    name = PurePosixPath(rel).name
+    # a base64 name is shown to detect as the text it holds; the renamed output file is plain text (see pipeline)
     return {"record_id": _rid(rel, "@file"), "file": rel, "loc": "@file", "fmt": fmt,
-            "fields": [{"path": "filename", "kind": "filename", "context": None, "value": PurePosixPath(rel).name}]}
+            "fields": [{"path": "filename", "kind": "filename", "context": None, "value": _b64_filename(name) or name}]}
 
 
 def parse(rel: str, text: str) -> ParsedFile:
@@ -74,6 +153,13 @@ def parse(rel: str, text: str) -> ParsedFile:
     stripped = text.lstrip()
     if ext == ".json" or (ext in (".csv", ".tsv", ".txt") and stripped[:1] in "{[" and _looks_json(stripped)):
         return _parse_json(rel, text)
+    if ext in (".csv", ".tsv", ".txt") and stripped[:1] == "{":
+        lines = _json_lines(text)
+        if lines is not None:
+            return _parse_json(rel, text, lines=lines)
+        if ext != ".txt" and _first_line_is_object(text):
+            # a table that starts like JSON Lines but is not: reading it as CSV would keep every value
+            raise Unsupported("malformed_json_lines")
     if ext in (".csv", ".tsv"):
         return _parse_csv(rel, text, "\t" if ext == ".tsv" else _sniff_delimiter(text))
     if ext == ".txt":
@@ -87,6 +173,31 @@ def _looks_json(s: str) -> bool:
         return True
     except (ValueError, RecursionError):
         return False
+
+
+def _first_line_is_object(text: str) -> bool:
+    first = next((ln for ln in text.split("\n") if ln.strip()), "")
+    try:
+        return isinstance(json.loads(first), dict)
+    except (ValueError, RecursionError):
+        return False
+
+
+def _json_lines(text: str) -> list[dict] | None:
+    """JSON Lines: two or more non-blank lines, each one a complete JSON object. None when it is not that.
+    (Split on "\n" only: U+2028 and friends may sit inside a JSON string.)"""
+    out = []
+    for ln in text.split("\n"):
+        if not ln.strip():
+            continue
+        try:
+            obj = json.loads(ln)
+        except (ValueError, RecursionError):
+            return None
+        if not isinstance(obj, dict):
+            return None
+        out.append(obj)
+    return out if len(out) >= 2 else None
 
 
 def _sniff_delimiter(text: str) -> str:
@@ -161,21 +272,26 @@ def _leaf_text(v: Any) -> str:
     return v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
 
 
-def _parse_json(rel: str, text: str) -> ParsedFile:
-    try:
-        data = json.loads(text)
-    except RecursionError:
-        raise Unsupported("json_too_deep") from None
-    except ValueError:
-        raise Unsupported("malformed_json") from None
+def _parse_json(rel: str, text: str, lines: list[dict] | None = None) -> ParsedFile:
+    """`lines` is the list of objects of a JSON Lines file: each line is one record, `row:N` like a CSV row."""
+    if lines is not None:
+        data = lines
+    else:
+        try:
+            data = json.loads(text)
+        except RecursionError:
+            raise Unsupported("json_too_deep") from None
+        except ValueError:
+            raise Unsupported("malformed_json") from None
     fmt = "fhir" if isinstance(data, dict) and data.get("resourceType") == "Bundle" else "json"
     frec = _file_record(rel, fmt)
-    pf = ParsedFile(rel, fmt, [frec], frec["record_id"], data=data)
-    rec_ptrs = _record_pointers(data)
+    pf = ParsedFile(rel, fmt, [frec], frec["record_id"], data=data, jsonl=lines is not None)
+    rec_ptrs = [f"/{i}" for i in range(len(data))] if lines is not None else _record_pointers(data)
     if rec_ptrs:
         by_ptr = {}
         for p in rec_ptrs:
-            r: Record = {"record_id": _rid(rel, p), "file": rel, "loc": p, "fmt": fmt, "fields": []}
+            loc = f"row:{p[1:]}" if lines is not None else p
+            r: Record = {"record_id": _rid(rel, loc), "file": rel, "loc": loc, "fmt": fmt, "fields": []}
             by_ptr[p] = r
             pf.records.append(r)
         top_len = {p.rsplit("/", 1)[0] for p in rec_ptrs}
@@ -235,10 +351,10 @@ def _add_leaf(pf, owner, container, key, v, ptr, ctx):
     pf.leaf_refs[ptr] = (container, key, v)
     text = _leaf_text(v)
     if isinstance(v, str):
-        decoded = _b64_text(v)
-        if decoded is not None:
-            pf.b64_ptrs.add(ptr)
-            text = decoded
+        hit = _b64_decode(v)
+        if hit is not None:
+            text = hit[0]
+            pf.b64_ptrs[ptr] = hit[1]
     owner(ptr)["fields"].append({"path": ptr, "kind": "value", "context": ctx, "value": text})
 
 
@@ -286,7 +402,7 @@ def write(pf: ParsedFile, new: dict[tuple[str, str], str]) -> str:
     for ptr in sorted(leaf_new):
         container, key, orig = pf.leaf_refs[ptr]
         if ptr in pf.b64_ptrs:
-            value = base64.b64encode(leaf_new[ptr].encode("utf-8")).decode("ascii")
+            value = _b64_encode(leaf_new[ptr], pf.b64_ptrs[ptr])
         else:
             value = _restore_type(orig, leaf_new[ptr])
         if container is None:
@@ -308,6 +424,8 @@ def write(pf: ParsedFile, new: dict[tuple[str, str], str]) -> str:
             items.append((nk, v))
         obj.clear()
         obj.update(items)
+    if pf.jsonl:
+        return "".join(json.dumps(obj, ensure_ascii=False) + "\n" for obj in pf.data)
     return json.dumps(pf.data, ensure_ascii=False, indent=2) + "\n"
 
 

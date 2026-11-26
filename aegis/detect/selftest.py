@@ -126,6 +126,57 @@ CASES = [
     ("R/o Barhalganj Patient stable today.", ["Barhalganj"], []),
     ("Woman r/o Sikandarpur heart disease on treatment.", ["Sikandarpur"], []),
     ("Man r/o Phuluria for ten years.", ["Phuluria"], []),
+    # dotted and "+91/" phones, mixed Aadhaar separators
+    ("Call 97.31.20.45.88 or +91/8123/004455; Na 138.5", ["97.31.20.45.88", "+91/8123/004455"], ["138.5"]),
+    ("ID seen 5821-7734 9012 at desk, HbA1c 7.2", ["5821-7734 9012"], ["HbA1c 7.2"]),
+    # zero-width characters, look-alike letters, accents (typed whole or as separate marks)
+    ("Patient: Bar\u200bnali Then\u200dgal, mob 97312\u200b04588", ["Bar\u200bnali Then\u200dgal", "97312\u200b04588"], []),
+    ("Patient: B\u0430rn\u0430li Thengal (44/F)", ["B\u0430rn\u0430li Thengal"], []),
+    ("Patient Name: H\u00e9ctor Pereira", ["H\u00e9ctor Pereira"], []),
+    ("Patient Name: He\u0301ctor Pereira", ["He\u0301ctor Pereira"], []),
+    ("TSH 2.1 \u03bcIU/mL, dose 50 \u00b5g, TNF-\u03b1 raised", [], ["\u03bcIU/mL", "50 \u00b5g", "TNF-\u03b1"]),
+    # years from 1800: the date is found and shifted; a 4-digit time of day is not a year
+    ("DOB 14/03/1893, seen 02 Feb 1895", ["14/03/1893", "02 Feb 1895"], []),
+    ("Born 1889-07-21; registered 1889/07/22", ["1889-07-21", "1889/07/22"], []),
+    ("Admitted 12 Mar 1830 hrs with BP 120/80, Tab Aspirin 75 mg 0-1-0", [], ["1830 hrs", "BP 120/80", "Aspirin 75 mg"]),
+    # URL escapes: found where they stand in the original text, and the words between them are not read as a name
+    ("Scan: https://his.example/files/Tarun%20Wadhwa%5Creport.pdf?tel=%2B91%2098765%2043210",
+     ["Tarun%20Wadhwa", "%2B91%2098765%2043210"], ["report.pdf"]),
+    ("file:///D%3A%5CRecords%5CKavya_Chaudhary%5Ccase_notes.pdf", ["Kavya_Chaudhary"], ["case_notes"]),
+    ("Open summary_Zubin_Pathak_2026.pdf and Lab_Reports_Singh_Block.csv", ["Zubin_Pathak"], ["Lab_Reports", "Singh_Block"]),
+    ("view?patient=Agust%C3%ADn%20Fonseca&visit=3", ["Agust%C3%ADn%20Fonseca"], ["visit=3"]),
+    ("log: patient=Zorawar Khetarpal ward=3 status=stable", ["Zorawar Khetarpal"], ["ward=3", "status=stable"]),
+    ("SpO2 96%, 5%DEXTROSE drip at 40%20 ml/hr, Tab Paracetamol 650 mg", [], ["96%", "5%DEXTROSE", "Paracetamol 650 mg"]),
+    ("Keep 100%25 oxygen; Hb 9.8 g/dL", [], ["Hb 9.8 g/dL"]),
+    # given names with no surname: only where the sentence says the person did something ("signed the", "took discharge")
+    ("Meenal signed the surgical consent form.", ["Meenal"], ["consent form"]),
+    ("Tarun took discharge against medical advice on 14/08/2026.", ["Tarun"], ["medical advice"]),
+    ("Consent signed by guardian. Nurse signed the form. Uncle signed the consent. Dr. Rao signed the order.", [],
+     ["Consent", "Nurse", "Uncle", "guardian"]),
+    ("Wheezing returned after 2 days. Itching signed off by physician. Pharmacy signed the bill.", [],
+     ["Wheezing", "Itching", "Pharmacy"]),
+    # Scrubadub-inspired improvements + English/Hindi/Hinglish translations
+    ("Contact ramesh.verma at gmail dot com or ph 98.45.01.12.23; BP 118/76.",
+     ["ramesh.verma at gmail dot com", "98.45.01.12.23"], ["118/76"]),
+    ("Patient: Ra\u200bhul\u200d Chatur\u200bvedi, Mob: 73053\u200b31651, Co-admitted: Dеvikа Rаo.",
+     ["Ra\u200bhul\u200d Chatur\u200bvedi", "73053\u200b31651", "Dеvikа Rаo"], []),
+    ("URL ref: https://portal.example/view?patient=Priyanka%20Sengupta&tel=%2B91%207759130735",
+     ["Priyanka%20Sengupta", "%2B91%207759130735"], []),
+    ("Satyendra discharged in stable condition on Tab Azithromycin 500 mg.",
+     ["Satyendra"], ["Azithromycin 500 mg"]),
+    ("Priyanka ne sign kiya aur Rohan ko chhutti mili; BP 120/80.",
+     ["Priyanka", "Rohan"], ["120/80"]),
+    ("रमेश ने हस्ताक्षर किए और प्रिया को छुट्टी दी गई; पैरासिटामोल 500mg जारी।",
+     ["रमेश", "प्रिया"], ["पैरासिटामोल 500mg"]),
+    ("Follow up with Pema Choden and Agustín Fonseca; PAN gxlpv2692s.",
+     ["Pema Choden", "Agustín Fonseca", "gxlpv2692s"], []),
+    # the same new rules must leave report and ward text alone
+    ("Culture verified, Repeat CBC signed.", [], ["Culture", "Repeat CBC"]),
+    ("Troponin, Negative called to physician.", [], ["Negative"]),
+    ("Seen at 10 at AIIMS dot in OPD.", [], ["AIIMS"]),
+    ("Lobsang verified the payment receipt at the counter.", ["Lobsang"], []),
+    ("Culture verified the organism; Smear signed out by pathologist.", [], ["Culture", "Smear"]),
+    ("Janam tithi 14/05/1988, जन्मतिथि 12-08-1992.", ["14/05/1988", "12-08-1992"], []),
 ]
 
 
@@ -138,6 +189,14 @@ def _run_line(line: str) -> list[str]:
 
 # whole-column cases: (headers, rows, header -> expected finding type for every row, or None = nothing flagged)
 TABLES = [
+    # recent years under an unreadable header are events, not birth years
+    (["Q_YR"], [["2009"], ["2014"], ["2021"], ["2024"]], {"Q_YR": None}),
+    # "Surname, Given" in an unreadable column, a birth-year column, Hindi-in-Latin headers
+    (["PX_LBL", "X_YOB", "CLIN_TXT"], [["Thengal, Barnali", "1968", "stable"], ["Pereira, Hector", "1981", "afebrile"],
+                                       ["Oraon, Suraj", "2003", "review"]],
+     {"PX_LBL": "PATIENT_NAME", "X_YOB": "DOB", "CLIN_TXT": None}),
+    (["rogee", "pehchaan_sankhya", "postal6", "nidan"], [["Barnali Thengal", "1234 5678 9012", "781001", "Anemia"]],
+     {"rogee": "PATIENT_NAME", "pehchaan_sankhya": "AADHAAR", "postal6": "PIN", "nidan": None}),
     (["P_NOM", "K_SUP", "M_RXR", "Q_LOC", "Z_6D", "N_MEMO"],
      [["Anirban Sen", "Mitali Sen", "Farhan Qureshi", "21A Lake Road, Near City Park", "700029", "seen by Dr. Farhan Qureshi"],
       ["Lalita Oraon", "Birsu Oraon", "Neha Kapoor", "H.No. 4, Station Road, Ranchi", "834001", "Dr. Neha Kapoor advised rest"],
@@ -213,6 +272,9 @@ def _run_cells() -> int:
 
 # JSON cases: (pointer -> value or key, strings that MUST be found, strings that MUST survive)
 DOCS = [
+    # an unlisted two-word value is a person only when its label says so
+    ({"organism": "Escherichia Coli", "sign": "Murphy Positive", "reviewer": "Tshering Wangdi"},
+     ["Tshering Wangdi"], ["Escherichia Coli", "Murphy Positive"]),
     # lookup tables keyed by people, whatever the table is called
     ({"on_call_map": {"Barnali Thengal": "bed 3"}}, ["Barnali Thengal"], ["bed 3"]),
     ({"drug_index": {"Amlodipine Besylate": "5 mg"}, "ward_map": {"General Ward": "2"},
@@ -259,6 +321,7 @@ def _run_docs() -> int:
 
 # a name run together or in lowercase inside a file name: (file name, text, expected pieces found in the file name)
 FILENAMES = [
+    ("बरनाली_शर्मा_पर्चा.txt", "BP 110/70\n", ["बरनाली_शर्मा"]),
     ("ds-barnalithengal-31145549.txt", "Patient Name: Barnali Thengal\n", ["barnalithengal"]),
     ("ds_devika_ranganathan.txt", "Patient Name: Devika Ranganathan\n", ["devika_ranganathan"]),
 ]

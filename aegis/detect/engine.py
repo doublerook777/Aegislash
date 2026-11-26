@@ -11,13 +11,15 @@ Pure: no printing, files or network. No iteration over sets (output must be dete
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 
 from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
 from aegis.detect.labels import classify, tokens
-from aegis.detect.normalize import DEVA, fold, norm_name
+from aegis.detect.normalize import DEVA, fold, norm_name, unquote_view, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
-from aegis.types import STRONG_ID_TYPES, Record, RecordResult, empty_evidence
+from aegis.types import DIRECT_TYPES, QUASI_TYPES, STRONG_ID_TYPES, Record, RecordResult, empty_evidence
 
 NAME_TYPES = ("PATIENT_NAME", "RELATIVE_NAME")
 # two or more of these words mean the sentence is Hinglish (Hindi written in Latin letters)
@@ -136,13 +138,20 @@ def _guess_role(vals: list[str]) -> str | None:
         return None
     if all(re.fullmatch(r"[1-9]\d{2}(?!000)\d{3}", v.strip()) for v in vals):
         return "pin"
+    if all(re.fullmatch(r"(?:19[1-9]\d|20[0-2]\d)", v.strip()) for v in vals):
+        yrs = [int(v.strip()) for v in vals]
+        # diagnosis, admission or follow-up years are recent and close together; patients' birth years are not
+        if max(yrs) - min(yrs) >= 10 and sorted(yrs)[len(yrs) // 2] < 1995:
+            return "dob"
     # addresses: most values carry a house number, landmark or PIN together with a comma
     addresses = [v for v in vals if "," in v and any(c.type in ("HOUSE", "LANDMARK", "LOCALITY", "PIN")
                                                      for c in address.find_places(fold(v)))]
     if len(addresses) >= 0.6 * len(vals) and all(len(v) <= 90 for v in vals):
         return "address"
-    people = [v for v in vals if re.fullmatch(r"[A-Z][A-Za-z.']*(?: [A-Z][A-Za-z.']*){1,3}", v.strip())]
-    with_surname = [v for v in people if set(v.casefold().split()) & gazetteer.SURNAMES]
+    folded = [fold(v).strip() for v in vals]
+    people = [v for v in folded
+              if re.fullmatch(r"[A-Z][A-Za-z.']*(?: [A-Z][A-Za-z.']*){1,3}", v) or fields.surname_first(v)]
+    with_surname = [v for v in people if set(v.casefold().replace(",", " ").split()) & gazetteer.SURNAMES]
     if len(people) >= 0.7 * len(vals) and len(with_surname) >= 0.4 * len(vals):
         return "patient_name"
     return None
@@ -209,6 +218,27 @@ def _next_to_mrn(text: str, found: list[Cand]) -> list[Cand]:
     return out
 
 
+_B64_STEM = re.compile(r"^[A-Za-z0-9+/]{16,}={0,2}$")
+
+
+def _b64_filename_cands(text: str, dmy: bool) -> list[Cand]:
+    stem, dot, _ext = text.rpartition(".")
+    if not dot:
+        stem = text
+    if not _B64_STEM.fullmatch(stem):
+        return []
+    try:
+        dec = base64.b64decode(stem + "=" * (-len(stem) % 4)).decode("utf-8")
+    except (binascii.Error, ValueError):
+        return []
+    if not dec or sum(c.isprintable() or c in "\n\r\t" for c in dec) < 0.95 * len(dec):
+        return []
+    inner = candidates({"path": "text", "kind": "text", "context": None, "value": dec}, None, dmy)
+    if any(c.type in DIRECT_TYPES or c.type in QUASI_TYPES for c in inner):
+        return [Cand(0, len(stem), "PATIENT_NAME", norm_name(dec) or None, "patient", prio=PRIORITY["PATIENT_NAME"] + 2)]
+    return []
+
+
 # In a lookup table ("..._map", "..._index") the keys are data, not field names. A capitalised key is only taken for a
 # person when the table's name is about people or whom to contact: "billing_map" keys look just like names.
 _PEOPLE_WORDS = frozenset("patient patients person people contact contacts caller callers call escalation family kin "
@@ -231,7 +261,26 @@ def _looks_like_person(key: str) -> bool:
     return not set(key.casefold().split()) & (names.STOP | gazetteer.NOT_A_PERSON_WORDS)
 
 
-def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
+# labels that say the value beside them is a person; classify() gives these no role of its own
+_PERSON_CLUES = frozenset("reviewer reviewers verifier signatory witness nominee informant attendant escort guardian "
+                          "kin spouse mother mothers father fathers maiden caller callee contact person".split())
+
+
+def _person_labels(by_path: dict[str, str]) -> set[str]:
+    """Paths whose own key, or the label paired with them ({"url": ".../mothers-maiden-name", "valueString": X}),
+    points at a person."""
+    out = set()
+    for path in by_path:
+        holder, _, key = path.rpartition("/")
+        labels = [key]
+        if _PAIR_VALUE.match(key):
+            labels += [re.split(r"[/#]", by_path.get(f"{holder}/{k}", "").rstrip("/"))[-1] for k in _PAIR_LABEL]
+        if any(set(tokens(label)) & _PERSON_CLUES for label in labels):
+            out.add(path)
+    return out
+
+
+def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False) -> list[Cand]:
     text = fold(f["value"])
     kind = f["kind"]
     label, parents = ("", ())
@@ -263,9 +312,16 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
         found += dates.find_ages(text)
         found += address.find_places(text)
         found += names.find_names(text)
-        found += gazetteer.find_listed_names(text, names.STOP)
+        # in file names, headers and keys "_" separates words
+        scan_text = text.replace("_", " ") if kind in ("filename", "header", "key") else text
+        found += gazetteer.find_listed_names(scan_text, names.STOP)
+        if kind not in ("filename", "header", "key"):
+            found += gazetteer.find_joined_names(text, names.STOP)
         found += _labelled(text, dmy)
     found += names.find_path_names(text)
+    found += names.find_url_pii(text)
+    if kind == "filename":
+        found += _b64_filename_cands(text, dmy)
     if kind in ("header", "key", "filename"):
         found += _next_to_mrn(text, found)
     if kind == "key":
@@ -273,8 +329,11 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
         holder = f["path"][4:].rsplit("/", 1)[0].rsplit("/", 1)[-1]
         if classify(holder.replace("by_", "")) in ("patient_name", "name") and holder.startswith("by_"):
             found += fields.name_value(text, 0, len(text), "name")
-        elif _is_lookup_table(holder) and _looks_like_person(text):
+        elif (_is_lookup_table(holder) or not holder) and _looks_like_person(text):
             found += fields.name_value(text, 0, len(text), "name")
+    elif kind == "value" and role is None and person_label:
+        if not any(classify(k) in ("doctor", "keep") for k in (label, *parents)):
+            found += gazetteer.find_unlisted_person(text, names.STOP)
     found += _conditions(text, role, label, parents)
 
     # "Door No. 18-4-22" is a house number, not a date
@@ -314,7 +373,10 @@ def _known_values(cands: list[Cand], text: str) -> list[tuple[str, str, Cand, bo
     for c in cands:
         surface = text[c.start:c.end]
         if c.type in NAME_TYPES:
-            words = [w for w in surface.split() if w]
+            words = surface.replace(",", " ").split()
+            if "," in surface and len(words) > 1:           # "Surname, Given" is usually written "Given Surname"
+                given_first = words[1:] + words[:1]
+                out.append((_anchor(given_first[0]), _word_pattern(given_first), c, True))
             useful = [w.strip(".") for w in words if len(w.strip(".")) >= 3
                       and w.strip(".").casefold() not in names.GENERIC | (names.STOP - {"asha"})]
             if len(words) > 1:
@@ -371,9 +433,9 @@ def _propagate(records: list[Record], per_field: dict) -> None:
                 if c.type in NAME_TYPES:
                     if any(m.start() < e and s < m.end() for s, e in blocked):
                         continue
-                    # lowercase is accepted only for a whole name: run together, or spaced out in a file name
+                    # lowercase is accepted only for a whole name: run together, or in a file name
                     value = m.group(0).casefold()
-                    whole = c.norm == _RUN_TOGETHER or (kind == "filename" and re.search(r"[ _.-]", value))
+                    whole = c.norm == _RUN_TOGETHER or kind == "filename"
                     if not (DEVA.search(value) or m.group(0)[0].isupper() or whole):
                         continue
                     norm = None
@@ -384,7 +446,43 @@ def _propagate(records: list[Record], per_field: dict) -> None:
 
 # ---------------------------------------------------------------- 4. results
 
+def _view(value: str) -> tuple[str, list[tuple[int, int]] | None]:
+    """The text detect reads: hidden characters removed and URL escapes decoded. For each of its characters, the
+    (start, end) it covers in `value` (None: the text is unchanged)."""
+    text, kept = visible(value)
+    spans = None if kept is None else [(k, k + 1) for k in kept]
+    text, inner = unquote_view(text)
+    if inner is not None:
+        spans = inner if spans is None else [(spans[s][0], spans[e - 1][1]) for s, e in inner]
+    return text, spans
+
+
 def detect_file(records: list[Record]) -> list[RecordResult]:
+    """Hidden characters are removed and URL escapes decoded before detection; findings point back into the
+    original values."""
+    originals: dict[tuple[str, str], tuple[str, list[tuple[int, int]]]] = {}
+    cleaned = []
+    for r in records:
+        fields_ = []
+        for f in r["fields"]:
+            text, spans = _view(f["value"])
+            if spans is not None:
+                originals[(r["record_id"], f["path"])] = (f["value"], spans)
+                f = {**f, "value": text}
+            fields_.append(f)
+        cleaned.append({**r, "fields": fields_})
+    results = _detect(cleaned)
+    for result in results:
+        for finding in result["findings"]:
+            key = (result["record_id"], finding["path"])
+            if key in originals:
+                value, spans = originals[key]
+                start, end = spans[finding["start"]][0], spans[finding["end"] - 1][1]
+                finding.update(start=start, end=end, text=value[start:end])
+    return results
+
+
+def _detect(records: list[Record]) -> list[RecordResult]:
     if not records:
         return []
     roles = field_roles(records)
@@ -393,11 +491,12 @@ def detect_file(records: list[Record]) -> list[RecordResult]:
                if f["kind"] == "header" or f["path"].startswith("col:")]
     dmy = dates.day_first(texts, list(dict.fromkeys(headers)))
 
+    people = _person_labels({f["path"]: f["value"] for r in records for f in r["fields"] if f["path"].startswith("/")})
     per_field = {}
     for r in records:
         for f in r["fields"]:
             key = (r["record_id"], f["path"])
-            per_field[key] = (fold(f["value"]), candidates(f, roles.get(key), dmy))
+            per_field[key] = (fold(f["value"]), candidates(f, roles.get(key), dmy, f["path"] in people))
     _propagate(records, per_field)
 
     out: list[RecordResult] = []
@@ -417,7 +516,8 @@ def detect_file(records: list[Record]) -> list[RecordResult]:
                 if c.type in STRONG_ID_TYPES or c.type == "AADHAAR_MASKED":
                     who = who or "patient"
                 if c.type in NAME_TYPES:
-                    norm = norm_name(surface) or None
+                    last, comma, given = surface.partition(",")
+                    norm = norm_name(f"{given} {last}" if comma else surface) or None
                     who = "relative" if c.type == "RELATIVE_NAME" else "patient"
                     hinglish = c.hinglish or len(_HINGLISH.findall(f["value"])) >= 2
                     script = "deva" if DEVA.search(surface) else ("hinglish" if hinglish else "latin")
