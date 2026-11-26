@@ -1,6 +1,6 @@
 """detect module (owner: Member-2). Contract: contracts/detect.md.
 
-Currently wired to the MOCK. When the real engine is ready, change the import below
-to the real implementation; the signature must stay exactly the same.
+The real engine lives in engine.py. mock.py is the old placeholder, kept so the
+contract's mock-only error case can still be run by pointing this import at it.
 """
-from aegis.detect.mock import detect_file  # noqa: F401
+from aegis.detect.engine import detect_file  # noqa: F401
