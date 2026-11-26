@@ -57,6 +57,7 @@ class _RecordInfo:
     full_names: tuple[tuple[str, ...], ...]
     single_names: tuple[tuple[str, ...], ...]
     relatives: tuple[_RelativeMention, ...]
+    multi_patient: bool = False
 
 
 @dataclass
@@ -204,6 +205,19 @@ def _parse_record(idx: int, ev: Evidence) -> _RecordInfo:
     h_raw = ev.get("hospital")
     hospital = h_raw.strip().casefold() if isinstance(h_raw, str) and h_raw.strip() else None
 
+    unique_full = tuple(sorted(set(full_names)))
+    # Multi-patient index/summary records (e.g. patient_index.json) hold multiple unrelated people
+    # and must never bridge separate patients together.
+    is_multi_patient = (
+        len(phones) > 1
+        or any(len(vals) > 1 for vals in single_ids.values())
+        or any(
+            not full_names_match(a, b)
+            for i, a in enumerate(unique_full)
+            for b in unique_full[i + 1 :]
+        )
+    )
+
     return _RecordInfo(
         idx=idx,
         record_id=ev["record_id"],
@@ -217,9 +231,10 @@ def _parse_record(idx: int, ev: Evidence) -> _RecordInfo:
         singleton_ids={t: tuple(sorted(v)) for t, v in single_ids.items()},
         phones=tuple(sorted(phones)),
         mrns=tuple(sorted(mrns)),
-        full_names=tuple(sorted(set(full_names))),
+        full_names=unique_full,
         single_names=tuple(sorted(set(single_names))),
         relatives=tuple(relatives),
+        multi_patient=is_multi_patient,
     )
 
 
@@ -309,12 +324,13 @@ def _clusters_compatible(
 
 
 def _mrn_edge_allowed(c1: _Cluster, c2: _Cluster, mrn: str) -> bool:
-    """Guard bare-digit MRNs against cross-hospital collisions."""
+    """Guard digits-only MRNs against accidental collisions when names don't confirm the link."""
     if mrn.isdigit():
-        if c1.hospitals and c2.hospitals and not (c1.hospitals & c2.hospitals):
-            return False
         if len(mrn) < 6 and not _cluster_names_match(c1, c2):
             return False
+        if c1.hospitals and c2.hospitals and not (c1.hospitals & c2.hospitals):
+            if not _cluster_names_match(c1, c2):
+                return False
     return True
 
 
@@ -355,6 +371,8 @@ def _merge_strong_ids(cm: _ClusterManager, records: list[_RecordInfo]) -> None:
     bare_digit_mrns: list[tuple[int, str]] = []
 
     for r in records:
+        if r.multi_patient:
+            continue
         for id_type, vals in r.singleton_ids.items():
             for v in vals:
                 buckets[(id_type, v)].append(r.idx)
@@ -398,10 +416,12 @@ def _merge_strong_ids(cm: _ClusterManager, records: list[_RecordInfo]) -> None:
                 cm.union(c1.root, c2.root)
 
 
-def _merge_name_and_dob(cm: _ClusterManager) -> None:
+def _merge_name_and_dob(cm: _ClusterManager, multi_roots: set[int]) -> None:
     """Phase 1b: link clusters sharing name + exact DOB (if unique in dataset)."""
     dob_buckets: dict[str, list[int]] = defaultdict(list)
     for root in cm.active_roots():
+        if root in multi_roots:
+            continue
         c = cm.clusters[root]
         if len(c.dobs) == 1:
             dob_buckets[next(iter(c.dobs))].append(root)
@@ -537,16 +557,24 @@ def resolve(evidence: list[Evidence]) -> dict[str, str | None]:
     records = [_parse_record(i, ev) for i, ev in enumerate(ordered)]
     cm = _ClusterManager(records)
 
-    # Phase 1: strong identifiers and exact DOB + name
+    # Phase 1: strong identifiers and exact DOB + name (skip multi-patient records in all phases)
+    multi_roots = {r.idx for r in records if r.multi_patient}
     _merge_strong_ids(cm, records)
-    _merge_name_and_dob(cm)
+    _merge_name_and_dob(cm, multi_roots)
+
+    def _filter_adj(adj: dict[int, list[int]]) -> dict[int, list[int]]:
+        return {
+            u: [v for v in vs if v not in multi_roots]
+            for u, vs in adj.items()
+            if u not in multi_roots and any(v not in multi_roots for v in vs)
+        }
 
     # Phase 2a: full name + second clue (relative, or village + age +/- 1)
-    adj_full = _collect_name_clue_candidates(cm, allow_single=False)
+    adj_full = _filter_adj(_collect_name_clue_candidates(cm, allow_single=False))
     _apply_unique_merges(cm, adj_full, strict_loc=True, max_age_diff=5)
 
     # Phase 2b: single-token name + second clue (fragmented notes)
-    adj_single = _collect_name_clue_candidates(cm, allow_single=True)
+    adj_single = _filter_adj(_collect_name_clue_candidates(cm, allow_single=True))
     _apply_unique_merges(cm, adj_single, strict_loc=True, max_age_diff=5)
 
     out: dict[str, str | None] = {}

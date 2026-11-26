@@ -20,6 +20,7 @@ import io
 import json
 import re
 import statistics
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
@@ -140,7 +141,22 @@ def _merge_profile(prof: dict[str, Any], key: str | None, val: str) -> None:
         prof["week"] = wk
 
 
-def _scan_json_obj(obj: Any, prof: dict[str, Any], parent_key: str | None = None, max_depth: int = 64) -> None:
+def _loads_json_safe(text: str) -> Any:
+    """Parse JSON, allowing deep nesting up to pipeline limit without crashing."""
+    try:
+        return json.loads(text)
+    except RecursionError:
+        old_limit = sys.getrecursionlimit()
+        if old_limit >= 20000:
+            raise
+        sys.setrecursionlimit(20000)
+        try:
+            return json.loads(text)
+        finally:
+            sys.setrecursionlimit(old_limit)
+
+
+def _scan_json_obj(obj: Any, prof: dict[str, Any], parent_key: str | None = None, max_depth: int = 4096) -> None:
     stack: list[tuple[Any, str | None, int]] = [(obj, parent_key, 0)]
     while stack:
         cur, pkey, depth = stack.pop()
@@ -220,8 +236,8 @@ def _load_release_profiles(out_dir: Path) -> tuple[dict[str, dict[str, Any]], in
                     _merge_profile(prof, h, cell)
         elif ext == ".json":
             try:
-                data = json.loads(text)
-            except ValueError:
+                data = _loads_json_safe(text)
+            except (ValueError, RecursionError):
                 continue
             if "doc" in loc_map:
                 _scan_json_obj(data, get_prof(loc_map["doc"]))

@@ -96,8 +96,8 @@ detect notes (2026-11-26):
 - Contract notes (no shape change): MRN `norm` is the digits only; evidence `gender` may be implied by S/o, D/o, W/o or an honorific. `check_contracts.py --mock` fails detect's mock-only "bad file" case by design.
 
 link notes (2026-11-26):
-- Done: cross-script Hindi-aware Devanagari/IAST/Latin normalizer (`aegis/link/normalize.py`), two-phase blocker/clustering linker (`aegis/link/resolver.py`) with strong IDs, Name+DOB, Name+Relative, Name+Village+Age±1, uniqueness gating, and anti-over-merge invariants; wired into `aegis/link/__init__.py`.
-- Next: re-measure `check_dev.py` once real `detect` (Member-2) lands.
+- Done: cross-script Hindi-aware Devanagari/IAST/Latin normalizer (`aegis/link/normalize.py`), two-phase blocker/clustering linker (`aegis/link/resolver.py`) with strong IDs, Name+DOB, Name+Relative, Name+Village+Age±1, uniqueness gating, anti-over-merge invariants, multi-patient bridge guard (`patient_index.json`), and cross-hospital digits-only MRN matching when names match; wired into `aegis/link/__init__.py`. Live `check_dev.py`: precision 1.00, recall 0.91 (Windows CRLF filename-hash mismatch on renamed txt/json), F0.5 0.98, 0 false merges.
+- Next: ready for final submission checks (`check_submission.py`).
 
 ## Open questions
 Format: what I'm unsure about | why it matters | options | recommended default | owner to answer

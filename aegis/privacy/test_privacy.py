@@ -185,6 +185,34 @@ class PrivacyTests(unittest.TestCase):
             self.assertEqual(rep["simulated_known_facts_attack"]["rare_cond_with_narrow_qi_hits"], 1)
             self.assertEqual(rep["simulated_known_facts_attack"]["exact_date_overlap_hits"], 1)
 
+    def test_risk_report_handles_deep_json(self) -> None:
+        import json
+        import tempfile
+        from pathlib import Path
+        from scripts.risk_report import analyze_release
+
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td)
+            (out / "sanitized").mkdir()
+            depth = 1500
+            leaf = json.dumps({"patient": "PSN-DEEP01", "age": "45-49", "gender": "M", "district": "Lucknow"})
+            (out / "sanitized" / "deep.json").write_text(
+                '{"level": ' * depth + leaf + "}" * depth,
+                encoding="utf-8",
+            )
+            (out / "sanitized" / "flat.json").write_text(
+                json.dumps({"patient": "PSN-FLAT01", "age": "45-49", "gender": "M", "district": "Lucknow"}),
+                encoding="utf-8",
+            )
+            (out / "records.jsonl").write_text(
+                json.dumps({"file": "sanitized/deep.json", "loc": "doc", "patient": "PSN-DEEP01"}) + "\n"
+                + json.dumps({"file": "sanitized/flat.json", "loc": "doc", "patient": "PSN-FLAT01"}) + "\n",
+                encoding="utf-8",
+            )
+            rep = analyze_release(out)
+            self.assertEqual(rep["linked_psn_profiles"], 2)
+            self.assertEqual(rep["k_anon_age_gender_district"]["min_k"], 2)
+
     def test_at_file_records_excluded_from_profiles_and_stats(self) -> None:
         # 8 real records (< 10 threshold) + 4 #@file records must NOT trigger k-anonymity suppression,
         # and @file findings must not inflate stats(), yet replace() must still work for @file.
