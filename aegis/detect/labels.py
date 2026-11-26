@@ -19,7 +19,7 @@ def _words(s: str) -> frozenset[str]:
     return frozenset(s.split())
 
 
-_DOCTOR = _words("doctor dr consultant physician surgeon nurse referred ref author practitioner clinician medico mo डॉक्टर चिकित्सक")
+_DOCTOR = _words("doctor dr consultant physician surgeon nurse referred referrer author practitioner clinician medico mo डॉक्टर चिकित्सक")
 _RELATIVE = _words("guardian relative relatives kin nok father fathers husband husbands mother mothers spouse attendant informant careof pita attender parivar sadasya gharwale gharwala gharwali "
                    "pati parent caregiver witness nominee पिता पति अभिभावक माता")
 _PHONE = _words("phone ph mobile mob tel telephone whatsapp cell callback contactno msisdn फ़ोन फोन मोबाइल दूरभाष")
@@ -28,7 +28,7 @@ _ID_WORDS = _words("id no num number ref code सं संख्या")
 _DOB = _words("dob birth birthdate janm जन्म")
 _AGE = _words("age umar umr aayu yrs आयु उम्र")
 _GENDER = _words("gender sex ling लिंग")
-_PIN = _words("pin pincode zip zipcode postal postalcode पिन")
+_PIN = _words("pin pincode zip zipcode postal postalcode dak dakghar पिन डाक")
 _DISTRICT = _words("district distt dist jila zila zilla जिला ज़िला")
 _TEHSIL = _words("tehsil taluk taluka tahsil block तहसील")
 _VILLAGE = _words("village vill gaon gaanv gaav gav gram city town गांव गाँव ग्राम")
@@ -43,9 +43,27 @@ _KEEP = _words("diagnosis dx drug drugs medicine medication test tests result re
                "coding schema profile निदान विभाग दवा")
 _NOT_PERSON = _words("hospital facility lab test tests drug medicine panel panels coding file organization org "
                      "department ward package scheme insurer company payer_org user username device software")
+_CONTACT = _words("contact contacts caller")
 _NOT_MRN = _words("visit bill invoice sample claim policy ticket trip report order txn receipt encounter")
 _FREE = _words("notes note remarks remark comment comments complaints complaint history narrative advice summary")
 _DATE = _words("date dated datetime tarikh तारीख दिनांक collected reported registered admitted discharged at on")
+
+
+def _owner(parents: tuple[str, ...]) -> str | None:
+    """Whose name sits under these keys, judged by the nearest key that says anything about it."""
+    contact = False
+    for parent in reversed(parents):
+        words = set(tokens(parent))
+        if words & _RELATIVE:
+            return "relative_name"
+        if words & _NOT_PERSON:             # before _SUBJECT: "patient_tests" holds test names
+            return "name" if contact else "keep"    # a contact person, even at an organisation
+        if words & _SUBJECT:
+            return "patient_name"
+        if words & _DOCTOR:
+            return "doctor"
+        contact = contact or bool(words & _CONTACT)
+    return None
 
 
 def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
@@ -62,7 +80,8 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
     joined = "".join(t)
     up = {w for p in parents for w in tokens(p)}
 
-    if s & _DOCTOR and not s & _PHONE:
+    # "ref" alone is only "reference" (patient_ref, mrn_ref, ref_range); "ref_by" names the referring doctor
+    if (s & _DOCTOR or {"ref", "by"} <= s) and not s & _PHONE:
         return "doctor"
     if s & _FREE and not s & _ADDRESS:
         return "free"
@@ -90,6 +109,9 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
         if s & {"reg", "regn", "registration", "ipd", "ip", "admission", "adm", "cr", "mr", "hospital"} and s & _ID_WORDS:
             return "mrn"
         if s & _SUBJECT and s & _ID_WORDS:
+            return "mrn"
+        # the paper case sheet carries the hospital's record number
+        if "casesheet" in joined and (s & _ID_WORDS or joined.endswith("casesheet")):
             return "mrn"
     if s & _AGE and s & _GENDER:
         return "age_sex"
@@ -124,15 +146,16 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
     if under_name and s & {"local", "text", "full", "display", "value"}:
         is_name_label = True
     if is_name_label:
-        if (s | up) & _NOT_PERSON:
+        if s & _NOT_PERSON:
             return "keep"
-        if up & _RELATIVE:
+        owner = _owner(parents)
+        if owner == "keep" and not s & _SUBJECT:
+            return "keep"
+        if owner == "relative_name":
             return "relative_name"
-        if (s | up) & _SUBJECT:
+        if s & _SUBJECT or owner == "patient_name":
             return "patient_name"
-        if up & _DOCTOR:
-            return "doctor"
-        return "name"
+        return owner or "name"
     if s & _SUBJECT and not s & _ID_WORDS and not s & _KEEP:
         return "patient_name"
     if s & _KEEP:

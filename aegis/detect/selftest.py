@@ -93,6 +93,22 @@ CASES = [
     ("Claim TPA-MEDI-771204 under PMJAY-MH-25-884210", ["TPA-MEDI-771204", "PMJAY-MH-25-884210"], []),
     ("Collected from Shastri Ward area, Nehru Nagar, 440012 yesterday.", ["Nehru Nagar", "440012"], []),
     ("सुखदेव उइके को भर्ती किया।", ["सुखदेव उइके"], []),
+    # lowercase PAN, more phone layouts, key=value logs, lowercase names
+    ("billing: pan mkrpd4821q noted, Tab. Cefixime 200 mg", ["mkrpd4821q"], ["Cefixime 200 mg"]),
+    ("Reach on (912) 455-7781 or 934/221/6650; SpO2 97%", ["(912) 455-7781", "934/221/6650"], ["SpO2 97%"]),
+    ("Landline 0512-2345678, alt (0581) 456789 and 022 2567 8901.",
+     ["0512-2345678", "(0581) 456789", "022 2567 8901"], []),
+    ("Ward office 0591-245566 open till 5; lot 0042-118, batch 0007-123456789",
+     ["0591-245566"], ["0042-118", "0007-123456789"]),
+    ("BP 130/80/72, counts 150/900/1100, ref range 4000-11000, dose 0.5-1.0 mg", [], ["130/80/72", "4000-11000", "0.5-1.0"]),
+    ("caller=devika ranganathan dial=912/450/7781", ["devika ranganathan", "912/450/7781"], []),
+    ("caller=Barnali Thengal status=resolved", ["Barnali Thengal"], ["resolved"]),
+    ("patient=stable name=unknown pt=afebrile", [], ["stable", "unknown", "afebrile"]),
+    ("pt devika ranganathan ko do din se bukhar hai", ["devika ranganathan"], ["bukhar"]),
+    ("mahesh tripathi s/o ramnaresh tripathi admitted kal raat", ["mahesh tripathi", "ramnaresh tripathi"], ["admitted"]),
+    ("pichle das din se pet dard, lal chakte, x ray normal, khan pan theek", [],
+     ["das din", "pet dard", "lal chakte", "x ray normal", "khan pan"]),
+    ("patient has chest pain and mild fever, advised rest at home", [], ["chest pain", "mild fever", "rest at home"]),
 ]
 
 
@@ -118,6 +134,11 @@ TABLES = [
      {"familyHeadRelation": "RELATIVE_NAME", "orderingClinician": None, "labRchId": "MRN", "Village/Mohalla": "VILLAGE"}),
     (["पता_ग्राम_पिन", "वार्ड"], [["मकान नं. 5/ए, ग्राम रामपुर, 263139", "कस्तूरबा वार्ड"]],
      {"पता_ग्राम_पिन": "HOUSE", "वार्ड": None}),
+    # "ref" does not mean doctor; real referrer and reference-range columns are still kept
+    (["case_sheet_ref", "patient_ref", "mrn_ref", "ref_by", "ref_doctor", "ref_range", "dak_code", "sample_code"],
+     [["31145549", "31147001", "31149002", "Neha Kapoor", "Farhan Qureshi", "4000-11000", "226010", "880123"]],
+     {"case_sheet_ref": "MRN", "patient_ref": "MRN", "mrn_ref": "MRN", "ref_by": None, "ref_doctor": None,
+      "ref_range": None, "dak_code": "PIN", "sample_code": None}),
 ]
 
 
@@ -136,6 +157,73 @@ def _run_tables() -> int:
     return failed
 
 
+# JSON cases: (pointer -> value or key, strings that MUST be found, strings that MUST survive)
+DOCS = [
+    # lookup tables keyed by people, whatever the table is called
+    ({"on_call_map": {"Barnali Thengal": "bed 3"}}, ["Barnali Thengal"], ["bed 3"]),
+    ({"drug_index": {"Amlodipine Besylate": "5 mg"}, "ward_map": {"General Ward": "2"},
+      "vital_signs": {"Heart Rate": "88", "Chief Complaint": "cough"}},
+     [], ["Amlodipine Besylate", "General Ward", "Heart Rate", "Chief Complaint"]),
+    ({"column_map": {"Referral Source": "ref_src"}, "patient_tests": [{"name": "Lipid Profile"}]},
+     [], ["Referral Source", "Lipid Profile"]),
+    # a table whose name says nothing about people keeps its keys
+    ({"billing_map": {"Room Rent": "1200"}, "symptom_index": {"Joint Stiffness": "1"}, "discount_map": {"Senior Citizen": "10"},
+      "organization": {"contact": {"name": "Help Desk"}}}, [], ["Room Rent", "Joint Stiffness", "Senior Citizen", "Help Desk"]),
+    # the closest parent decides whose name it is
+    ({"organization": {"patient": {"name": "Barnali Thengal"}, "contact": {"name": "Devika Ranganathan"}}},
+     ["Barnali Thengal", "Devika Ranganathan"], []),
+    ({"organization": {"name": "Sunrise Care Centre", "department": {"name": "Cardiology"}},
+      "patient": {"insurer": {"name": "Star Health"}}}, [], ["Sunrise Care Centre", "Cardiology", "Star Health"]),
+]
+
+
+def _walk(node, ptr=""):
+    items = node.items() if isinstance(node, dict) else enumerate(node)
+    for k, v in items:
+        child = f"{ptr}/{k}"
+        if isinstance(node, dict):
+            yield {"path": f"key:{child}", "kind": "key", "context": None, "value": k}
+        if isinstance(v, (dict, list)):
+            yield from _walk(v, child)
+        else:
+            yield {"path": child, "kind": "value", "context": str(k), "value": str(v)}
+
+
+def _run_docs() -> int:
+    failed = 0
+    for data, must_find, must_keep in DOCS:
+        record = {"record_id": "t.json#doc", "file": "t.json", "loc": "doc", "fmt": "json", "fields": list(_walk(data))}
+        found = [f["text"] for f in detect_file([record])[0]["findings"]
+                 if f["type"] not in ("CONDITION", "DISTRICT", "GENDER")]
+        missed = [x for x in must_find if x not in found]
+        eaten = [x for x in must_keep if any(x in f or f in x for f in found)]
+        if missed or eaten:
+            failed += 1
+            print(f"FAIL  {data}\n      missed={missed} wrongly_removed={eaten}")
+    return failed
+
+
+# a name run together or in lowercase inside a file name: (file name, text, expected pieces found in the file name)
+FILENAMES = [
+    ("ds-barnalithengal-31145549.txt", "Patient Name: Barnali Thengal\n", ["barnalithengal"]),
+    ("ds_devika_ranganathan.txt", "Patient Name: Devika Ranganathan\n", ["devika_ranganathan"]),
+]
+
+
+def _run_filenames() -> int:
+    failed = 0
+    for name, text, expected in FILENAMES:
+        records = [{"record_id": f"{name}#@file", "file": name, "loc": "@file", "fmt": "text",
+                    "fields": [{"path": "filename", "kind": "filename", "context": None, "value": name}]},
+                   {"record_id": f"{name}#doc", "file": name, "loc": "doc", "fmt": "text",
+                    "fields": [{"path": "text", "kind": "text", "context": None, "value": text}]}]
+        found = [f["text"] for f in detect_file(records)[0]["findings"]]
+        if not all(any(x in f for f in found) for x in expected):
+            failed += 1
+            print(f"FAIL  file name {name}: found {found}")
+    return failed
+
+
 def main() -> int:
     failed = 0
     for line, must_find, must_keep in CASES:
@@ -147,8 +235,10 @@ def main() -> int:
             print(f"FAIL  {line}\n      missed={missed} wrongly_removed={eaten}")
     table_failures = _run_tables()
     print(f"{len(TABLES)} column tables checked, {table_failures} problems")
+    doc_failures = _run_docs() + _run_filenames()
+    print(f"{len(DOCS)} JSON documents and {len(FILENAMES)} file names checked, {doc_failures} problems")
     print(f"{len(CASES) - failed}/{len(CASES)} cases passed")  # keep last: tools read the last line
-    return 1 if failed or table_failures else 0
+    return 1 if failed or table_failures or doc_failures else 0
 
 
 if __name__ == "__main__":
