@@ -262,12 +262,38 @@ def test_export_metadata_key_does_not_collapse_a_list_of_patients():
                       {"patient_name": "Meenal Dasgupta", "mobile": "9811100034"}]}
     pf = formats.parse("reg/wrapped.json", json.dumps(doc))
     assert [r["loc"] for r in pf.records] == ["@file", "/visits/0", "/visits/1", "/visits/2"] and pf.doc_record_id is None
-    for key in ("patient_count", "patientTotal", "patient_source", "patient_export_version", "patient_batch"):
-        assert not formats._person_key(key)
-    for key in ("patient", "patient_name", "uhid", "mobile", "guardian"):     # real subjects still are
-        assert formats._person_key(key)
+    for key, value in (("patient_count", 3), ("patientTotal", 812), ("patient_source", "HIS-2"),
+                       ("patient_export_version", "v2.1"), ("patient_batch", "B07")):
+        assert formats._describes_export(key, value)
     one = {"patient_name": "Kavya Rastogi", "visits": [{"patient_name": "Kavya Rastogi", "mobile": "9811100032"}]}
     assert formats.parse("reg/one.json", json.dumps(one)).doc_record_id is not None      # a subject of its own: one document
+
+
+@pytest.mark.parametrize("key, value", [
+    ("batch_patient_name", "Imkong Walling"), ("source_patient_name", "Imkong Walling"), ("export_name", "Imkong Walling"),
+    ("sourcePatientName", "Imkong"), ("patient_name_source", "Imkong_Walling"), ("patient_source", "Walling"),
+    ("uhid_source", "KGMU/26/55102"), ("mobile_source", "9811100031"), ("mobile_batch", 9811100031),
+    ("patient_source", {"name": "Imkong Walling"}),
+])
+def test_a_patient_field_with_an_export_word_is_still_the_subject(key, value):
+    assert not formats._describes_export(key, value)
+    doc = {key: value, "visits": [{"mrn": "KGMU/26/55102", "note": "Review"}]}
+    assert formats.parse("reg/one.json", json.dumps(doc)).doc_record_id is not None
+
+
+@pytest.mark.parametrize("key", ["batch_patient_name", "source_patient_name", "export_name"])
+def test_subject_beside_visits_leaves_no_part_of_the_name_in_the_notes(tmp_path, monkeypatch, key):
+    doc = {key: "Imkong Walling", "visits": [{"mrn": "KGMU/26/55102", "note": "Walling reports less fever. Hb 9.1 g/dL"},
+                                             {"mrn": "KGMU/26/55102", "note": "Imkong doing well."}]}
+    out, _ = _sanitize(tmp_path, monkeypatch, {"reg/one.json": json.dumps(doc)})
+    text = _outputs(out)["reg/one.json"]
+    assert "Walling" not in text and "Imkong" not in text and "Hb 9.1 g/dL" in text
+
+
+@pytest.mark.parametrize("key", ["batch_patient_name", "source_patient_name", "export_name"])
+def test_a_list_of_people_keyed_with_export_words_still_splits(key):
+    doc = [{key: "Kavya Rastogi", "dx": "Anemia"}, {key: "Tarun Kulkarni", "dx": "Asthma"}]
+    assert [r["loc"] for r in formats.parse("reg/list.json", json.dumps(doc)).records] == ["@file", "/0", "/1"]
 
 
 def test_gate_keeps_the_doctor_but_removes_the_patient_with_the_same_name():

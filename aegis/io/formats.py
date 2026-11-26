@@ -243,15 +243,29 @@ _PERSON_KEY = re.compile(r"patient|uhid|mrn|(^|_)name|naam|mobile|phone|aadha|ab
                          r"birth|reg_?no|ipd|beneficiar|member|subject|person|मरीज|नाम")
 
 
-# A key that describes the export, not the person: "patient_export_source": "HIS-Lucknow-Ward-3" is no subject
-_META_WORDS = frozenset("export exported exports source meta metadata count total version schema format generated "
-                        "extract dump batch page pages size created updated".split())
-
-
 def _person_key(k: str) -> bool:
-    words = re.sub(r"[^\w]+", "_", k.casefold())
-    parts = re.sub(r"[^\w]+", "_", re.sub(r"(?<=[a-z])(?=[A-Z])", "_", k)).casefold().split("_")   # camelCase too
-    return bool(_PERSON_KEY.search(words)) and not set(parts) & _META_WORDS
+    return bool(_PERSON_KEY.search(re.sub(r"[^\w]+", "_", k.casefold())))
+
+
+# The last word of a key that describes the export: "patient_export_source", "patientTotal", "patient_batch"
+_META_WORDS = frozenset("export source meta metadata count total version schema format batch pages size".split())
+
+
+def _describes_export(k: str, v: Any) -> bool:
+    """True only when both the key and the value are about the export: the key ENDS in an export word
+    ("batch_patient_name" ends in "name": a patient) and the value is a count or a short code such as
+    "HIS-Lucknow-Ward-3". Words that could be a name, and long numbers that could be an ID, are not."""
+    words = re.sub(r"[^\w]+", "_", re.sub(r"(?<=[a-z])(?=[A-Z])", "_", k)).casefold().strip("_").split("_")
+    if words[-1] not in _META_WORDS:
+        return False
+    if v is None or isinstance(v, bool):
+        return True
+    if isinstance(v, int):
+        return 0 <= v < 100_000
+    if not isinstance(v, str):
+        return False
+    return (any(c.isdigit() for c in v) and not any(c.isspace() for c in v)
+            and not re.search(r"\d{5}", re.sub(r"[-./]", "", v)))
 
 
 def _person_records(v: Any) -> bool:
@@ -268,7 +282,7 @@ def _record_pointers(data: Any) -> list[str]:
     if not isinstance(data, dict) or data.get("resourceType") == "Bundle":
         return []
     if any(_person_key(k) and not (isinstance(v, list) and v and all(isinstance(x, dict) for x in v))
-           for k, v in data.items()):
+           and not _describes_export(k, v) for k, v in data.items()):
         return []
     out = []
     for k, v in data.items():

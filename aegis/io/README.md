@@ -48,10 +48,12 @@ Check a change: `.venv/bin/python -m pytest -q aegis/io`, then the usual `main.p
   and below the 1,500-level bombs (the kit accepts either outcome for those). The audit suggested 256-500, which would
   quarantine a file the kit expects to be sanitized. JSON deeper than 64 levels is written without indentation: with
   `indent=2`, 950 levels grew from a few KB to 1.8 MB. Shallower JSON is written exactly as before.
-- **V9, export metadata keys.** A top-level key that describes the export (`patient_export_source`, `patient_count`,
-  `patientTotal`, `*_version`, `*_batch` ...) is no longer taken for the file's own subject, so the `visits` array of such a
-  file is split into one record per patient again. A real subject key (`patient`, `patient_name`, `uhid`, `mobile`) still
-  makes the file one document.
+- **V9, export metadata keys.** A top-level key is ignored when deciding what the file's subject is only when BOTH its
+  key and its value describe the export (`_describes_export`): the key ends in an export word (`..._source`, `..._count`,
+  `...Total`, `..._version`, `..._batch`) and the value is a count or a short code with no spaces (`HIS-Lucknow-Ward-3`).
+  Then the `visits` array is split into one record per patient again. `batch_patient_name`, `source_patient_name`,
+  `export_name`, or a name or long number under `patient_source`, still make the file one document: splitting such a file
+  left the patient's first name or surname in the visit notes. When unsure the file stays one document.
 - **V11, doctors in the leak gate.** A name that follows a doctor's title (`Dr.`, `Dr R.`, `Prof`, `डॉ.`) is not scrubbed by the
   gate, nor does it make `contains_leak` quarantine the file: detect already protects that span, and the gate used to turn
   `Dr. Suresh Pandey` into `Dr. [REDACTED]` whenever a patient had the same name. The same name elsewhere is still removed.
