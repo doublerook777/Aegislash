@@ -1,0 +1,469 @@
+{
+  "schema": "raksha-report/1",
+  "files": [
+    {
+      "input_sha256": "8fad508545246b155bf7076d396ff5e768c175a452689b0278974f49cd3cecb5",
+      "output": "sanitized/billing/bkd_claims.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "ca9df123305d091c88981312cc227f9ab6dfde28b25ddd06ba8d8022feaad484",
+      "output": "sanitized/clean/clinical_protocol.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "f56be7240d6409161bd1347327a079f3cd786290af478d1ad67274af4eb0115a",
+      "output": "sanitized/clean/drug_formulary.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "84b929672dcadda358415c788ee7a1b2ab53d4e9000aa95b542775f82954651b",
+      "output": "sanitized/discharge/Discharge_Summary_PATIENT_MRN.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "89e0d0ca3bfe178d0967e57595caf19590fbd6c9b23c74e94a332cd61b630bb6",
+      "output": "sanitized/discharge/Discharge_Summary_PATIENT_MRN_2.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "fceeea9ebfac12efcc7a9dd1936b56ba6d7ab80f4b0e0d7bf621c2eee25532d3",
+      "output": "sanitized/discharge/Discharge_Summary_PATIENT_MRN_3.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "372bdb513314889edacaab46e753bdfff893efc104df0d1085aa23cb490bdebc",
+      "output": "sanitized/discharge/Discharge_Summary_PATIENT_MRN_4.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "963958549e4f88ee529c24fc8c5177a4130e45839a0b54c9dfc87060a0079f1f",
+      "output": "sanitized/discharge/Discharge_Summary_PATIENT_MRN_5.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "0f4c516b7aa6c8528f9e4284218c0943a521594815997241ea1364c0160b87a4",
+      "output": "sanitized/discharge/bkd_ds_PSN-6YQBZG.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "4c7793c1e87bd3de0eb559a014da11e706de5696b5eacce194ac632783c16108",
+      "output": "sanitized/discharge/bkd_ds_PSN-C6X00V.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "bfb1b8cd282b62fda0b108e9b48d24f8abeb5a9f284f22adaa1e6a83cb6c470d",
+      "output": "sanitized/discharge/bkd_ds_MRN.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "0f2ca6eae509e2bd6e3c46c1bbcfb46d2389a88cebccfa8d879579edc903d908",
+      "output": "sanitized/discharge/bkd_ds_MRN_2.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "ee393c47dbf5ef332367f4828180a600d2a45d3f3015d7248e4300fd5130991d",
+      "output": "sanitized/discharge/bnd_ds_PSN-6QSV1G.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "6324e33ce63a750fe491285567fe4bd0bd03197c83d45b639c7c6de08537e9b9",
+      "output": "sanitized/discharge/bnd_ds_MRN.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "5188e0da26b097440c69cbe296605d4b6b3c0caea73982a2944e638498abe17d",
+      "output": "sanitized/discharge/bnd_ds_MRN_2.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "db42efe96bcc068960d7f3a67d37de10a85337bace538593aa4e3fbd6039fdc7",
+      "output": "sanitized/discharge/dhf_ds_PSN-4C3PTF.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "878c54ba4b57ceb9c3320974909e41e54d97c151ed9e5144e58cb24a0ae6fecb",
+      "output": "sanitized/discharge/knp_ds_PSN-35F690.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "0bdbc7a9db03505e8db250c60e2a057fa4c62b0d47a18ce0192b84e2a56c18b7",
+      "output": "sanitized/discharge/note_0001.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "3f1b6e928a7a127e68a2bbc0d7009431dd545080be0364219f6a59a0ca25f1a9",
+      "output": "sanitized/discharge/note_0002.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "cccd5bba8e505673e4d18c395126111c257a87035c697b40dda37b66017339bb",
+      "output": "sanitized/discharge/note_0003.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "c6dbb92c173b4b2a77cf48b2906dcc7ab647831652bab1264674e68637bc37ad",
+      "output": "sanitized/fhir/bundle_02227638.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "7f7f05cfe35f28e3f6730ec738ff228420ac211734fab22ae0c11518c3fd0d6f",
+      "output": "sanitized/fhir/bundle_13f4f43c.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "7c67efac417586a0039319693f1b41bdac07126489460fc4d198bdb8882116c3",
+      "output": "sanitized/fhir/bundle_95b603f0.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "64b20ff7818e6c80971f8575f1c2d69f8727a592caf92221f58a86a0a8e66bdb",
+      "output": "sanitized/fhir/bundle_b4138a1f.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "bf7211e2515452794a6667c61fb7d8fe0ee105b5a46d109fc06339cad88ccde8",
+      "output": "sanitized/fhir/bundle_b6e74898.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "9d75419bfcf32a786b432088bae491443d5b66a80490a82a15b44de0bb81cf81",
+      "output": "sanitized/fhir/bundle_cda5aac2.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "c298309efe84421bc6d7873544c7b44b947f3a80805c4a81b5331bb05d2c9586",
+      "output": "sanitized/fhir/bundle_fd23720e.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "8420c82f72b94241911ef73d030c2530ebc7925c2024c774d45d5bfc200e6b75",
+      "output": "sanitized/fhir/bundle_ff525a99.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "5195a8fbc4f8f0cd2c16485e9b39cfa2fffc6293a039b5775b354edf827061a7",
+      "output": "sanitized/lab/PHONE_report_0007.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a8d4215ab22472667ea1427a91d05140e5052927bd373b45090425f2c99d68be",
+      "output": "sanitized/lab/PHONE_report_0005.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "31aef623d621b2e012acc78d1cfe1f62b87d4818b75b9286a78970e9d0e35b68",
+      "output": "sanitized/lab/PHONE_report_0003.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "631f5adf8d22e38111c5404f13503a8c4e6ece3e81d68d83ab34870ac826c8d8",
+      "output": "sanitized/lab/PHONE_report_0001.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "b139ce7504b53c12c5f2cb044bae1a0ecff44672d36f5fa8aeeb4986c518a2a4",
+      "output": "sanitized/lab/diagnostics_results.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "d350f72443e9502b3fd4db69d5a506ea9980a83b2c5feb7511753a55b094956e",
+      "output": "sanitized/lab/report_00002.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "8b4ab7efcf47d018114460a134f561a74b2826fe0d70039ff16030f1f50ab9bd",
+      "output": "sanitized/lab/report_00004.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "1a018337ebc10fab386b663280d87f6b3279653b4bd7c782e3a12fca241f2d0e",
+      "output": "sanitized/lab/report_00006.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "0948fc2516837d41fa53970b6522a2d50cd9b5960e052c43668e7ec7cf4eac4a",
+      "output": "sanitized/lab/report_00008.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "ab629052c7db51dde873da7fc5d46088107f882f522c7a0854b53bb0d6afe19a",
+      "output": "sanitized/lab/whatsapp_forward_0001.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "17ee9abb15c3bdd903bec263f72407d81458357e21aaf5be887fde9f5b5bb587",
+      "output": "sanitized/lab/whatsapp_forward_0002.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "fd7746810e672dcf5250169d4da5f7d3316946821ea69d8032ffb543150825e0",
+      "output": "sanitized/lab/whatsapp_forward_0003.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a2dd727fc4e1b30adeafac01c010aa57665cac82ca65b27e57bd395dd482835d",
+      "output": "sanitized/lab/whatsapp_forward_0004.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "6c00a2363ce14a4a0d6b18716f6edfda3431019c138c4651fed2a2f64aa3c817",
+      "output": "sanitized/lab/whatsapp_forward_0005.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "17252c1549612b937743e0db978c294e7143694b1da379de540fad60ad2a90a6",
+      "output": "sanitized/lab/whatsapp_forward_0006.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "4a43ae8991057f772b5953f2152c18c38089927bd7b30cb0bc6e2b9fc029b863",
+      "output": "sanitized/misc/corrupt_bytes_note.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "3114fb9a26412ab837e3f5672aa6409a9faafd601940083473714bb20712c6cc",
+      "output": "sanitized/misc/deep_export.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output": null,
+      "status": "quarantined",
+      "reason": "empty_file"
+    },
+    {
+      "input_sha256": "ac34a9087c57c4cf8d5789172baff3bf5e24a3fdc8eb64a949e03327fb788e00",
+      "output": null,
+      "status": "quarantined",
+      "reason": "unsupported_format"
+    },
+    {
+      "input_sha256": "692948618c650c32ba664a5c4b5bee4ffe54982d4fc7e5570324b77df82f3e53",
+      "output": "sanitized/misc/mislabeled_export.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "d5759cb7410a824822c07fbcdbf80f6cef425bab7146147908562ce29159d974",
+      "output": "sanitized/misc/patient_index.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a0bb5f860a130aaff639116ee03eb692b873eb267313b0d14abfa2928154db1e",
+      "output": null,
+      "status": "quarantined",
+      "reason": "unsupported_format"
+    },
+    {
+      "input_sha256": "d715498b54f0daa5f770cf1d84c266567dd48ab7a942919d7fac03a48bc0d22d",
+      "output": "sanitized/misc/scanned_consent_form.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "b36619af2f4b433864e53a84eecbeac51d965549a07fcbbc327df5863890756b",
+      "output": null,
+      "status": "quarantined",
+      "reason": "unsupported_format"
+    },
+    {
+      "input_sha256": "81ec5f2f17c2ddeac696cd4efba00619bb1be69ea4b65e46b35b60b087ac1b09",
+      "output": null,
+      "status": "quarantined",
+      "reason": "malformed_json"
+    },
+    {
+      "input_sha256": "d695fb0b54fa8d0985038a5cdab97ac521c8741c264b587121f1beb310eb4b82",
+      "output": "sanitized/misc/ward_vitals_sheet.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "c599791592bdab56abdb432dce6d6d5c15fb29c20cf7ca85ffcec147f752f855",
+      "output": "sanitized/notes/nursing_PSN-6QSV1G.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "3066e79f84735bb900d4bca263eee2713fbf0a002a978635f141635a18abe0b3",
+      "output": "sanitized/notes/nursing_PSN-YTZ1D6.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "8dda170232e5d16deaa53cd5a5f6aa4e76396d719d682dc686a366a476d0d828",
+      "output": "sanitized/notes/nursing_PSN-6YQBZG.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "effcdd7eedda10a0d2a8264e4d2bec77d93f7ecb53259e6a1c6bb1d0afcc3750",
+      "output": "sanitized/notes/nursing_PSN-QHZDBE.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "65922f427fed3c479d62329993d17ec7497066fb82aadead57b39c88cb9679db",
+      "output": "sanitized/notes/nursing_PSN-GTHSYN.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "8aa64acc3d5a1c22af9a143ee8928100fcea9a351009255f4fdbe55c27756dc2",
+      "output": "sanitized/notes/nursing_PSN-4C3PTF.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e3fbd337dc7240707b01048f175bd3da88830781d83a3424441305c18adbd38c",
+      "output": "sanitized/notes/nursing_MRN.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "45535a25c272317cb2954789327c2b6c83287ff142e973a268391ec6bd31e88a",
+      "output": "sanitized/notes/nursing_PSN-D8JQ66.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "787030def8b962cbb1444a697a84f0e454bba07aafb15401f0d4e0c9631d17ed",
+      "output": "sanitized/notes/specialist_eponym_trap.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "de46fb61dfdee91504f2c3ddd6546670858ec3f7b499e96798177210e668b0fc",
+      "output": "sanitized/notes/visitor_log_ward5.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "6076060c592e09fce692051a75ff9b9de683ba3e6fa6ced141cfe76fb2bb0a66",
+      "output": "sanitized/opd/bkd_opd_2026.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "633861f652396ae8e4f91763b95e64d18b25e3dd4d2b257c7d4c287f21215ec8",
+      "output": "sanitized/opd/bnd_opd_2026.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "083993be9f705e9a4cfa8f000f396472855b5729f143494ec120df0a99d39970",
+      "output": "sanitized/opd/knp_opd_2026.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "2bb7eed34ea140ac95a96bd3cc623aada494714d40ff607748dc4a72b63c9820",
+      "output": "sanitized/prescriptions/rx_bkd_00003.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "09bbf119fd7cbc2ee0b49b55401e2141b3b28cd53e015db68749fd5a03794bfa",
+      "output": "sanitized/prescriptions/rx_bkd_00007.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "39823999987631eb0636604a9ebcb19642f2f66012a13bf8eff7e5ef22033a44",
+      "output": "sanitized/prescriptions/rx_bkd_00011.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "080d41fe3ed710e1ebd7bed15cba22c2d56cee31abd26eff57c55f394859fb4a",
+      "output": "sanitized/prescriptions/rx_bnd_00001.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "eeeac6f49e415d97a4a1173000527c4b40b86a9d5b62898ca9cc33e170c43177",
+      "output": "sanitized/prescriptions/rx_bnd_00005.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a47dc702cd3b17aafcc22a2be42a4ea798ad7458e0ce9c36031be8972d84075d",
+      "output": "sanitized/prescriptions/rx_bnd_00009.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "13c37b4b19faeadfa60d1858de10d2b274af79364dbd3571630ad0a991127101",
+      "output": "sanitized/prescriptions/rx_dhf_00002.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a2eb7c39d58cddf0b7fcdfff883b53ca535f7a74777e184f9978e4b380fc275e",
+      "output": "sanitized/prescriptions/rx_dhf_00006.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "4cf3835a0f1d805316eb7927b9c70ee716218f5e6dd4b7d40c592873b807debf",
+      "output": "sanitized/prescriptions/rx_dhf_00010.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e393f887777fbffb6f5bbfb912b9a9d3ae355ddc339782f7b590bfd5251e5f27",
+      "output": "sanitized/prescriptions/rx_knp_00004.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "2bb27db77a74163aa6d9e33bbb03c4517b4e046a3c50a561c550bb8e8b6f3ce4",
+      "output": "sanitized/prescriptions/rx_knp_00008.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "40d3accc88a935ebf7ddea477ee7de685796af1ced09567937d7091b1241cd86",
+      "output": "sanitized/prescriptions/rx_knp_00012.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e83dcc7e5fdc6284d7c5d219604c9b424ecd4e742247ae000fba64872cbbb5b4",
+      "output": "sanitized/registration/bkd_registration (1).csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e83dcc7e5fdc6284d7c5d219604c9b424ecd4e742247ae000fba64872cbbb5b4",
+      "output": "sanitized/registration/bkd_registration.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "291be7c18dca931656affc7324a01ddac6479cdc319d89c16c8e988fce81f163",
+      "output": "sanitized/registration/bnd_legacy_export.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "4e52cacc4779be7fa5a6f3d6bff0a2ae8062b3bbc93419ea2fcd0498ba1f8592",
+      "output": "sanitized/registration/dhf_patients.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a47af8ddc593731338b0898c063ebb0448de5a925865000c73b0596cfc88d7c2",
+      "output": "sanitized/registration/knp_patients.tsv",
+      "status": "sanitized"
+    }
+  ],
+  "counts": {
+    "files_total": 84,
+    "files_sanitized": 79,
+    "files_quarantined": 5,
+    "records_processed": 192,
+    "identifiers_detected": 1791,
+    "records_linked": 160,
+    "records_generalized": 71,
+    "records_suppressed": 109,
+    "records_quarantined": 0
+  },
+  "entities": {
+    "AADHAAR": 64,
+    "ABHA_NUMBER": 32,
+    "AGE": 123,
+    "CONDITION": 54,
+    "DATE": 239,
+    "DISTRICT": 183,
+    "DOB": 97,
+    "EMAIL": 11,
+    "GENDER": 127,
+    "HOUSE": 102,
+    "INSURANCE_ID": 10,
+    "LANDMARK": 14,
+    "LOCALITY": 31,
+    "MRN": 237,
+    "PAN": 10,
+    "PATIENT_NAME": 304,
+    "PHONE": 139,
+    "PIN": 108,
+    "RELATIVE_NAME": 161,
+    "VILLAGE": 107
+  },
+  "timing": {
+    "seconds": 3.51
+  },
+  "resources": {
+    "peak_rss_mb": 0.0
+  }
+}

@@ -1,0 +1,427 @@
+{
+  "schema": "raksha-report/1",
+  "files": [
+    {
+      "input_sha256": "24a83f5ecb58646338407ea15b152b84f3d1355b2b4fba8cbb69b1c0e347da45",
+      "output": "sanitized/billing/adversarial_claims.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "ae3c93da84aa00e3abd212d45e033baba96ade24d4fabbf27593c9285fa4f46f",
+      "output": "sanitized/clean/clinical_eponyms_snomed.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a0c76a49752742aa4771dabca79ac18d11ed39224765f9e3fb72bc1a04bf0ad7",
+      "output": "sanitized/discharge/ds-ashasiddiqui-20261142.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a87e4545aa82e81797968193576820b67633ba23eefe3971d84f666ca605e9f6",
+      "output": "sanitized/discharge/ds-kalyanitripathi-20264675.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "0c977d83d3aa5664cfc30eb05ba0bf38bd80a402077d5300f1d82a2bdb05f6f9",
+      "output": "sanitized/discharge/ds-meenakshiupadhyay-20267007.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "50e4cae94d76d5650528e828d25e9ab00263bd46790e0b00c4129252a1b1139a",
+      "output": "sanitized/discharge/ds-prashantsuryavanshi-20268656.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "902f3814b8ad95e4c43b8853803c1a06a024770f83b338666a6bbc8ca1020be1",
+      "output": "sanitized/discharge/ds-siddharthbhattacharya-20269870.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "14ca112d08f27117ea96db4f1cad336471c18d8f493ca51db76a8077193d50f3",
+      "output": "sanitized/discharge/ds-siddharthkushwaha-20267628.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "19b3f65948d6fc085fbb390cd262995c0824695e80aa3b3fb67f60c02294a32e",
+      "output": "sanitized/discharge/ds-subhashchandra-20268042.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e41188a110664b27c52acb8686fb806abe13688bbc1f4d590b747f2b37b43b89",
+      "output": "sanitized/discharge/ds-sumitvishwakarma-20266575.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "4cd17448fb2e5a9b7db8c352dcd75e36a548c2c06eaaac13ffb72a064efd762c",
+      "output": "sanitized/discharge/ds-vaishalisiddiqui-20264536.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "76c02bbc5556cc3437a15f17eed7ad7176f3e6e0493e04c39d61cb62a03eebad",
+      "output": "sanitized/discharge/\u0921\u093f\u0938\u094d\u091a\u093e\u0930\u094d\u091c_PSN-MJP0D5_PHONE.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "da989f7ead104a186c7d14e1e7a2da8b738c33a219417b70dfc5bef88205a225",
+      "output": "sanitized/discharge/\u0921\u093f\u0938\u094d\u091a\u093e\u0930\u094d\u091c_PATIENT_PHONE.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "ebf319cc78c52266523df4bfaf9a115c5533e09e65bcd735d3d7eaf3268e726b",
+      "output": "sanitized/discharge/\u0921\u093f\u0938\u094d\u091a\u093e\u0930\u094d\u091c_PATIENT_PHONE_2.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "bde9bf0a1ab102ad1348191cbc2ca09dfd046a7234e810d8ca031f88427a56ec",
+      "output": "sanitized/discharge/\u0921\u093f\u0938\u094d\u091a\u093e\u0930\u094d\u091c_PSN-EVVEKE_PHONE.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "1bc4bd57789434b98674d945e02a476166278e69f99886980c1b6bb42a68cab2",
+      "output": "sanitized/discharge/\u0921\u093f\u0938\u094d\u091a\u093e\u0930\u094d\u091c_PSN-5S5F15_PHONE.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "bf236a207e996408650bcb255ebc50d7995ff96e9cec778a6c8e49a8909cee85",
+      "output": "sanitized/fhir/bundle_deva_docref_0849d6ed.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "bd064e570d3b8728345ca4a1b436cad3e216912708b27b4316019a8c2221640d",
+      "output": "sanitized/fhir/bundle_deva_docref_34fe4b7b.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "bd8ff77e98bfc83003a0163e2220d07b62b1eb1d5e754d512d4ccdddd879d25f",
+      "output": "sanitized/fhir/bundle_deva_docref_42b1ea35.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "7fc304a3e5ad9aa1594fdb1315b859625786c165eb7bc1a0644c103b85039004",
+      "output": "sanitized/fhir/bundle_deva_docref_bbe58d69.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "42196274b308673094941f4fa18f05bb03cc086e054d58e2d80974d9f7bfb6e3",
+      "output": "sanitized/fhir/bundle_html_entity_0f9ac042.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a9227fedf5bc58d2015a7399792abe15be415319d10ff5bd883ce5db97027acc",
+      "output": "sanitized/lab/stream_export_jsonl.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "b4ac0cdc09ca65bcc3ee3650ac102b4b75d7ddd28af26d977e86d83496ad29c1",
+      "output": "sanitized/lab/wa_lowercase_001.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "9446c41a707cf046d8a6fd2900dd4f37c16ba3e8377a7e2d98576ddeed42d64f",
+      "output": "sanitized/lab/wa_lowercase_002.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a693f05a284e93ed320304c293354388abb756e317dc2a61ae8e6e1fad8ea92d",
+      "output": "sanitized/lab/wa_lowercase_003.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "ce8acf9af0ef5893422ac116a07de156b450a1df44a2673f2b989a3c7a01c64f",
+      "output": "sanitized/lab/wa_lowercase_004.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "61bfb903b1de67c3b7aea4c60eb5781cb1ca0065334a120e064c10baf05dbf4c",
+      "output": "sanitized/lab/wa_lowercase_005.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "63a983e74f9610de3b0f8d30bf254b0b2fb32042094c828b9bf4695e54fc6512",
+      "output": "sanitized/lab/wa_lowercase_006.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "5fb57abf062c6678ced2d67170f3a741498dd66864e902d9437a8a5b2787f237",
+      "output": "sanitized/lab/wa_lowercase_007.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "9836925c7de8f664ebb162df0050933b1cfef6221b4d996b49d11ffd3e65c40f",
+      "output": "sanitized/lab/wa_lowercase_008.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e8b19b2692c727cd0ed71bb1e964cdcf7b4532c1626efc73a2c3d61064e75eeb",
+      "output": "sanitized/lab/wa_lowercase_009.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "67f2d89d781b43a1c5281dfbe879e5f8e5930d411c88c6c457e242bf21c9d165",
+      "output": "sanitized/lab/wa_lowercase_010.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "57013f2074280533a45ccea372c02edec0b6d8ada53bc47f65e979dada793a46",
+      "output": "sanitized/lab/wa_lowercase_011.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "163fce0620411621ebb4ce80301ed7f9f7e454b01a74d263c90686161312c0c2",
+      "output": "sanitized/lab/wa_lowercase_012.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "398e8ba6ebaf7c2c28cb4fb1c6d5430762c55b48e6aee57267a660a8ad461c57",
+      "output": "sanitized/misc/canary_header_sheet.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "94dba92cf2177739ab52116de66e6efce326662e013de5cb82d257bb677bfadc",
+      "output": "sanitized/misc/canary_key_trap.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e646f7afdba05e5bdd8fb127f9053fcb2da560f2a9675c4c5875400d96fbcbc9",
+      "output": null,
+      "status": "quarantined",
+      "reason": "unsupported_format"
+    },
+    {
+      "input_sha256": "707dfac21769d66ac7c0cb00e5984a3ca27179915b2544c93f8584cb80b6e58f",
+      "output": "sanitized/misc/consent_wrapped_b64.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "b6c21b563d1c3190858c83f70766cc780248d63fc2f9bdd307c5178f3a0e8370",
+      "output": "sanitized/misc/corrupt_utf8.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "7113ff9c3d7687e697eba54ac969c1da44ee5ea09be7e439ff1fc7f664c82b1a",
+      "output": "sanitized/misc/deep_1600.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "ad9cf0a05f468895b5b3af365d770eb7d74477e46474cc50bf6017af135230ef",
+      "output": "sanitized/misc/disguised_json.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output": null,
+      "status": "quarantined",
+      "reason": "empty_file"
+    },
+    {
+      "input_sha256": "2106c36011520fe73876d45bfb9ef8bf7b2e9f4362096a320376d8ee9b27ef12",
+      "output": null,
+      "status": "quarantined",
+      "reason": "empty_file"
+    },
+    {
+      "input_sha256": "a3f1cc2f0013848d4e737981cf55f8fbf7fd15cc1697f958e56829f8cbf241fc",
+      "output": null,
+      "status": "quarantined",
+      "reason": "unsupported_format"
+    },
+    {
+      "input_sha256": "60592899c1cc78af6d2c4270cd114f9c08f9a7bacf9ae04100fedb4629d505c0",
+      "output": null,
+      "status": "quarantined",
+      "reason": "unsupported_format"
+    },
+    {
+      "input_sha256": "68eeb842bb5427dec7fc8e08253cc098cca31abbbbc598d58d10bfb644ce2d1d",
+      "output": "sanitized/notes/escalation_canaries.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "7ebe58e14416b8fc149b54e85c41eb6dd09d6a8cb066e845beb25cf0cfc55e56",
+      "output": "sanitized/notes/frag_xscript_01.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "0b231124ba1d1782921b49fa61ad80cb79bc044fa2ea69e475aa97a5bcd5b086",
+      "output": "sanitized/notes/frag_xscript_02.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "5f298ed1be3051b4f0cf498d77f50d5b87ba6aacb3c661b73b86c101ac784275",
+      "output": "sanitized/notes/frag_xscript_03.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e684c4e8d898e47250bdfedc7698578d8ecbcb34e005e29dfa39d188e8f6acb3",
+      "output": "sanitized/notes/frag_xscript_04.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "eebbe8a1713af961fe88a685d3aee5d24cbdba255eff1afc068f093ab9a25391",
+      "output": "sanitized/notes/frag_xscript_05.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "11a3a9956d58ec64749fda4d6f596ef6b176806ed1cea5d8611860f1498a4824",
+      "output": "sanitized/notes/frag_xscript_06.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a928a45ce2ef02665db51b2fdb609659b91c7790ebf32a268b1751fde9dba9ba",
+      "output": "sanitized/notes/frag_xscript_07.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e07c64d3db9056fac5fd047b8cbc2edd3deeb01317f636a65e0915388ff0104c",
+      "output": "sanitized/notes/frag_xscript_08.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "da392aba8afc4f6be05489a0f8dc327377bd4497ea67eb007fe5c8283b40193a",
+      "output": "sanitized/notes/frag_xscript_09.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "ad0d7258986b4edc780c7ab3ae0fb20715d4fdb1df3e81a8cf81bd6483595677",
+      "output": "sanitized/notes/frag_xscript_10.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "e90063be6ad4431e2e8d2adb0c5cafcf4990103d29f6485b0abf42d088decde9",
+      "output": "sanitized/opd/nested_key_int_bom.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "734a438293fe0996c6227bea6bb0c8ff2b47825dcdd101b676862da1538c7c8e",
+      "output": "sanitized/prescriptions/rx_breaker_001.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "3c2cd1c74b304081cc5f78bbd3472b258f3e195ae5a05d1beb84942a78ddabc8",
+      "output": "sanitized/prescriptions/rx_breaker_002.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "d45cc2997183a0c3c012b114ab824b9b712a3d859beae0c373ba8a5c4adeb4d0",
+      "output": "sanitized/prescriptions/rx_breaker_003.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "51a7c37f9928863cfe933971a5617d6b52007c95770c691a370d0fc5dea23b4f",
+      "output": "sanitized/prescriptions/rx_breaker_004.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "3f3beea57b53e3b4de15198b639d5e348de56d17befa3d0ad0c5ea1a67044bfd",
+      "output": "sanitized/prescriptions/rx_breaker_005.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "32310021e28fd54e2d5b118459be67f1a1ed314e21696f46cfb0c32b3035905e",
+      "output": "sanitized/prescriptions/rx_breaker_006.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "d484f72fb4f3e4b8004853c4f66d17926b5f3dcf765ba7e04fa871288a6b0954",
+      "output": "sanitized/prescriptions/rx_breaker_007.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "dae001c43d9761ac53da4f25a22b4688c6b5a83facb0ffd816e9731b1ab7fa23",
+      "output": "sanitized/prescriptions/rx_breaker_008.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "468f454212888b9cd8756168ef313d56b2b1cda819064e4f75cb1d5e4165186f",
+      "output": "sanitized/prescriptions/rx_breaker_009.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "3a94b121c02533b751cf0a4a2ef407136590f4f881502549efa0f738cb631632",
+      "output": "sanitized/prescriptions/rx_breaker_010.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "4d93052aae2cd1e402013219328542bb73b5b4627c65eea64657fb4236aada09",
+      "output": "sanitized/prescriptions/rx_breaker_011.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "ade5039281f63ad408c0a1700b82e184d296002269a187fb540dc7fffb164cd5",
+      "output": "sanitized/prescriptions/rx_breaker_012.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a83e23dafe3c426c7d9262ab2b10b118d2a2b3b36c4e0f17f3a0a6e104ce8aa9",
+      "output": "sanitized/prescriptions/rx_breaker_013.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "48b6f8f7fcad94126cc0d929bf2d543b36e836f0fefe63f2fc92de624c7c67c9",
+      "output": "sanitized/prescriptions/rx_breaker_014.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "7e50daecb5d5135ae4fe3075ec3fad509e09ae1c65437fb158df3b04ee44e962",
+      "output": "sanitized/prescriptions/rx_breaker_015.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "d325b92dcb9c234b590fe3432516d5a31d5345f260501c14698c464dde861c2a",
+      "output": "sanitized/prescriptions/rx_breaker_016.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "edead2a1b203820588a6933ca663d48c0921606cafba0b2ab57c99dde2ea93c8",
+      "output": "sanitized/registration/legacy_smartquotes_cp1252.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "a587291789fa9a0c5b8997134f12c021a4c9fd1d31a68440b78c90112a2575ad",
+      "output": "sanitized/registration/opaque_pipe_export.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "dc1269dff7c59e2db158c16a6c87a9000b0d6e2475fa193b452598d480abf861",
+      "output": "sanitized/registration/unlabelled_deva_utf16be.tsv",
+      "status": "sanitized"
+    }
+  ],
+  "counts": {
+    "files_total": 76,
+    "files_sanitized": 71,
+    "files_quarantined": 5,
+    "records_processed": 139,
+    "identifiers_detected": 1177,
+    "records_linked": 34,
+    "records_generalized": 38,
+    "records_suppressed": 93,
+    "records_quarantined": 0
+  },
+  "entities": {
+    "AADHAAR": 54,
+    "ABHA_ADDRESS": 24,
+    "AGE": 81,
+    "CONDITION": 10,
+    "DATE": 172,
+    "DISTRICT": 102,
+    "DOB": 45,
+    "EMAIL": 5,
+    "GENDER": 57,
+    "HOUSE": 40,
+    "INSURANCE_ID": 12,
+    "LOCALITY": 65,
+    "MRN": 63,
+    "PATIENT_NAME": 219,
+    "PHONE": 95,
+    "PIN": 46,
+    "RELATIVE_NAME": 70,
+    "VILLAGE": 90
+  },
+  "timing": {
+    "seconds": 5.66
+  },
+  "resources": {
+    "peak_rss_mb": 0.0
+  }
+}
