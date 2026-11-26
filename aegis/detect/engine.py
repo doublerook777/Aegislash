@@ -238,6 +238,28 @@ def _b64_filename_cands(text: str, dmy: bool) -> list[Cand]:
     return []
 
 
+# In a lookup table ("..._map", "..._index") the keys are data, not field names. A capitalised key is only taken for a
+# person when the table's name is about people or whom to contact: "billing_map" keys look just like names.
+_PEOPLE_WORDS = frozenset("patient patients person people contact contacts caller callers call escalation family kin "
+                          "relative relatives attendant".split())
+_LOOKUP_WORDS = frozenset(("map", "lookup", "index", "directory"))
+_FIELD_MAP_WORDS = frozenset(("field", "column", "header", "label", "key"))   # keyed by field names
+
+
+def _is_lookup_table(holder: str) -> bool:
+    words = tokens(holder)
+    # "drug_index" or "ward_map" are keyed by drugs and wards
+    return (bool(words) and words[-1] in _LOOKUP_WORDS and bool(set(words) & _PEOPLE_WORDS)
+            and not set(words) & _FIELD_MAP_WORDS and all(classify(w) not in ("keep", "free") for w in words[:-1]))
+
+
+def _looks_like_person(key: str) -> bool:
+    """Two to four capitalised words, none of them a field, medical, report, place or organisation word."""
+    if not re.fullmatch(r"[A-Z][a-z']+(?: [A-Z][a-z']+){1,3}", key.strip()) or classify(key) is not None:
+        return False
+    return not set(key.casefold().split()) & (names.STOP | gazetteer.NOT_A_PERSON_WORDS)
+
+
 def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
     folded = fold(f["value"])
     text, idx_map = strip_evasion_with_map(folded)
@@ -245,6 +267,10 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
     label, parents = ("", ())
     if kind == "value":
         label, parents = (f["context"] or "", ()) if f["path"].startswith("col:") else _json_label(f["path"])
+
+    # a record number always has a digit: "patient_ref" holding words is read like any unknown value
+    if role == "mrn" and kind == "value" and not re.search(r"\d", text):
+        role = None
 
     found = ids.find_ids(text)
     if role in fields.ID_ROLES:
@@ -277,8 +303,8 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
         holder = f["path"][4:].rsplit("/", 1)[0].rsplit("/", 1)[-1]
         if classify(holder.replace("by_", "")) in ("patient_name", "name") and holder.startswith("by_"):
             found += fields.name_value(text, 0, len(text), "name")
-        elif role not in ("keep", "doctor"):
-            found += gazetteer.find_unlisted_person(text.replace("_", " "), names.STOP)
+        elif (_is_lookup_table(holder) or not holder) and _looks_like_person(text):
+            found += fields.name_value(text, 0, len(text), "name")
     elif kind == "value" and role is None and not f["path"].startswith("col:"):
         if not any(classify(k) in ("doctor", "keep") for k in (label, *parents)):
             found += gazetteer.find_unlisted_person(text, names.STOP)
@@ -316,6 +342,9 @@ def _anchor(value: str) -> str:
     return m.group(0).casefold() if m else ""
 
 
+_RUN_TOGETHER = "run-together"   # marks the template of a full name written without spaces
+
+
 def _known_values(cands: list[Cand], text: str) -> list[tuple[str, str, Cand, bool]]:
     """(first word, regex, template candidate, file-wide?) for every value worth searching for again."""
     out = []
@@ -327,6 +356,9 @@ def _known_values(cands: list[Cand], text: str) -> list[tuple[str, str, Cand, bo
                       and w.strip(".").casefold() not in names.GENERIC | (names.STOP - {"asha"})]
             if len(words) > 1:
                 out.append((_anchor(words[0]), _word_pattern(words), c, True))
+                joined = "".join(words)
+                if len(joined) >= 8 and re.fullmatch(r"[A-Za-z]+", joined):     # "ds-<firstlast>-<number>.txt"
+                    out.append((joined.casefold(), _word_pattern([joined]), c._replace(norm=_RUN_TOGETHER), True))
             for w in useful:
                 out.append((_anchor(w), _word_pattern([w]), c, False))
         elif c.type == "MRN" and c.norm:
@@ -376,7 +408,10 @@ def _propagate(records: list[Record], per_field: dict) -> None:
                 if c.type in NAME_TYPES:
                     if any(m.start() < e and s < m.end() for s, e in blocked):
                         continue
-                    if not (DEVA.search(m.group(0)) or m.group(0)[0].isupper() or kind == "filename"):
+                    # lowercase is accepted only for a whole name: run together, or in a file name
+                    value = m.group(0).casefold()
+                    whole = c.norm == _RUN_TOGETHER or kind == "filename"
+                    if not (DEVA.search(value) or m.group(0)[0].isupper() or whole):
                         continue
                     norm = None
                 else:

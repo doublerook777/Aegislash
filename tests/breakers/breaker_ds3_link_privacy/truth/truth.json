@@ -1,0 +1,663 @@
+{
+  "schema": "raksha-truth/1",
+  "dataset": "breaker_ds3_link_privacy",
+  "description": "Linkage fragmentation (cross-script phonetic/initial/nickname) + privacy k-anonymity bypass (micro-batch <10 profiles + unredacted Tehsil/Block quasi-identifiers)",
+  "files": {
+    "hosp_a/jhansi_reg.csv": {
+      "path": "hosp_a/jhansi_reg.csv",
+      "expect": "sanitize",
+      "sha256": "cac80c7f662c7e2bf565da333b70eb1fd751e238b3fd5a470b1c3deeabffdfcf",
+      "units": {
+        "row:0": {
+          "patient": "PT001",
+          "link": "required",
+          "entities": [
+            {
+              "type": "MRN",
+              "surface": "JHS/26/1001",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Shailendra Tiwari",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "RELATIVE_NAME",
+              "surface": "Mahesh Tiwari",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "DOB",
+              "surface": "12/05/1978",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "Raniyapur",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "284204",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9810001001",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 8901 2345",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "CKD Stage 3"
+            }
+          ]
+        },
+        "row:1": {
+          "patient": "PT002",
+          "link": "required",
+          "entities": [
+            {
+              "type": "MRN",
+              "surface": "JHS/26/1002",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Govind Prasad",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "RELATIVE_NAME",
+              "surface": "Bhola Prasad",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "DOB",
+              "surface": "04/02/1937",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "Pahari",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "284204",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9810001002",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 8901 2346",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Visceral leishmaniasis"
+            }
+          ]
+        },
+        "row:2": {
+          "patient": "PT003",
+          "link": "required",
+          "entities": [
+            {
+              "type": "MRN",
+              "surface": "JHS/26/1003",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Shanti Devi",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "RELATIVE_NAME",
+              "surface": "Rajesh Verma",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "DOB",
+              "surface": "19/08/1984",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "Katera",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "284205",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9810001003",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 8901 2347",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Hypertension"
+            }
+          ]
+        },
+        "row:3": {
+          "patient": "PT004",
+          "link": "required",
+          "entities": [
+            {
+              "type": "MRN",
+              "surface": "JHS/26/1004",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Shanti Devi",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "RELATIVE_NAME",
+              "surface": "Mohan Verma",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "DOB",
+              "surface": "22/11/1984",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "Baruasagar",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "284201",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9810001004",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 8901 2348",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Diabetes"
+            }
+          ]
+        },
+        "row:4": {
+          "patient": "PT005",
+          "link": "required",
+          "entities": [
+            {
+              "type": "MRN",
+              "surface": "JHS/26/1005",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Kausalya Bai",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "RELATIVE_NAME",
+              "surface": "Hari Singh",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "DOB",
+              "surface": "10/01/1934",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "Naraini",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "210205",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9810001005",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 8901 2349",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Huntington's chorea"
+            }
+          ]
+        },
+        "row:5": {
+          "patient": "PT006",
+          "link": "required",
+          "entities": [
+            {
+              "type": "MRN",
+              "surface": "JHS/26/1006",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Raghavendra Mishra",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "RELATIVE_NAME",
+              "surface": "Sitaram Mishra",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "DOB",
+              "surface": "05/07/1995",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "Tindwari",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "210128",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9810001006",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 8901 2350",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Wilson's disease"
+            }
+          ]
+        },
+        "row:6": {
+          "patient": "PT007",
+          "link": "required",
+          "entities": [
+            {
+              "type": "MRN",
+              "surface": "JHS/26/1007",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Salma Begum",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "RELATIVE_NAME",
+              "surface": "Imran Khan",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "DOB",
+              "surface": "14/03/1972",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "Moth",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "284303",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9810001007",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 8901 2351",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Hypothyroidism"
+            }
+          ]
+        },
+        "row:7": {
+          "patient": "PT008",
+          "link": "required",
+          "entities": [
+            {
+              "type": "MRN",
+              "surface": "JHS/26/1008",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Balram Yadav",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "RELATIVE_NAME",
+              "surface": "Ramu Yadav",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "DOB",
+              "surface": "01/01/1892",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "Bindki",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PIN",
+              "surface": "212635",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9810001008",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "AADHAAR",
+              "surface": "4567 8901 2352",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Anemia"
+            }
+          ]
+        }
+      }
+    },
+    "hosp_b/hindi_opd.tsv": {
+      "path": "hosp_b/hindi_opd.tsv",
+      "expect": "sanitize",
+      "sha256": "3afbb08be0d5432ec53ab44d0e0ef8f331a8152796ad5fac9804011884ce2a63",
+      "units": {
+        "row:0": {
+          "patient": "PT001",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "शैलेन्द्र तिवाडी",
+              "script": "deva",
+              "channel": "content"
+            },
+            {
+              "type": "RELATIVE_NAME",
+              "surface": "महेश तिवारी",
+              "script": "deva",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "रानियापुर",
+              "script": "deva",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "CKD Stage 3"
+            }
+          ]
+        },
+        "row:1": {
+          "patient": "PT002",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "गोविन्द प्रसाद",
+              "script": "deva",
+              "channel": "content"
+            },
+            {
+              "type": "RELATIVE_NAME",
+              "surface": "भोला प्रसाद",
+              "script": "deva",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "पहाड़ी",
+              "script": "deva",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "Kala-azar"
+            }
+          ]
+        }
+      }
+    },
+    "hosp_c/lab_note.txt": {
+      "path": "hosp_c/lab_note.txt",
+      "expect": "sanitize",
+      "sha256": "b8b6ea734f63d4ec1d5eaf40979d6893005aeb8621615f6398f951ed417a7cc5",
+      "units": {
+        "doc": {
+          "patient": "PT001",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "S. Tiwari",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "981/000/1001",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "Raniyapur",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PATIENT_NAME",
+              "surface": "R. Mishra",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "VILLAGE",
+              "surface": "Tindwari",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "CANARY",
+              "surface": "CANARY_DS3_UNLINKED",
+              "script": "latin",
+              "channel": "content"
+            }
+          ],
+          "preserve": [
+            {
+              "text": "2.1 mg/dL"
+            },
+            {
+              "text": "Wilson's"
+            }
+          ]
+        }
+      }
+    },
+    "hosp_d/ward_followup.json": {
+      "path": "hosp_d/ward_followup.json",
+      "expect": "sanitize",
+      "sha256": "1d52b498c04009d92dbd64775292817f3613c5922189a3a92a397a6c34a10aca",
+      "units": {
+        "/0": {
+          "patient": "PT001",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Shailu Tiwari",
+              "script": "latin",
+              "channel": "content"
+            }
+          ]
+        },
+        "/1": {
+          "patient": "PT003",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Shanti Devi",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9810001003",
+              "script": "latin",
+              "channel": "content"
+            }
+          ]
+        },
+        "/2": {
+          "patient": "PT004",
+          "link": "required",
+          "entities": [
+            {
+              "type": "PATIENT_NAME",
+              "surface": "Shanti Devi",
+              "script": "latin",
+              "channel": "content"
+            },
+            {
+              "type": "PHONE",
+              "surface": "9810001004",
+              "script": "latin",
+              "channel": "content"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

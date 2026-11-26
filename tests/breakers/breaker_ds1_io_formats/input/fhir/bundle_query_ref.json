@@ -1,0 +1,44 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "fullUrl": "https://his.local/fhir/Patient/pat-901",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "pat-901",
+        "name": [
+          {
+            "family": "Kulkarni",
+            "given": [
+              "Ashok",
+              "Narayan"
+            ]
+          }
+        ],
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "9866778899"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:obs-901",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-901",
+        "status": "final",
+        "subject": {
+          "reference": "Patient/pat-901?_format=json",
+          "display": "Ashok Narayan Kulkarni"
+        },
+        "valueQuantity": {
+          "value": 182,
+          "unit": "mg/dL"
+        }
+      }
+    }
+  ]
+}

@@ -24,7 +24,7 @@ ABHA_ADDR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._]*@(?:abdm|sbx|ndhm|abha)" + _R,
 ABHA_NUM = re.compile(_L + r"\d{2}([- ])\d{4}\1\d{4}\1\d{4}(?!\d)")
 AADHAAR_MASKED = re.compile(r"(?<![A-Za-z0-9])(?:[Xx*•]{4}[- ]?){2}\d{4}(?!\d)")
 AADHAAR = re.compile(r"(?<![A-Za-z0-9%])(?<![\d][- /.])[2-9]\d{3}([- ]?)\d{4}\1\d{4}(?![- /.]?\d)" + _R)
-PAN = re.compile(_L + r"[A-Za-z]{5}\d{4}[A-Za-z]" + _R)
+PAN = re.compile(_L + r"[A-Z]{5}\d{4}[A-Z]" + _R, re.I)
 INSURANCE = re.compile(
     _L + r"(?:[A-Z]{2,10}-POL(?:[-/]\d+){1,4}|PMJAY(?:[-/ ]?[A-Z]{2,3})?(?:[-/]\d{2,4})?[-/ ]?\d{6,}"
     r"|(?:POL|POLICY|INS|TPA|MEDI|CGHS|ESIC?)(?:[-/][A-Z]{2,5})?(?:[-/]\d+){1,4})" + _R, re.I)
@@ -38,6 +38,14 @@ _PHONE_BODY = (r"(?:\([6-9]\d{2}\)[- .]?\d{3}[- .]\d{4}"  # (795) 633-0006
                r"|[6-9]\d(?: \d{2}){4})")                 # 98 76 54 32 10
 PHONE = re.compile(r"(?<![A-Za-z0-9])(?:(?:\(\+?91\)|\+91|0091|91(?=[- ])|0)[- .]{0,2})?"
                    + _PHONE_BODY + r"(?!\d|[-/]\d|[A-Za-z])")
+
+# "(912) 455-7781", "934/221/6650": brackets round the first three digits, or slashes between 3-3-4
+PHONE_GROUPED = re.compile(r"(?<![A-Za-z0-9/])(?:\+91[- .]?)?(?:\([6-9]\d{2}\)[- .]?\d{3}[- .]?\d{4}|[6-9]\d{2}/\d{3}/\d{4})"
+                           r"(?!\d|[-/]\d|[A-Za-z])")
+# landlines: an STD code starting with 0, then the number, 10 or 11 digits in all
+# ("0512-2345678", "(0581) 456789", "022 2567 8901")
+LANDLINE = re.compile(r"(?<![A-Za-z0-9/.-])(?:\(0[1-9]\d{1,3}\)[- ]?\d{6,8}|0[1-9]\d{1,3}-\d{6,8}"
+                      r"|0[1-9]\d[- ]\d{4}[- ]\d{4})(?!\d|[-/.]\d|[A-Za-z])")
 
 # hospital record numbers. Bill / visit / sample / claim numbers are NOT patient identifiers.
 _NOT_MRN_PREFIX = {"BL", "BILL", "INV", "OPD", "OP", "AMB", "HD", "LAB", "POL", "PMJAY", "TPA", "INS", "REF", "VISIT",
@@ -124,6 +132,12 @@ def find_ids(text: str) -> list[Cand]:
         out.append(Cand(m.start(), m.end(), "INSURANCE_ID", re.sub(r"[^A-Z0-9]", "", m.group(0).upper())))
     for m in PHONE.finditer(text):
         out.append(Cand(m.start(), m.end(), "PHONE", phone_norm(m.group(0))))
+    for m in PHONE_GROUPED.finditer(text):
+        out.append(Cand(m.start(), m.end(), "PHONE", phone_norm(m.group(0))))
+    for m in LANDLINE.finditer(text):
+        d = digits(m.group(0))
+        if 10 <= len(d) <= 11:
+            out.append(Cand(m.start(), m.end(), "PHONE", phone_norm(m.group(0))))
     # a 12-digit mobile written without "+": 919876543210
     for m in re.finditer(_L + r"91[6-9]\d{9}(?!\d)", text):
         out.append(Cand(m.start(), m.end(), "PHONE", m.group(0)[2:], prio=PRIORITY["AADHAAR"] - 1))

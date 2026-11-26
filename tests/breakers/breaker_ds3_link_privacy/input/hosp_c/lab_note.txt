@@ -1,0 +1,2 @@
+Lab Report: S. Tiwari, age 47/M, village Raniyapur, ph 981/000/1001. Creatinine 2.1 mg/dL, eGFR 36.
+Separate patient alert: CANARY_DS3_UNLINKED, R. Mishra (32/M), Tindwari, copper low (Wilson's).

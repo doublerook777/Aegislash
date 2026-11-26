@@ -79,6 +79,7 @@ lane street nagar colony vihar puram enclave park market bazar bazaar station ch
 scheme yojana bank office district tehsil village gram path sarani circle layout extension sector maternity charitable
 multispeciality superspeciality disease syndrome palsy sign test score scale method procedure
 """.split())
+NOT_A_PERSON_WORDS = _PLACE_OR_ORG
 _DEVA_PLACE_OR_ORG = frozenset("""
 अस्पताल हॉस्पिटल चिकित्सालय क्लिनिक नर्सिंग होम स्मारक मेमोरियल संस्थान कॉलेज विद्यालय ट्रस्ट केंद्र केन्द्र सेंटर केयर
 सदन सेवा वार्ड विभाग लैब पैथोलॉजी मेडिकल स्टोर मंदिर मस्जिद चौक चौराहा रोड मार्ग गली नगर कॉलोनी विहार पार्क बाजार बाज़ार
@@ -110,6 +111,21 @@ _RELATIVE_BEFORE = re.compile(
 _WORD = r"(?:(?:Md|Mohd)\.(?= [A-Z])|[A-Z]'[A-Z][a-z]+|[A-Z][a-z]+(?:'[A-Z]?[a-z]+)?|[A-Z]{2,}(?![A-Za-z])|[A-Z]\.(?= ?[A-Z]))"
 _RUN = re.compile(rf"(?<![A-Za-z0-9]){_WORD}(?:(?: |(?<=\.)|-(?=[A-Z])){_WORD})*(?![a-z0-9])")
 _PART = re.compile(r"(?:Md|Mohd)\.|[A-Z]'[A-Z][a-z]+|[A-Z][a-z]+(?:'[A-Z]?[a-z]+)?|[A-Z]{2,}|[A-Z]\.")
+
+# Chat messages and machine logs are often all lowercase. There capital letters cannot help, so only surnames of four
+# or more letters that are not also everyday English or Hindi words count.
+_LOWER_AMBIGUOUS = frozenset("""
+amma anand bora dang dash dave deka dubey engineer gandhi gill hand kale kali kamat khan krishna lama lone mali
+mane mani master mistry modi more nagar nanda nath nayak naik panda pandit pant patra prakash raja rajan rana
+raman roth sagar sahib saha soni suri swami tiga wagh wani bibi begam sahib kumari bhat kutty
+""".split())
+_LOWER_SURNAMES = frozenset(w for w in SURNAMES if len(w) >= 4) - _LOWER_AMBIGUOUS
+# words that can stand before a surname in a sentence but are not a first name
+_LOWER_NOT_GIVEN = frozenset("""
+ask asked tell told give gave sent send took take lene liye diya diye liya aaya aaye aayi gaya gaye gayi mila mile
+wala unke uske unka uska mera meri apne naya purana saath lekin toh tak par bhi phir called calls meet met say says said
+""".split())
+_LOWER_RUN = re.compile(r"(?<![A-Za-z0-9_@.])[a-z]{3,}(?: [a-z]{3,})*(?![A-Za-z0-9_@])")
 
 _DEVA_TOKEN = re.compile(r"[ऀ-ॣॱ-ॿ]+")
 _DEVA_NOT_NAME = frozenset("""
@@ -175,6 +191,34 @@ def _latin(text: str, stop: frozenset[str]) -> list[Cand]:
     return out
 
 
+def _lower(text: str, stop: frozenset[str]) -> list[Cand]:
+    """"pt <first name> <surname> ko bukhar hai": only on lines that have no capital letter at all."""
+    out = []
+    never = stop | _NOT_NAME | _PLACE_OR_ORG | _LOWER_NOT_GIVEN
+    for line in re.finditer(r"[^\n]+", text):
+        if re.search(r"[A-Z]", line.group(0)):
+            continue
+        for run in _LOWER_RUN.finditer(line.group(0)):
+            offset = line.start() + run.start()
+            words = [(m.start() + offset, m.end() + offset, m.group(0)) for m in re.finditer(r"[a-z]+", run.group(0))]
+            i = 1
+            while i < len(words):
+                if words[i][2] not in _LOWER_SURNAMES or words[i - 1][2] in never:
+                    i += 1
+                    continue
+                first, last = i - 1, i
+                if first and words[first][2] in _MIDDLE and words[first - 1][2] not in never:
+                    first -= 1
+                while last + 1 < len(words) and words[last + 1][2] in _LOWER_SURNAMES:
+                    last += 1
+                start, end = words[first][0], words[last][1]
+                following = {w[2] for w in words[last + 1:last + 2]}
+                if not following & _PLACE_OR_ORG and not _STAFF_BEFORE.search(text[max(0, start - 20):start]):
+                    out.append(_cand(text, start, end))
+                i = last + 1
+    return out
+
+
 def _deva(text: str) -> list[Cand]:
     out = []
     # words separated by single spaces form a run; punctuation breaks it
@@ -202,7 +246,8 @@ def _deva(text: str) -> list[Cand]:
 
 def find_listed_names(text: str, stop: frozenset[str]) -> list[Cand]:
     """`stop` is the caller's list of words that are never names (medicines, report words)."""
-    return _latin(text, stop - SURNAMES - {"asha"}) + _deva(text)
+    never = stop - SURNAMES - {"asha"}
+    return _latin(text, never) + _lower(text, never) + _deva(text)
 
 
 _PERSON_KEY_RUN = re.compile(r"^(?:[A-Z][a-z]{1,20}(?: [A-Z][a-z]{1,20}){1,2}|[ऀ-ॣॱ-ॿ]{2,20}(?: [ऀ-ॣॱ-ॿ]{2,20}){1,2})$")

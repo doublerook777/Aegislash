@@ -1,0 +1,28 @@
+[
+  {
+    "patient_name": "Shailu Tiwari",
+    "age": 48,
+    "gender": "M",
+    "tehsil": "Mauranipur",
+    "district": "Jhansi",
+    "dx": "CKD Followup"
+  },
+  {
+    "patient_name": "Shanti Devi",
+    "age": 42,
+    "gender": "F",
+    "tehsil": "Mauranipur",
+    "district": "Jhansi",
+    "mobile": "9810001003",
+    "dx": "HTN Review"
+  },
+  {
+    "patient_name": "Shanti Devi",
+    "age": 42,
+    "gender": "F",
+    "tehsil": "Jhansi",
+    "district": "Jhansi",
+    "mobile": "9810001004",
+    "dx": "DM Review"
+  }
+]

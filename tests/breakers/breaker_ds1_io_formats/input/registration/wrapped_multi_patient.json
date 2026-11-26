@@ -1,0 +1,27 @@
+{
+  "patient_export_source": "HIS-Lucknow-Ward-3",
+  "export_date": "2026-10-15",
+  "visits": [
+    {
+      "patient_name": "Anwar Ansari",
+      "mobile": "9833001101",
+      "age": 41,
+      "gender": "M",
+      "dx": "Type 2 Diabetes"
+    },
+    {
+      "patient_name": "Rehana Parveen",
+      "mobile": "9833001102",
+      "age": 36,
+      "gender": "F",
+      "dx": "Asthma"
+    },
+    {
+      "patient_name": "Yogesh Shukla",
+      "mobile": "9833001103",
+      "age": 53,
+      "gender": "M",
+      "dx": "Coronary Artery Disease"
+    }
+  ]
+}

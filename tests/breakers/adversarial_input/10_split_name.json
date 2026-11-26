@@ -1,0 +1,14 @@
+[
+  {
+    "first_name": "Suresh",
+    "last_name": "Verma",
+    "age": 40,
+    "district": "Agra"
+  },
+  {
+    "first_name": "Meena",
+    "last_name": "Devi",
+    "age": 35,
+    "district": "Meerut"
+  }
+]

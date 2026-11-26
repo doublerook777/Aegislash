@@ -6,7 +6,7 @@ import re
 from aegis.detect.address import parse_address
 from aegis.detect.dates import find_dates
 from aegis.detect.ids import find_ids, phone_norm
-from aegis.detect.names import _TITLE, DEVA_NAME, STOP, trim_name
+from aegis.detect.names import _TITLE, DEVA_NAME, ORG, STOP, trim_name
 from aegis.detect.normalize import DEVA, digits, norm_name
 from aegis.detect.spans import PRIORITY, Cand
 
@@ -91,7 +91,7 @@ def name_value(text: str, s: int, e: int, role: str) -> list[Cand]:
         return []
     if role == "name":
         # a bare "name" label: only accept values that really look like a person
-        if all(w.strip(".,").casefold() in STOP - {"asha"} for w in words):
+        if all(w.strip(".,").casefold() in (STOP | ORG) - {"asha"} for w in words):
             return []
         if not (re.fullmatch(DEVA_NAME, value) or all(w[0].isupper() for w in words)):
             return []

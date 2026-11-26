@@ -1,0 +1,6 @@
+{
+  "record_type": "lab_result",
+  "sample_id": "LAB-9901",
+  "encoded_patient": "eyJwYXRpZW50IjogIlp1YmFpciBLaGFuIiwgInBob25lIjogIjk4NzY1NDMyMTAiLCAiZG9iIjogIjE5ODUtMDMtMjEifQ==",
+  "result": "Hb: 10.2 g/dL, WBC: 7800"
+}
