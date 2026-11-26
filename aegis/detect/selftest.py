@@ -256,6 +256,24 @@ CASES = [
     ("पिता का नाम: जगदीश मौर्य\nउम्र: 63 वर्ष\nपति: हरिप्रसाद\nबीमारी: उच्च रक्तचाप\nश्रीमती उर्मिला\nइलाज: जारी",
      ["जगदीश मौर्य", "हरिप्रसाद", "उर्मिला"], ["उम्र", "बीमारी", "रक्तचाप", "इलाज", "पिता का नाम"]),
     ("पिता रोज़ सुबह इंसुलिन लेते हैं। घर से लेकर आए, अस्पताल से लाए गए।", [], ["पिता", "इंसुलिन", "घर", "अस्पताल"]),
+    # Hinglish relation words before a name, a locality after "Ghar", a landmark cue, a name in brackets (invented)
+    ("Bete Vinod Kharwar ne dawa nahi li. Tab. Telmisartan 40 mg 1-0-0.", ["Vinod Kharwar"], ["Telmisartan 40 mg", "1-0-0", "Bete"]),
+    ("Patni Savita Munda ko sugar hai, bhatija Deepak Toppo saath aaya, SpO2 95%.",
+     ["Savita Munda", "Deepak Toppo"], ["sugar", "SpO2 95%", "Patni", "bhatija"]),
+    ("Saas Kamla Oram aur damaad Pritam Lakra mile. Dr. Neelam Bakshi ne dekha.", ["Kamla Oram", "Pritam Lakra"], ["Neelam Bakshi", "Saas"]),
+    ("Ghar Shanti Colony mein hai, landmark Blue Gate School. BP 124/82 mmHg.",
+     ["Shanti Colony", "Blue Gate School"], ["BP 124/82 mmHg", "Ghar"]),
+    ("Makaan Ambedkar Vihar mein hai. Subhash Nagar ke paas. Syp. Cetirizine 5 mg HS.",
+     ["Ambedkar Vihar", "Subhash Nagar"], ["Cetirizine 5 mg", "ke paas"]),
+    ("Mareez Girish ji (Girish Lakda) ko Pantop 40 mg di gayi, Metformin 500 mg 1-0-1.",
+     ["Lakda"], ["Pantop 40 mg", "Metformin 500 mg", "1-0-1"]),
+    ("Sunita Minz ne raat ko dawa nahi li; Metformin 500 mg 1-0-1.", ["Sunita Minz"], ["Metformin 500 mg", "dawa nahi li"]),
+    # ... and what is NOT a name: relation word + particle or medical word, drugs, "Beta Blocker", doctors
+    ("Beta ko bukhar nahi hai. Pati ko TB hai. Bhai ka BP 150/90. Bete ne dawa li.", [], ["Beta", "Pati", "Bhai", "Bete", "150/90", "bukhar"]),
+    ("Beta Blocker (Metoprolol 25 mg) shuru kiya. Beta Thalassemia trait.", [], ["Beta Blocker", "Metoprolol 25 mg", "Beta Thalassemia"]),
+    ("Dengue ne aaj bahut kamzor kar diya, platelet 90000. Dr. Rekha Soren ke paas refer.", [], ["Dengue", "platelet 90000", "Rekha Soren"]),
+    ("Bhai Sahab ne dawa li. Pita Ji ka BP 140/90 hai. Ghar Hospital mein hai.", [], ["Bhai", "Pita", "140/90", "Hospital"]),
+    ("Patni Savita Devi (MD Pathology) ka report aaya, Hb 10.2 g/dl.", ["Savita Devi"], ["Pathology", "Hb 10.2 g/dl"]),
 ]
 
 

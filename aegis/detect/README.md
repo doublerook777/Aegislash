@@ -257,3 +257,30 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 - Selftest: `HL7_MESSAGES` (three invented messages: `\n` and `\r` separators, guarantor, insured person, OBX content).
 - Left alone: HL7 inside base64 or a CSV cell is only read if the cell itself starts with `MSH|`; escape sequences
   (`\F\`, `\S\`) inside names are not decoded; ORC / OBR / PV1 doctor names stay (staff).
+
+## Hinglish relation words, "Ghar <place> mein", "landmark <place>" and a name in brackets (finding F4)
+- **Cause.** The English kin cues (`son`, `wife`, `brother` ...) had no Roman-script Hindi twin before a name: `beta`, `pati`,
+  `bhai`, ... only worked *after* a name ("<name> beta"). A place had no Hinglish sentence cue: `Ghar <X> mein hai` and
+  `landmark <X>` were not cues, and `<X> ke paas` worked only when X ended in a landmark noun (Mandir, Chowk ...). A
+  `<name> ne <what a person does>` sentence (`Rekha ne raat ko dawa nahi li`) was a cue only for `ne sign / call ...`. A name in
+  brackets after a found name was never read by itself, so its surname survived (`Nitin sahab (Nitin Ekka)`). Separately a
+  relation word at the start of a sentence went through the "<Name> ko bukhar" and "<Name> sahab" cues, so
+  `Beta ko bukhar nahi hai` and `Bhai Sahab ne ...` lost "Beta" / "Bhai" as if they were names.
+- **Change.** `names._HINGLISH_KIN` (about 40 relation words; "didi", "sister", "maa" are left out on purpose: ASHA didi and
+  nurses are staff) is a cue before a capitalised name. The first-word check (`_NEVER_FIRST`) drops `Beta Blocker`,
+  `Bhai Sahab`, `Dr`, particles and medical words; a lowercase word after the relation word (`ko`, `ka`, `ne`) never matches.
+  `names._after_kin_words` takes a leading relation word off a captured name for the "<Name> ko bukhar", "<Name> sahab / ji"
+  and new `<Name> ne <raat|dawa|bataya|...>` cues (also after `ki`, `jo`, `jab`); nothing left means no name.
+  `names._alias_names` reads `( <Given> <Surname> )` right after a found name and its honorific, if the words are capitalised
+  and none is a stop, medical, hospital, staff or pronoun word. `address._HINGLISH_LOCALITY` (`Ghar / Makaan <Place words> mein`),
+  `_LANDMARK_CUE` (`landmark <Place words>`) and `_PLACE_LANDMARK` (`<... Nagar / Colony / Vihar / Chowk / Marg> ke paas`) add the
+  places; `_place_span` cuts report words and refuses a first word that is a stop or hospital word, and a doctor before it.
+  No contract change (no new fields, types or files).
+- **Checks.** selftest 196/196 (12 new cases with invented names; 9 fail on the base commit, the rest are Hinglish medical text,
+  `Beta Blocker`, `Dr. <name> ke paas` and drug subjects that must survive). `dev/` sanitized output and `records.jsonl`, the adversarial
+  set, the three breaker sets and `tests/breakers/adversarial_input` are byte-identical to the base (only `report.json` timings
+  differ), so no recorded number changed; these sets do not contain the failing shapes, so this is **not** an unseen measurement.
+- **Left.** `<X> ke paas` is a landmark only when X ends in Nagar / Colony / Vihar / Puri / Enclave / Chowk / Marg or a landmark noun
+  (`Anita ke paas` is a person, not a place). `Mama <Capitalised noun>` (`Mama Earth`) still reads the noun as a name; `landmark Gate No 4`
+  keeps "No 4"; the `ne` cue knows about 30 verbs and nouns, so `<name> ne <other verb>` is not a cue; lowercase names are not found by
+  the new cues.
