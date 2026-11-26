@@ -84,6 +84,8 @@ def _compute_profile_tiers(
 
     for res in ordered_results:
         rid = res["record_id"]
+        if rid.endswith("#@file"):
+            continue
         pid = _profile_id(rid, keys.get(rid))
         rec_to_prof[rid] = pid
         prof = profiles.setdefault(
@@ -227,7 +229,8 @@ def plan(results: list[RecordResult], keys: dict[str, str | None]) -> dict[str, 
 
     for res in ordered:
         rid = res["record_id"]
-        pkey = keys.get(rid)
+        is_file_rec = rid.endswith("#@file")
+        pkey = None if is_file_rec else keys.get(rid)
         pid = _profile_id(rid, pkey)
         shift_key = pkey if pkey else f"rec|{rid}"
         if shift_key not in shift_cache:
@@ -236,16 +239,20 @@ def plan(results: list[RecordResult], keys: dict[str, str | None]) -> dict[str, 
             psn_cache[pkey] = pseudonym(pkey)
 
         ev = res.get("evidence") or {}
-        district = ev.get("district") or profiles[pid]["district"]
+        prof = profiles.get(pid)
+        district = ev.get("district") or (prof["district"] if prof else None)
         rec_info = {
             "key": pkey,
             "psn": psn_cache[pkey] if pkey else None,
             "profile_id": pid,
-            "tier": tiers[pid],
+            "tier": tiers.get(pid, "normal"),
             "shift_days": shift_cache[shift_key],
             "district": district,
         }
         records_map[rid] = rec_info
+
+        if is_file_rec:
+            continue
 
         has_gen = False
         has_sup = False

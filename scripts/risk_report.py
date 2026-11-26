@@ -152,6 +152,22 @@ def _scan_json_obj(obj: Any, prof: dict[str, Any], parent_key: str | None = None
             _merge_profile(prof, pkey, str(cur))
 
 
+def _sniff_delimiter(text: str, ext: str) -> str:
+    default = "\t" if ext == ".tsv" else ","
+    sample = "\n".join(text.splitlines()[:5])
+    if not sample.strip():
+        return default
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters="\t,;|")
+        return dialect.delimiter
+    except csv.Error:
+        return default
+
+
+def _rfc6901_escape(key: str) -> str:
+    return key.replace("~", "~0").replace("/", "~1")
+
+
 def _load_release_profiles(out_dir: Path) -> tuple[dict[str, dict[str, Any]], int]:
     """Read sanitized/ and records.jsonl to assemble quasi-identifier profiles."""
     records_path = out_dir / "records.jsonl"
@@ -187,7 +203,7 @@ def _load_release_profiles(out_dir: Path) -> tuple[dict[str, dict[str, Any]], in
         loc_map = {loc: (pat or f"unlinked:{rel}#{loc}") for loc, pat in locs}
 
         if ext in (".csv", ".tsv"):
-            delim = "\t" if ext == ".tsv" else ","
+            delim = _sniff_delimiter(text, ext)
             rows = list(csv.reader(io.StringIO(text, newline=""), delimiter=delim))
             if not rows:
                 continue
@@ -202,16 +218,28 @@ def _load_release_profiles(out_dir: Path) -> tuple[dict[str, dict[str, Any]], in
                 data = json.loads(text)
             except ValueError:
                 continue
-            if "doc" in loc_map or not isinstance(data, dict):
-                prof = get_prof(loc_map.get("doc", f"unlinked:{rel}#doc"))
-                _scan_json_obj(data, prof)
-            else:
+            if "doc" in loc_map:
+                _scan_json_obj(data, get_prof(loc_map["doc"]))
+            elif isinstance(data, list):
+                for idx, item in enumerate(data):
+                    loc = f"/{idx}"
+                    pid = loc_map.get(loc, f"unlinked:{rel}#{loc}")
+                    _scan_json_obj(item, get_prof(pid))
+            elif isinstance(data, dict):
+                matched_records = False
                 for k, v in data.items():
                     if isinstance(v, list):
+                        pk = _rfc6901_escape(str(k))
                         for idx, item in enumerate(v):
-                            loc = f"/{k}/{idx}"
-                            pid = loc_map.get(loc, loc_map.get("doc", f"unlinked:{rel}#{loc}"))
-                            _scan_json_obj(item, get_prof(pid))
+                            loc = f"/{pk}/{idx}"
+                            if loc in loc_map or isinstance(item, dict):
+                                matched_records = True
+                                pid = loc_map.get(loc, f"unlinked:{rel}#{loc}")
+                                _scan_json_obj(item, get_prof(pid))
+                if not matched_records:
+                    _scan_json_obj(data, get_prof(f"unlinked:{rel}#doc"))
+            else:
+                _scan_json_obj(data, get_prof(f"unlinked:{rel}#doc"))
         else:
             pid = loc_map.get("doc", f"unlinked:{rel}#doc")
             prof = get_prof(pid)
@@ -285,11 +313,8 @@ def _simulate_known_facts_attack(
     known_facts_path: Path,
 ) -> dict[str, Any]:
     """Estimate A5 targeted risk: known rare conditions / unshifted dates matching profiles."""
-    cond_freq: Counter[str] = Counter()
     all_dates: dict[str, set[str]] = defaultdict(set)
     for pid, p in profiles.items():
-        for d in p["diagnoses"]:
-            cond_freq[d] += 1
         if p.get("dates"):
             all_dates[pid] = p["dates"]
 
@@ -303,15 +328,20 @@ def _simulate_known_facts_attack(
         targets += 1
         ch = _norm(str(fact.get("condition_hint") or ""))
         vdates = set(fact.get("visit_dates") or [])
+
+        matched_cond_pids = [
+            pid for pid, p in profiles.items()
+            if ch and any(ch in d or d in ch for d in p["diagnoses"])
+        ]
         matched_rare = False
-        matched_date = False
-        for pid, p in profiles.items():
-            if ch and any(ch in d or d in ch for d in p["diagnoses"]) and cond_freq.get(ch, 0) <= 3:
-                # Only high risk if district or age also remains narrow on that profile
+        if 1 <= len(matched_cond_pids) <= 3:
+            for pid in matched_cond_pids:
+                p = profiles[pid]
                 if p["district"] is not None or (p["age_range"] and (p["age_range"][1] - p["age_range"][0]) <= 10):
                     matched_rare = True
-            if vdates and (vdates & all_dates.get(pid, set())):
-                matched_date = True
+                    break
+
+        matched_date = any(vdates and (vdates & all_dates.get(pid, set())) for pid in profiles)
         if matched_rare:
             rare_cond_hits += 1
         if matched_date:

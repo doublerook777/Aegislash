@@ -81,6 +81,6 @@ Export: sanitized/ + report.json + records.jsonl (verified by final leak gate)
 
 ## Known Limitations
 
-- Cross-module integration between `io`, `detect`, and `link` is in progress across team branches (`main.py` still runs the starter skeleton until modules merge).
+- Full-pipeline end-to-end integration and privacy-utility tuning await the `detect` module merge (`io`, `link`, and `privacy` are implemented; `main.py` already runs `io`'s two-pass pipeline).
 - K-anonymity risk mitigation relies on `detect` emitting `CONDITION`, `DISTRICT`, `GENDER`, and `AGE` findings/evidence consistently across formats, including unseen layouts.
 - Unlinked records that lack strong IDs or matching secondary clues receive per-record date shifts rather than cross-file patient shifts, preserving intra-record LOS but not cross-document intervals.

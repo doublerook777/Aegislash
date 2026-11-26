@@ -148,22 +148,66 @@ class PrivacyTests(unittest.TestCase):
             out = Path(td)
             (out / "sanitized").mkdir()
             (out / "sanitized" / "p.csv").write_text(
-                "patient,age,gender,district,visit_date,diagnosis\n"
-                "PSN-AAAAAA,45-49,M,Lucknow,2026-03-01,Fever\n"
-                "PSN-BBBBBB,45-49,M,Lucknow,2026-03-02,Fever\n",
+                "patient;age;gender;district;visit_date;diagnosis\n"
+                "PSN-AAAAAA;45-49;M;Lucknow;2026-03-01;Viral fever\n"
+                "PSN-BBBBBB;45-49;M;Lucknow;2026-03-02;Viral fever\n",
+                encoding="utf-8",
+            )
+            (out / "sanitized" / "arr.json").write_text(
+                json.dumps([
+                    {"patient": "PSN-CCCCCC", "age": "45-49", "gender": "M", "district": "Lucknow", "diagnosis": "Viral fever"},
+                    {"patient": "PSN-DDDDDD", "age": "45-49", "gender": "M", "district": "Lucknow", "diagnosis": "Viral fever"},
+                ]),
+                encoding="utf-8",
+            )
+            (out / "sanitized" / "esc.json").write_text(
+                json.dumps({"visit/log": [{"patient": "PSN-EEEEEE", "age": "45-49", "gender": "M", "district": "Lucknow", "diagnosis": "Rare Addison"}]}),
                 encoding="utf-8",
             )
             (out / "records.jsonl").write_text(
                 json.dumps({"file": "sanitized/p.csv", "loc": "row:0", "patient": "PSN-AAAAAA"}) + "\n"
-                + json.dumps({"file": "sanitized/p.csv", "loc": "row:1", "patient": "PSN-BBBBBB"}) + "\n",
+                + json.dumps({"file": "sanitized/p.csv", "loc": "row:1", "patient": "PSN-BBBBBB"}) + "\n"
+                + json.dumps({"file": "sanitized/arr.json", "loc": "/0", "patient": "PSN-CCCCCC"}) + "\n"
+                + json.dumps({"file": "sanitized/arr.json", "loc": "/1", "patient": "PSN-DDDDDD"}) + "\n"
+                + json.dumps({"file": "sanitized/esc.json", "loc": "/visit~1log/0", "patient": "PSN-EEEEEE"}) + "\n",
                 encoding="utf-8",
             )
             kf = out / "kf.jsonl"
-            kf.write_text(json.dumps({"rid": "R1", "visit_dates": ["2026-03-01"], "condition_hint": "Fever"}) + "\n", encoding="utf-8")
+            kf.write_text(
+                json.dumps({"rid": "R1", "visit_dates": ["2026-03-01"], "condition_hint": "Fever"}) + "\n"
+                + json.dumps({"rid": "R2", "visit_dates": [], "condition_hint": "Rare Addison"}) + "\n",
+                encoding="utf-8",
+            )
             rep = analyze_release(out, known_facts_path=kf)
-            self.assertEqual(rep["linked_psn_profiles"], 2)
-            self.assertEqual(rep["k_anon_age_gender_district"]["min_k"], 2)
+            self.assertEqual(rep["linked_psn_profiles"], 5)
+            self.assertEqual(rep["k_anon_age_gender_district"]["min_k"], 5)
+            # "Fever" matches 4 "Viral fever" profiles -> not rare; only "Rare Addison" (1 profile) hits
+            self.assertEqual(rep["simulated_known_facts_attack"]["rare_cond_with_narrow_qi_hits"], 1)
             self.assertEqual(rep["simulated_known_facts_attack"]["exact_date_overlap_hits"], 1)
+
+    def test_at_file_records_excluded_from_profiles_and_stats(self) -> None:
+        # 8 real records (< 10 threshold) + 4 #@file records must NOT trigger k-anonymity suppression,
+        # and @file findings must not inflate stats(), yet replace() must still work for @file.
+        results = []
+        keys = {}
+        for i in range(4):
+            f_rec = _rec(
+                f"f{i}.csv#@file",
+                [{"path": "filename", "start": 0, "end": 6, "type": "PIN", "text": "226001", "norm": "226001", "role": None}],
+            )
+            results.append(f_rec)
+        for i in range(8):
+            rid = f"f{i % 4}.csv#row:{i}"
+            pin_f = {"path": "col:0", "start": 0, "end": 6, "type": "PIN", "text": "226001", "norm": "226001", "role": "patient"}
+            results.append(_rec(rid, [pin_f], age=47, gender="M", district="lucknow"))
+            keys[rid] = f"k:{i}"
+
+        p = plan(results, keys)
+        self.assertEqual(replace(p, "f0.csv#@file", results[0]["findings"][0]), {"text": "226***", "status": "generalized"})
+        self.assertEqual(replace(p, "f0.csv#row:0", results[4]["findings"][0]), {"text": "226***", "status": "generalized"})
+        st = stats(p)
+        self.assertEqual(st["records_generalized"], 8)
+        self.assertEqual(st["records_suppressed"], 0)
 
 
 if __name__ == "__main__":
