@@ -106,6 +106,11 @@ def holds_address(text: str) -> bool:
     return "," in text and bool(_PIN_ANY.search(text)) and bool(re.search(r"[A-Za-z]{3,}|[ऀ-ॿ]{2,}", rest))
 
 
+def has_no_pin(text: str) -> bool:
+    """Words, and no six digits anywhere: not a PIN code cell."""
+    return len(re.sub(r"\D", "", text)) != 6 and not _PIN_ANY.search(text) and bool(re.search(r"[A-Za-z]{3,}|[ऀ-ॿ]{2,}", text))
+
+
 _CARE_OF_ADDRESS = re.compile(r"(?<![A-Za-z/])(?i:c/o)[ :.-]+(?P<a>\d{1,4}[A-Z]?(?:/\d+)?, *[^;\n|]{5,120})")
 
 

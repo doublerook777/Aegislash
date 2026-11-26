@@ -5,6 +5,7 @@ import re
 
 from aegis.detect.address import parse_address
 from aegis.detect.dates import find_dates
+from aegis.detect.gazetteer import SURNAMES
 from aegis.detect.ids import find_ids, phone_norm
 from aegis.detect.names import _TITLE, DEVA_NAME, ORG, STOP, trim_name
 from aegis.detect.normalize import DEVA, digits, norm_name
@@ -98,7 +99,10 @@ def surname_first(value: str) -> bool:
 
 def relative_in_contact(text: str) -> list[Cand]:
     """A relative's "contact" cell: "<relation> <name>", or something that looks like a name, with or without a number."""
-    found = kin_and_name(text) or name_value(text, 0, len(text), "name")
+    found = kin_and_name(text)
+    if not found and (DEVA.search(text) or len(digits(text)) >= 5
+                      or set(re.findall(r"[a-z]+", text.casefold())) & SURNAMES):
+        found = name_value(text, 0, len(text), "name")
     return [c._replace(type="RELATIVE_NAME", role="relative", prio=PRIORITY["RELATIVE_NAME"] + 2) for c in found]
 
 

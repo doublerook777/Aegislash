@@ -26,7 +26,7 @@ def _words(s: str) -> frozenset[str]:
 _DOCTOR = _words("doctor dr consultant physician surgeon nurse referred referrer author practitioner clinician medico mo डॉक्टर चिकित्सक")
 _RELATIVE = _words("guardian relative relatives kin nok father fathers husband husbands mother mothers spouse attendant informant careof pita attender parivar sadasya gharwale gharwala gharwali "
                    "pati parent caregiver witness nominee पिता पति अभिभावक माता")
-_PHONE = _words("phone ph mobile mob tel telephone whatsapp cell callback contactno contactdigits msisdn fon फ़ोन फोन मोबाइल दूरभाष संपर्क")
+_PHONE = _words("phone ph mobile mob tel telephone whatsapp cell callback contactno contactdigits msisdn फ़ोन फोन मोबाइल दूरभाष संपर्क")
 _MRN = _words("uhid mrn umr crno uid_h भर्ती_संख्या पंजीकरण आईपीडी")
 _ID_WORDS = _words("id no num number ref code सं संख्या")
 _DOB = _words("dob yob birth birthdate birthyear janm janam जन्म")
@@ -37,7 +37,6 @@ _DISTRICT = _words("district distt dist jila zila zilla जिला ज़ि�
 _TEHSIL = _words("tehsil taluk taluka tahsil block तहसील")
 _VILLAGE = _words("village vill gaon gaanv gaav gav gram city town गांव गाँव ग्राम")
 _ADDRESS = _words("address addr adr street pata residence mohalla locality area house door doorno hno ghar makan "
-                  "landmark landmarks lndmrk nearby nbhd neighbourhood neighborhood dwelling "
                   "पता निवास घर मकान मोहल्ला")
 _NAME = _words("name nm naam fname lname fullname नाम")
 _SUBJECT = _words("patient pt beneficiary member subject client person insured मरीज़ मरीज रोगी mareez marij rogi rogee")
@@ -49,6 +48,19 @@ _KEEP = _words("diagnosis dx drug drugs medicine medication test tests result re
 _NOT_PERSON = _words("hospital facility lab test tests drug medicine panel panels coding file organization org "
                      "department ward package scheme insurer company payer_org user username device software")
 _STUDENT = _words("student विद्यार्थी छात्र छात्रा")
+_AREA = _words("landmark landmarks lndmrk nearby nbhd neighbourhood neighborhood dwelling")
+
+
+def extra_checks(label: str) -> str | None:
+    """"place", "phone" or "student": a header that adds a check to an otherwise unknown column, without switching any off."""
+    s = set(tokens(label))
+    if s & _AREA and not s & (_KEEP | _NOT_PERSON | _SUBJECT | _RELATIVE | _DOCTOR):
+        return "place"
+    if "fon" in s and not s & _DOCTOR:     # Hinglish spelling of "phone"
+        return "phone"
+    if s and s <= _STUDENT:           # "Student", but not "student_vision"
+        return "student"
+    return None
 _PLACE_IN_HOSPITAL = _words("ward bed")
 _CONTACT = _words("contact contacts caller")
 _NOT_MRN = _words("visit bill invoice sample claim policy ticket trip report order txn receipt encounter")
@@ -172,9 +184,6 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
             return "patient_name"
         return owner or "name"
     if s & _SUBJECT and not s & _ID_WORDS and not s & _KEEP:
-        return "patient_name"
-    # school health sheets: "Student" holds the child's name, but "student_vision" does not
-    if s <= _STUDENT:
         return "patient_name"
     # "Bed & Patient", "ward_patient": where the person lies and who they are, in one column
     if s & _SUBJECT and not s & _ID_WORDS and s & _KEEP and s & _KEEP <= _PLACE_IN_HOSPITAL:

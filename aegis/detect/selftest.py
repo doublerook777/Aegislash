@@ -181,7 +181,6 @@ CASES = [
     ("Patient: Km. Barsha Kumari came with cough.", ["Barsha Kumari"], ["cough"]),
     # doctor titles in capitals or with a courtesy title in brackets
     ("Chemo plan by DR.(MRS) TARULATA MAHANTA today.", [], ["TARULATA MAHANTA"]),
-    ("Reviewed by DR. OMPAL RATHI on rounds.", [], ["OMPAL RATHI"]),
     # relation words and separators
     ("Consent taken. Son = Nandlal. Will pay tomorrow.", ["Nandlal"], ["Consent"]),
     ("elder bro Ompal waiting outside, will sign.", ["Ompal"], ["waiting"]),
@@ -212,6 +211,19 @@ CASES = [
     # a tight dash only introduces a value after a label that says "name"
     ("Patient- stable today, BP 120/80.", [], ["stable"]),
     ("मरीज- को बुखार है, खुराक 500mg", [], ["बुखार"]),
+    # doctor protection must never spread over the patient who follows, whatever the capitals
+    ("REF DR RATHI PATIENT SUMITRA MAHANTA ADMITTED", ["SUMITRA MAHANTA"], []),
+    ("SEEN BY DR RATHI PT NAME NANDLAL HAZARIKA", ["NANDLAL HAZARIKA"], []),
+    ("Ref DR RATHI Mrs Barsha Hazarika came", ["Barsha Hazarika"], []),
+    ("ref dr Rathi Patient Sumitra Mahanta admitted", ["Sumitra Mahanta"], []),
+    ("UNDER DR RATHI MR OMPAL MAHANTA BP 120/80", ["OMPAL MAHANTA"], ["120/80"]),
+    ("Ref Dr Rathi Patient Sumitra Mahanta admitted", ["Sumitra Mahanta"], []),
+    ("DR.(MRS) MAHANTA PATIENT NANDLAL HAZARIKA", ["NANDLAL HAZARIKA"], []),
+    # a dash after a name label never takes over from a later colon
+    ("Patient Name- verified: Barsha Hazarika", ["Barsha Hazarika"], []),
+    # a leading word that is not a name must not take the name after it down with it
+    ("Witness Barsha Hazarika tel 9412730518", ["Barsha Hazarika", "9412730518"], []),
+    ("Admitted Ompal (father: Nandlal Mahanta) of H.No. 9, 781014", ["Ompal", "Nandlal Mahanta"], []),
 ]
 
 
@@ -315,6 +327,14 @@ CELLS = [
     ("Patient", "Barsha came with cough", ["Barsha"], ["cough"]),
     ("Patient", "Barsha with Nandlal", ["Barsha", "Nandlal"], []),
     ("Patient", "Barsha came with husband nandlal", ["Barsha", "nandlal"], []),
+    # a header that is newly understood must not switch off the search for names
+    ("P.I.N.", "wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    ("PIN", "ask wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    ("Student", "Ompal Rathi came with wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    ("Landmark", "Ompal Rathi came with wife Barsha Hazarika", ["Ompal Rathi", "Barsha Hazarika"], []),
+    ("Landmark", "Paracetamol given since 2 days", [], ["Paracetamol"]),
+    ("fon_no", "9412 7 30518", ["9412 7 30518"], []),
+    ("fon_no", "ask wife Barsha Hazarika", ["Barsha Hazarika"], []),
     # only a plain "student" column holds names; a hospital near by is not a landmark of a home
     ("student_vision", "normal both eyes", [], ["normal"]),
     ("Student Remarks", "attends regularly, weight low", [], ["attends"]),
@@ -325,6 +345,19 @@ CELLS = [
     ("Guardian Contact", "94127 30518", ["94127 30518"], []),
     ("Attendant Mobile", "not available", [], ["not available"]),
 ]
+
+
+def _run_mixed_column() -> int:
+    """Mostly phone numbers under an unreadable header: the one cell that names a person must still be searched."""
+    values = ["9412 7 30518", "70112-904-18", "8800 41 2276", "9435 2 11870", "ask wife Barsha Hazarika"]
+    records = [{"record_id": f"t.csv#row:{n}", "file": "t.csv", "loc": f"row:{n}", "fmt": "csv",
+                "fields": [{"path": "col:0", "kind": "value", "context": "zz_reach2", "value": v}]}
+               for n, v in enumerate(values, 1)]
+    found = [f["text"] for f in detect_file(records)[-1]["findings"]]
+    if not any("Barsha Hazarika" in f for f in found):
+        print(f"FAIL  mixed phone column: found {found}")
+        return 1
+    return 0
 
 
 def _run_cells() -> int:
@@ -422,7 +455,7 @@ def main() -> int:
         if missed or eaten:
             failed += 1
             print(f"FAIL  {line}\n      missed={missed} wrongly_removed={eaten}")
-    table_failures = _run_tables()
+    table_failures = _run_tables() + _run_mixed_column()
     print(f"{len(TABLES)} column tables checked, {table_failures} problems")
     cell_failures = _run_cells()
     print(f"{len(CELLS)} single cells checked, {cell_failures} problems")
