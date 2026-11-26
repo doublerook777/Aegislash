@@ -158,6 +158,29 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   word ("son <diagnosis>") can be removed as a name; in an address cell, "<name> came with <relation> <name>" removes
   only the second name; a bare capital `DR <name>` is not protected as a doctor (on purpose).
 
+## Hindi honorifics, relation words and places in running text (F1)
+- **Cause.** The Hindi cues were weaker than the English and Hinglish ones: only `श्री / श्रीमती / कुमारी / सुश्री` and
+  `पुत्र / पुत्री / पत्नी / सुपुत्र` were cues, and each took the next 3 Hindi words with no check of where the name ends (so
+  `श्रीमती रीना फॉलो-अप ...` removed "फॉलो"). `श्रीमान`, `स्व.`, `पति`, `भाई`, `बेटे`, `बहन`, ... were no cues. `<kin word> जी`
+  and `पति को ...` were read as a name because a bare kin word went through the "<name> जी" and "<name> को" cues. The danda
+  `।` also sits inside the Devanagari block, so `(?![ऀ-ॿ])` made a cue fail at the end of a sentence. Places: only
+  `ग्राम / गाँव / गांव` announced a village; `निवासी X` and `X से (लेकर) आए` did not.
+- **Change.** `names._hindi_cue_names` replaces the two greedy cues. Honorifics (strong: first word is taken if nothing
+  better) and relation words (weak: need an end) are followed by 1-3 Hindi words; the name ends at a comma / danda, at a
+  number or Latin text, or before a word in `names.HI_NOT_NAME` (particles, verb forms, relation words, honorifics, time
+  and medical words, taken from `gazetteer` lists plus a general Hindi vocabulary list). No end and no listed surname means no
+  name (`पति रोज़ ...` stays text). `HI_NOT_NAME` is also part of `STOP`, so a kin word is never trimmed in as a name.
+  `address._NIWASI` and `address._BROUGHT_FROM` add the two place cues (the place cannot be a `HI_NOT_NAME` word:
+  घर, अस्पताल, वहाँ, कल ...). `gazetteer.DEVA_*` are public names for the existing Hindi lists (no new data).
+- **Checks.** selftest 175/175 (12 new cases, 8 fail on the base commit; the other 4 are medical text that must survive);
+  `dev/` sanitized output and `records.jsonl` byte-identical to the base; the committed sets (adversarial, three breaker
+  sets) also byte-identical, so no recorded number changed. These sets do not contain the failing shapes, so this is
+  **not** an unseen measurement.
+- **Left.** Name followed by a word that is neither listed nor a surname (`पति रमेश ऑफिस ...`) is not found by the relation
+  cue (a bare name with no cue is still found by the surname list). `<place> के निवासी`, Hinglish `<place> se laye`,
+  and `मास्टर / सरदार` are not cues. A district written in Devanagari is removed like a village (there is no Devanagari
+  district list).
+
 ## Next (generalisation)
 1. Another round of fresh unseen cases; fix general causes, never single sentences.
 2. Known blind spots: one-word names with no clue (nicknames, "<name> signed"); full names whose surname is not in

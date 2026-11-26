@@ -136,6 +136,10 @@ _DEVA_NOT_NAME = frozenset("""
 भर्ती वाले वाली वाला हेतु लिए लिये द्वारा निवासी ग्राम गाँव गांव मोहल्ला पता फोन फ़ोन मोबाइल नोट लेबल बिना टिप्पणी विवरण
 जांच जाँच रिपोर्ट दवा टैबलेट इंजेक्शन बुखार दर्ज बताया कहा दिया दी गई
 """.split())
+# public names for the Hindi word lists, used by names.py and address.py
+DEVA_SURNAMES = _DEVA_SURNAMES
+DEVA_NOT_NAME = _DEVA_NOT_NAME
+DEVA_PLACE_OR_ORG = _DEVA_PLACE_OR_ORG
 
 
 def _clean(word: str) -> str:

@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 
 from aegis.detect.gazetteer import SURNAMES
-from aegis.detect.names import STOP, find_names
+from aegis.detect.names import HI_NOT_NAME, STOP, find_names
 from aegis.detect.normalize import norm_name
 from aegis.detect.spans import PRIORITY, Cand
 
@@ -40,6 +40,12 @@ _LIVES_IN = re.compile(
     rf"\b(?i:resident of|residing (?:at|in)|resides (?:at|in)|hailing from|hails from|native of|lives (?:at|in))"
     rf" (?:(?i:village|vill\.?|gram) )?(?P<v>{_PLACE_WORD}(?: {_PLACE_WORD}){{0,2}})")
 _THEN_VILLAGE = re.compile(rf"(?<![A-Za-z])(?P<v>{_PLACE_WORD}) (?i:village|gaon)\b|(?<![ऀ-ॿ])(?P<d>{_DEVA_W}(?:-{_DEVA_W})?) (?:गांव|गाँव)(?![ऀ-ॿ])")
+# Hindi: "निवासी रसूलपुर" (resident), and the place a patient was brought from: "<place> से लेकर आए".
+# A word from HI_NOT_NAME (time, "home", "hospital", pronoun ...) is not a place.
+_NIWASI = re.compile(rf"(?<![ऀ-ॿ])निवासी(?![ऀ-ॣॱ-ॿ])[ :.-]+(?P<v>{_DEVA_W}(?: (?:खुर्द|कलां|कलाँ))?)(?![ऀ-ॣॱ-ॿ]|-)")
+_BROUGHT_FROM = re.compile(
+    rf"(?<![ऀ-ॿ-])(?P<v>{_DEVA_W}(?: (?:खुर्द|कलां|कलाँ))?) से (?:(?:ले ?कर|लाकर|ले ?आकर) )?"
+    r"(?:आए|आये|आया|आई|आयी|आईं|लाए|लाये|लाया|लाई|लायी|लाईं)(?![ऀ-ॣॱ-ॿ])")
 DISTRICT_CUE = re.compile(
     rf"(?:\b(?i:district|distt\.?|dist\.?|zila|jila)|(?:जिला|ज़िला|जनपद))[ :.-]+"
     rf"(?P<d>{_PLACE_WORD}(?: {_PLACE_WORD}){{0,2}}|{_DEVA_W})")
@@ -126,6 +132,10 @@ def find_places(text: str, care_of: bool = True) -> list[Cand]:
         if m.group(0)[:3].casefold() == "r/o" and _rules_out(m.group("v"), text[m.end("v"):]):
             continue
         out.append(Cand(m.start("v"), m.end("v"), "VILLAGE", norm_name(m.group("v")), "patient"))
+    for pattern in (_NIWASI, _BROUGHT_FROM):
+        for m in pattern.finditer(text):
+            if m.group("v").split()[0] not in HI_NOT_NAME:
+                out.append(Cand(m.start("v"), m.end("v"), "VILLAGE", norm_name(m.group("v")), "patient"))
     for pattern in (_LIVES_IN, _THEN_VILLAGE):
         for m in pattern.finditer(text):
             group = "v" if m.group("v") else "d"
