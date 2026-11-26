@@ -1,0 +1,6 @@
+DISCHARGE SUMMARY - Rare Disease Registry
+Name: Harbans Lal (Age: 94 Yrs)   UHID: KGH/2026/9012
+Village: Phulpur, District: Prayagraj, PIN: 212402
+Admission: 10/06/2026   Discharge: 2026-07-01T23:55:00+05:30   Follow-up: Nov 2026
+Diagnosis: Rabies, unspecified (A82.9)
+Procedure: Deep brain stimulation

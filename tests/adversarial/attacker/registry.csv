@@ -1,0 +1,121 @@
+rid,name,relation,relative_name,gender,age,house_no,mohalla,village,tehsil,district,pin,phone,email,aadhaar_last4
+ADV1000071,Sunil Verma,S/o,Ramesh Verma,M,34,77,,Bakshi Talab,,Lucknow,226201,6102030679,sunil.verma1@example.com,2832
+ADV1000142,Sunil Verma,S/o,Mohan Verma,M,61,406,,Pindra Kalan,,Varanasi,221206,6450633983,sunil.verma2@example.com,9814
+ADV1000213,Sunil Verma,S/o,Kishan Verma,M,49,38,,Mauranipur,,Jhansi,284204,8577596128,sunil.verma3@example.com,2036
+ADV1000284,Ramesh Kumar,S/o,Suresh Kumar,M,42,419,,Purwa,,Unnao,209825,8035650168,ramesh.kumar4@example.com,7346
+ADV1000355,Ramesh Kumar,S/o,Suresh Kumar,M,29,304,,Safipur,,Unnao,209871,9504955683,ramesh.kumar5@example.com,9287
+ADV1000426,Mohammad Tariq Khan,S/o,Salim Khan,M,44,305,,Biswan,,Sitapur,261201,9277671044,mohammadtariq.khan6@example.com,8994
+ADV1000497,Anjali Tiwari,W/o,Rajesh Tiwari,F,31,252,,Sandila,,Hardoi,241204,7470969393,anjali.tiwari7@example.com,1259
+ADV1000568,Anjali Mishra,W/o,Rajesh Mishra,F,39,192,,Bilgram,,Hardoi,241301,8812442555,anjali.mishra8@example.com,9397
+ADV1000639,Kavya Shukla,D/o,Anurag Shukla,F,0,138,,Keshavpur,,Gorakhpur,273209,8412670702,kavya.shukla9@example.com,8945
+ADV1000710,Bhagwan Das,S/o,Ramphal Das,M,97,51,,Sohawal,,Ayodhya,224188,7419168340,bhagwan.das10@example.com,5153
+ADV1000781,Shyama Kaur,W/o,Baldev Singh,F,102,342,,Khair,,Aligarh,202138,9080934366,shyama.kaur11@example.com,2220
+ADV1000852,Harbans Lal,S/o,Gopal Lal,M,94,206,,Phulpur,,Prayagraj,212402,9470767338,harbans.lal12@example.com,1549
+ADV1000923,Rukmani Devi,W/o,Shivcharan,F,89,495,,Haidergarh,,Barabanki,225124,9498805793,rukmani.devi13@example.com,5543
+ADV1000994,Radhika Kulkarni,W/o,Vasant Kulkarni,F,54,377,,Kothrud,,Pune,411038,9652027679,radhika.kulkarni14@example.com,9602
+ADV1001065,Pranav Deshmukh,S/o,Sharad Deshmukh,M,47,313,,Kamptee,,Nagpur,441002,9691246176,pranav.deshmukh15@example.com,6311
+ADV1001136,Meera Deshpande,W/o,Anil Deshpande,F,38,44,,Alambagh,,Lucknow,226005,9363990676,meera.deshpande16@example.com,5872
+ADV1001207,Pema Choden,D/o,Dorje Wangchuk,F,28,476,,Kurseong,,Darjeeling,734203,7816062273,pema.choden17@example.com,5496
+ADV1001278,Agustín Fonseca,S/o,Mateo Fonseca,M,52,355,,Mapusa,,Goa,403507,8673997291,agustín.fonseca18@example.com,8280
+ADV1001349,Devika Rao,D/o,Rameshwar Rao,F,33,371,,Raja Talab,,Varanasi,221311,9185299354,devika.rao19@example.com,6363
+ADV1001420,Priyanka Sengupta,W/o,Subrata Sengupta,F,41,477,,Sahjanwa,,Gorakhpur,273209,7759130735,priyanka.sengupta20@example.com,9457
+ADV1001491,Rohan Awasthi,S/o,Mahesh Awasthi,M,26,14,,Bikapur,,Ayodhya,224204,8092798567,rohan.awasthi21@example.com,8102
+ADV1001562,Rahul Chaturvedi,S/o,Dinesh Chaturvedi,M,58,45,,Garautha,,Jhansi,284203,7305331651,rahul.chaturvedi22@example.com,8913
+ADV1001633,Lakshmi Iyer,W/o,Venkat Iyer,F,66,178,,Soraon,,Prayagraj,212502,8905782474,lakshmi.iyer23@example.com,1326
+ADV1001704,Gurleen Sandhu,W/o,Harpreet Sandhu,F,45,63,,Atrauli,,Aligarh,202280,8203807386,gurleen.sandhu24@example.com,7178
+ADV1001775,Neha Verma,S/o,Mohan Verma,M,36,337,,Bakshi Talab,,Lucknow,226201,7690329354,neha.verma25@example.com,7463
+ADV1001846,Seema Verma,S/o,Mohan Verma,M,61,18,,Pindra Kalan,,Varanasi,221206,8593387876,seema.verma26@example.com,9266
+ADV1001917,Neha Verma,S/o,Mohan Verma,M,47,25,,Mauranipur,,Jhansi,284204,7428342510,neha.verma27@example.com,4088
+ADV1001988,Suresh Kumar,S/o,Mohan Kumar,M,42,114,,Purwa,,Unnao,209825,8318184948,suresh.kumar28@example.com,8543
+ADV1002059,Pooja Kumar,S/o,Mohan Kumar,M,31,30,,Safipur,,Unnao,209871,7548160894,pooja.kumar29@example.com,7099
+ADV1002130,Neha Khan,S/o,Mohan Khan,M,43,423,,Biswan,,Sitapur,261201,6625267184,neha.khan30@example.com,6775
+ADV1002201,Suresh Tiwari,W/o,Mohan Tiwari,F,34,332,,Sandila,,Hardoi,241204,6012788021,suresh.tiwari31@example.com,6434
+ADV1002272,Amit Mishra,W/o,Mohan Mishra,F,36,474,,Bilgram,,Hardoi,241301,7290288281,amit.mishra32@example.com,2496
+ADV1002343,Kiran Shukla,D/o,Mohan Shukla,F,2,66,,Keshavpur,,Gorakhpur,273209,6782773954,kiran.shukla33@example.com,4908
+ADV1002414,Kiran Das,S/o,Mohan Das,M,94,419,,Sohawal,,Ayodhya,224188,6871855737,kiran.das34@example.com,3024
+ADV1002485,Suresh Kaur,W/o,Mohan Kaur,F,103,142,,Khair,,Aligarh,202138,7232685551,suresh.kaur35@example.com,5126
+ADV1002556,Ravi Lal,S/o,Mohan Lal,M,95,69,,Phulpur,,Prayagraj,212402,6766822920,ravi.lal36@example.com,6607
+ADV1002627,Neha Devi,W/o,Mohan Devi,F,91,278,,Haidergarh,,Barabanki,225124,6555535305,neha.devi37@example.com,9260
+ADV1002698,Neha Kulkarni,W/o,Mohan Kulkarni,F,53,463,,Kothrud,,Pune,411038,9921529728,neha.kulkarni38@example.com,3014
+ADV1002769,Neha Deshmukh,S/o,Mohan Deshmukh,M,45,181,,Kamptee,,Nagpur,441002,9677408314,neha.deshmukh39@example.com,9714
+ADV1002840,Suresh Deshpande,W/o,Mohan Deshpande,F,36,357,,Alambagh,,Lucknow,226005,6423324733,suresh.deshpande40@example.com,6493
+ADV1002911,Seema Choden,D/o,Mohan Choden,F,31,250,,Kurseong,,Darjeeling,734203,6164759647,seema.choden41@example.com,9516
+ADV1002982,Vikas Fonseca,S/o,Mohan Fonseca,M,55,224,,Mapusa,,Goa,403507,6314675909,vikas.fonseca42@example.com,9796
+ADV1003053,Seema Rao,D/o,Mohan Rao,F,35,279,,Raja Talab,,Varanasi,221311,6875976610,seema.rao43@example.com,1203
+ADV1003124,Vikas Sengupta,W/o,Mohan Sengupta,F,43,89,,Sahjanwa,,Gorakhpur,273209,6064851737,vikas.sengupta44@example.com,3417
+ADV1003195,Pooja Awasthi,S/o,Mohan Awasthi,M,25,193,,Bikapur,,Ayodhya,224204,7438725767,pooja.awasthi45@example.com,7301
+ADV1003266,Amit Chaturvedi,S/o,Mohan Chaturvedi,M,55,309,,Garautha,,Jhansi,284203,8180109763,amit.chaturvedi46@example.com,6679
+ADV1003337,Suresh Iyer,W/o,Mohan Iyer,F,63,427,,Soraon,,Prayagraj,212502,7718299269,suresh.iyer47@example.com,9746
+ADV1003408,Kiran Sandhu,W/o,Mohan Sandhu,F,47,118,,Atrauli,,Aligarh,202280,9095225425,kiran.sandhu48@example.com,3830
+ADV1003479,Pooja Verma,S/o,Mohan Verma,M,32,238,,Bakshi Talab,,Lucknow,226201,6786412492,pooja.verma49@example.com,4960
+ADV1003550,Ravi Verma,S/o,Mohan Verma,M,61,94,,Pindra Kalan,,Varanasi,221206,8306977343,ravi.verma50@example.com,1164
+ADV1003621,Neha Verma,S/o,Mohan Verma,M,48,322,,Mauranipur,,Jhansi,284204,9942772947,neha.verma51@example.com,2748
+ADV1003692,Vikas Kumar,S/o,Mohan Kumar,M,41,116,,Purwa,,Unnao,209825,6235092643,vikas.kumar52@example.com,9378
+ADV1003763,Ravi Kumar,S/o,Mohan Kumar,M,26,339,,Safipur,,Unnao,209871,8196911727,ravi.kumar53@example.com,5574
+ADV1003834,Seema Khan,S/o,Mohan Khan,M,41,326,,Biswan,,Sitapur,261201,7208247617,seema.khan54@example.com,9969
+ADV1003905,Amit Tiwari,W/o,Mohan Tiwari,F,29,419,,Sandila,,Hardoi,241204,9541390505,amit.tiwari55@example.com,0941
+ADV1003976,Seema Mishra,W/o,Mohan Mishra,F,37,112,,Bilgram,,Hardoi,241301,8562411757,seema.mishra56@example.com,2850
+ADV1004047,Pooja Shukla,D/o,Mohan Shukla,F,1,371,,Keshavpur,,Gorakhpur,273209,7198605860,pooja.shukla57@example.com,1610
+ADV1004118,Vikas Das,S/o,Mohan Das,M,94,150,,Sohawal,,Ayodhya,224188,7351352929,vikas.das58@example.com,0880
+ADV1004189,Kiran Kaur,W/o,Mohan Kaur,F,100,493,,Khair,,Aligarh,202138,7772970504,kiran.kaur59@example.com,7016
+ADV1004260,Ravi Lal,S/o,Mohan Lal,M,97,325,,Phulpur,,Prayagraj,212402,8550425160,ravi.lal60@example.com,5958
+ADV1004331,Kiran Devi,W/o,Mohan Devi,F,88,250,,Haidergarh,,Barabanki,225124,7526244378,kiran.devi61@example.com,1268
+ADV1004402,Kiran Kulkarni,W/o,Mohan Kulkarni,F,51,455,,Kothrud,,Pune,411038,7448847471,kiran.kulkarni62@example.com,9778
+ADV1004473,Pooja Deshmukh,S/o,Mohan Deshmukh,M,45,150,,Kamptee,,Nagpur,441002,9390868139,pooja.deshmukh63@example.com,0105
+ADV1004544,Ravi Deshpande,W/o,Mohan Deshpande,F,40,103,,Alambagh,,Lucknow,226005,6690485881,ravi.deshpande64@example.com,0492
+ADV1004615,Kiran Choden,D/o,Mohan Choden,F,31,218,,Kurseong,,Darjeeling,734203,7357163166,kiran.choden65@example.com,7383
+ADV1004686,Amit Fonseca,S/o,Mohan Fonseca,M,49,148,,Mapusa,,Goa,403507,6206750049,amit.fonseca66@example.com,4791
+ADV1004757,Suresh Rao,D/o,Mohan Rao,F,31,311,,Raja Talab,,Varanasi,221311,6411067293,suresh.rao67@example.com,4522
+ADV1004828,Pooja Sengupta,W/o,Mohan Sengupta,F,39,103,,Sahjanwa,,Gorakhpur,273209,8512866855,pooja.sengupta68@example.com,1209
+ADV1004899,Seema Awasthi,S/o,Mohan Awasthi,M,28,319,,Bikapur,,Ayodhya,224204,9980017011,seema.awasthi69@example.com,5993
+ADV1004970,Vikas Chaturvedi,S/o,Mohan Chaturvedi,M,55,330,,Garautha,,Jhansi,284203,7129526814,vikas.chaturvedi70@example.com,6842
+ADV1005041,Amit Iyer,W/o,Mohan Iyer,F,66,202,,Soraon,,Prayagraj,212502,7175364094,amit.iyer71@example.com,4890
+ADV1005112,Neha Sandhu,W/o,Mohan Sandhu,F,48,163,,Atrauli,,Aligarh,202280,9288834572,neha.sandhu72@example.com,2557
+ADV1005183,Vikas Verma,S/o,Mohan Verma,M,36,416,,Bakshi Talab,,Lucknow,226201,6909115265,vikas.verma73@example.com,9935
+ADV1005254,Neha Verma,S/o,Mohan Verma,M,58,177,,Pindra Kalan,,Varanasi,221206,7849220655,neha.verma74@example.com,4923
+ADV1005325,Pooja Verma,S/o,Mohan Verma,M,51,437,,Mauranipur,,Jhansi,284204,8754709338,pooja.verma75@example.com,3762
+ADV1005396,Amit Kumar,S/o,Mohan Kumar,M,39,343,,Purwa,,Unnao,209825,7911945651,amit.kumar76@example.com,4702
+ADV1005467,Pooja Kumar,S/o,Mohan Kumar,M,30,138,,Safipur,,Unnao,209871,9722804826,pooja.kumar77@example.com,2359
+ADV1005538,Seema Khan,S/o,Mohan Khan,M,47,298,,Biswan,,Sitapur,261201,9717162775,seema.khan78@example.com,2489
+ADV1005609,Neha Tiwari,W/o,Mohan Tiwari,F,34,283,,Sandila,,Hardoi,241204,6620978847,neha.tiwari79@example.com,3144
+ADV1005680,Neha Mishra,W/o,Mohan Mishra,F,41,398,,Bilgram,,Hardoi,241301,8328365486,neha.mishra80@example.com,8584
+ADV1005751,Vikas Shukla,D/o,Mohan Shukla,F,1,404,,Keshavpur,,Gorakhpur,273209,6671455582,vikas.shukla81@example.com,7013
+ADV1005822,Pooja Das,S/o,Mohan Das,M,96,134,,Sohawal,,Ayodhya,224188,6754154482,pooja.das82@example.com,3525
+ADV1005893,Seema Kaur,W/o,Mohan Kaur,F,102,443,,Khair,,Aligarh,202138,7880250054,seema.kaur83@example.com,7773
+ADV1005964,Ravi Lal,S/o,Mohan Lal,M,95,63,,Phulpur,,Prayagraj,212402,9219807015,ravi.lal84@example.com,4256
+ADV1006035,Neha Devi,W/o,Mohan Devi,F,90,205,,Haidergarh,,Barabanki,225124,7826199763,neha.devi85@example.com,4131
+ADV1006106,Neha Kulkarni,W/o,Mohan Kulkarni,F,53,370,,Kothrud,,Pune,411038,9151554368,neha.kulkarni86@example.com,3042
+ADV1006177,Amit Deshmukh,S/o,Mohan Deshmukh,M,49,77,,Kamptee,,Nagpur,441002,8290440446,amit.deshmukh87@example.com,7342
+ADV1006248,Amit Deshpande,W/o,Mohan Deshpande,F,40,98,,Alambagh,,Lucknow,226005,7671967770,amit.deshpande88@example.com,7440
+ADV1006319,Kiran Choden,D/o,Mohan Choden,F,28,471,,Kurseong,,Darjeeling,734203,8710807772,kiran.choden89@example.com,1534
+ADV1006390,Pooja Fonseca,S/o,Mohan Fonseca,M,55,346,,Mapusa,,Goa,403507,6635693303,pooja.fonseca90@example.com,7159
+ADV1006461,Neha Rao,D/o,Mohan Rao,F,36,482,,Raja Talab,,Varanasi,221311,6598465794,neha.rao91@example.com,3929
+ADV1006532,Amit Sengupta,W/o,Mohan Sengupta,F,44,473,,Sahjanwa,,Gorakhpur,273209,6248127443,amit.sengupta92@example.com,1304
+ADV1006603,Pooja Awasthi,S/o,Mohan Awasthi,M,24,456,,Bikapur,,Ayodhya,224204,9106567644,pooja.awasthi93@example.com,1112
+ADV1006674,Ravi Chaturvedi,S/o,Mohan Chaturvedi,M,56,313,,Garautha,,Jhansi,284203,6588589096,ravi.chaturvedi94@example.com,9484
+ADV1006745,Neha Iyer,W/o,Mohan Iyer,F,63,46,,Soraon,,Prayagraj,212502,7494687103,neha.iyer95@example.com,9239
+ADV1006816,Ravi Sandhu,W/o,Mohan Sandhu,F,47,358,,Atrauli,,Aligarh,202280,9572423880,ravi.sandhu96@example.com,8473
+ADV1006887,Seema Verma,S/o,Mohan Verma,M,34,477,,Bakshi Talab,,Lucknow,226201,8665060893,seema.verma97@example.com,4673
+ADV1006958,Amit Verma,S/o,Mohan Verma,M,58,313,,Pindra Kalan,,Varanasi,221206,6565539005,amit.verma98@example.com,3607
+ADV1007029,Suresh Verma,S/o,Mohan Verma,M,48,293,,Mauranipur,,Jhansi,284204,8513737456,suresh.verma99@example.com,3286
+ADV1007100,Neha Kumar,S/o,Mohan Kumar,M,45,137,,Purwa,,Unnao,209825,9073728634,neha.kumar100@example.com,1308
+ADV1007171,Suresh Kumar,S/o,Mohan Kumar,M,29,342,,Safipur,,Unnao,209871,8811584991,suresh.kumar101@example.com,2363
+ADV1007242,Seema Khan,S/o,Mohan Khan,M,45,203,,Biswan,,Sitapur,261201,8134486094,seema.khan102@example.com,8945
+ADV1007313,Amit Tiwari,W/o,Mohan Tiwari,F,33,257,,Sandila,,Hardoi,241204,7935459508,amit.tiwari103@example.com,1163
+ADV1007384,Kiran Mishra,W/o,Mohan Mishra,F,36,231,,Bilgram,,Hardoi,241301,7141627754,kiran.mishra104@example.com,1719
+ADV1007455,Suresh Shukla,D/o,Mohan Shukla,F,1,225,,Keshavpur,,Gorakhpur,273209,9542389268,suresh.shukla105@example.com,7478
+ADV1007526,Pooja Das,S/o,Mohan Das,M,95,236,,Sohawal,,Ayodhya,224188,9398449081,pooja.das106@example.com,3264
+ADV1007597,Ravi Kaur,W/o,Mohan Kaur,F,102,156,,Khair,,Aligarh,202138,8863810305,ravi.kaur107@example.com,5883
+ADV1007668,Ravi Lal,S/o,Mohan Lal,M,91,134,,Phulpur,,Prayagraj,212402,7411686668,ravi.lal108@example.com,9380
+ADV1007739,Vikas Devi,W/o,Mohan Devi,F,90,427,,Haidergarh,,Barabanki,225124,6293362311,vikas.devi109@example.com,3687
+ADV1007810,Seema Kulkarni,W/o,Mohan Kulkarni,F,53,203,,Kothrud,,Pune,411038,6536906897,seema.kulkarni110@example.com,3677
+ADV1007881,Kiran Deshmukh,S/o,Mohan Deshmukh,M,46,391,,Kamptee,,Nagpur,441002,9595160435,kiran.deshmukh111@example.com,6389
+ADV1007952,Kiran Deshpande,W/o,Mohan Deshpande,F,35,223,,Alambagh,,Lucknow,226005,7426558449,kiran.deshpande112@example.com,7550
+ADV1008023,Vikas Choden,D/o,Mohan Choden,F,27,298,,Kurseong,,Darjeeling,734203,9329347300,vikas.choden113@example.com,0570
+ADV1008094,Pooja Fonseca,S/o,Mohan Fonseca,M,52,12,,Mapusa,,Goa,403507,6995131127,pooja.fonseca114@example.com,3412
+ADV1008165,Seema Rao,D/o,Mohan Rao,F,36,116,,Raja Talab,,Varanasi,221311,6047523970,seema.rao115@example.com,2764
+ADV1008236,Amit Sengupta,W/o,Mohan Sengupta,F,43,330,,Sahjanwa,,Gorakhpur,273209,9233341618,amit.sengupta116@example.com,0793
+ADV1008307,Kiran Awasthi,S/o,Mohan Awasthi,M,24,135,,Bikapur,,Ayodhya,224204,6715213018,kiran.awasthi117@example.com,0421
+ADV1008378,Neha Chaturvedi,S/o,Mohan Chaturvedi,M,61,191,,Garautha,,Jhansi,284203,7436636419,neha.chaturvedi118@example.com,2408
+ADV1008449,Neha Iyer,W/o,Mohan Iyer,F,69,456,,Soraon,,Prayagraj,212502,7630565781,neha.iyer119@example.com,3086
+ADV1008520,Pooja Sandhu,W/o,Mohan Sandhu,F,47,141,,Atrauli,,Aligarh,202280,8480043269,pooja.sandhu120@example.com,7254

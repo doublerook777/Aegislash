@@ -1,0 +1,4 @@
+Patient: Ra​hul‍ Chatur​vedi, Mob: 73053​31651, Aadhaar: 6961​9052​8913.
+Co-admitted: Dеvikа Rаo, contact 9185299354.
+URL ref: https://portal.example/view?patient=Priyanka%20Sengupta&tel=%2B91%207759130735
+BP 118/76 mmHg, Tab Paracetamol 650 mg 1-1-1 x 5 days.
