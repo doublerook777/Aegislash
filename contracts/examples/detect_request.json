@@ -1,0 +1,30 @@
+[
+  {
+    "record_id": "notes/nn_01.txt#@file",
+    "file": "notes/nn_01.txt",
+    "loc": "@file",
+    "fmt": "text",
+    "fields": [
+      {
+        "path": "filename",
+        "kind": "filename",
+        "context": null,
+        "value": "nn_01.txt"
+      }
+    ]
+  },
+  {
+    "record_id": "notes/nn_01.txt#doc",
+    "file": "notes/nn_01.txt",
+    "loc": "doc",
+    "fmt": "text",
+    "fields": [
+      {
+        "path": "text",
+        "kind": "text",
+        "context": null,
+        "value": "Shahid sahab ka BP 117/82. Dr. Ramesh ne dekha. Attendant (S/o Zubair) ph 9876543210."
+      }
+    ]
+  }
+]

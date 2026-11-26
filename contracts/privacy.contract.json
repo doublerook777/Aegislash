@@ -1,0 +1,75 @@
+{
+  "name": "privacy",
+  "provider": "privacy",
+  "consumer": "io",
+  "setup": {
+    "call": "aegis.privacy:plan",
+    "args": [{"$file": "contracts/examples/privacy_plan_request.json", "$key": "results"},
+             {"$file": "contracts/examples/privacy_plan_request.json", "$key": "keys"}],
+    "env": {"RAKSHA_SECRET": "practice"},
+    "as": "plan"
+  },
+  "cases": [
+    {
+      "case": "DOB is shifted and keeps DD/MM/YYYY",
+      "call": "aegis.privacy:replace",
+      "args": [{"$ref": "plan"}, "registration/sanjeevani_registration.csv#row:0",
+               {"path": "col:3", "start": 0, "end": 10, "type": "DOB", "text": "12/04/1977", "norm": "1977-04-12", "role": "patient"}],
+      "env": {"RAKSHA_SECRET": "practice"},
+      "expect": "return",
+      "deterministic": true,
+      "response_schema": {"allOf": [{"$ref": "#/$defs/Replacement"},
+        {"properties": {"text": {"type": "string", "pattern": "^\\d{2}/\\d{2}/\\d{4}$", "not": {"const": "12/04/1977"}},
+                        "status": {"const": "generalized"}}}]},
+      "example_only": {"equals": {"text": "03/07/1977", "status": "generalized"}}
+    },
+    {
+      "case": "patient name in a linked record becomes its PSN",
+      "call": "aegis.privacy:replace",
+      "args": [{"$ref": "plan"}, "notes/nn_01.txt#doc",
+               {"path": "text", "start": 0, "end": 6, "type": "PATIENT_NAME", "text": "Shahid", "norm": "shahid", "role": "patient"}],
+      "env": {"RAKSHA_SECRET": "practice"},
+      "expect": "return",
+      "response_schema": {"allOf": [{"$ref": "#/$defs/Replacement"},
+        {"properties": {"text": {"type": "string", "pattern": "^PSN-[0-9A-HJKMNP-TV-Z]{6}$"}}}]}
+    },
+    {
+      "case": "phone becomes a placeholder with no original digits",
+      "call": "aegis.privacy:replace",
+      "args": [{"$ref": "plan"}, "notes/nn_01.txt#doc",
+               {"path": "text", "start": 74, "end": 84, "type": "PHONE", "text": "9876543210", "norm": "9876543210", "role": "patient"}],
+      "env": {"RAKSHA_SECRET": "practice"},
+      "expect": "return",
+      "response_schema": {"allOf": [{"$ref": "#/$defs/Replacement"},
+        {"properties": {"text": {"type": "string", "not": {"pattern": "\\d{4}"}}}}]}
+    },
+    {
+      "case": "unknown finding type fails closed",
+      "call": "aegis.privacy:replace",
+      "args": [{"$ref": "plan"}, "notes/nn_01.txt#doc",
+               {"path": "text", "start": 0, "end": 6, "type": "SOMETHING_NEW", "text": "Shahid", "norm": null, "role": null}],
+      "env": {"RAKSHA_SECRET": "practice"},
+      "expect": "return",
+      "response_schema": {"type": "object", "properties": {"text": {"const": "[REDACTED]"}, "status": {"const": "sanitized"}}}
+    },
+    {
+      "case": "unknown record_id raises KeyError",
+      "call": "aegis.privacy:replace",
+      "args": [{"$ref": "plan"}, "nope#doc",
+               {"path": "text", "start": 0, "end": 6, "type": "PHONE", "text": "9876543210", "norm": "9876543210", "role": null}],
+      "env": {"RAKSHA_SECRET": "practice"},
+      "expect": "raise",
+      "exception": "KeyError"
+    },
+    {
+      "case": "stats shape",
+      "call": "aegis.privacy:stats",
+      "args": [{"$ref": "plan"}],
+      "env": {"RAKSHA_SECRET": "practice"},
+      "expect": "return",
+      "response_schema": {"type": "object", "required": ["records_generalized", "records_suppressed"],
+        "properties": {"records_generalized": {"type": "integer", "minimum": 0},
+                       "records_suppressed": {"type": "integer", "minimum": 0}}}
+    }
+  ]
+}

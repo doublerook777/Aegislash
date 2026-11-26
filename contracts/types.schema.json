@@ -1,0 +1,65 @@
+{
+  "$comment": "Machine-readable shapes from contracts/types.md. If they disagree, fix this file to match types.md.",
+  "$defs": {
+    "Finding": {
+      "type": "object",
+      "required": ["path", "start", "end", "type", "text", "norm", "role"],
+      "properties": {
+        "path": {"type": "string"},
+        "start": {"type": "integer", "minimum": 0},
+        "end": {"type": "integer", "minimum": 1},
+        "type": {"enum": ["PATIENT_NAME", "RELATIVE_NAME", "PHONE", "AADHAAR", "AADHAAR_MASKED", "ABHA_NUMBER",
+                          "ABHA_ADDRESS", "EMAIL", "MRN", "PAN", "INSURANCE_ID", "HOUSE", "LOCALITY", "LANDMARK",
+                          "OTHER_ID", "DOB", "DATE", "AGE", "VILLAGE", "PIN", "CONDITION", "DISTRICT", "GENDER"]},
+        "text": {"type": "string", "minLength": 1},
+        "norm": {"type": ["string", "null"]},
+        "role": {"enum": ["patient", "relative", null]}
+      }
+    },
+    "NameMention": {
+      "type": "object",
+      "required": ["text", "norm", "script", "role", "relation"],
+      "properties": {
+        "text": {"type": "string"}, "norm": {"type": "string"},
+        "script": {"enum": ["latin", "deva", "hinglish"]},
+        "role": {"enum": ["patient", "relative"]},
+        "relation": {"enum": ["S/o", "D/o", "W/o", "C/O", null]}
+      }
+    },
+    "Evidence": {
+      "type": "object",
+      "required": ["record_id", "names", "ids", "dob", "age", "gender", "village", "district", "pin", "hospital"],
+      "properties": {
+        "record_id": {"type": "string"},
+        "names": {"type": "array", "items": {"$ref": "#/$defs/NameMention"}},
+        "ids": {"type": "array", "items": {"type": "object", "required": ["type", "norm"],
+                "properties": {"type": {"enum": ["PHONE", "AADHAAR", "ABHA_NUMBER", "ABHA_ADDRESS", "EMAIL", "MRN", "PAN", "INSURANCE_ID"]},
+                               "norm": {"type": "string", "minLength": 1}}}},
+        "dob": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "age": {"type": ["integer", "null"], "minimum": 0, "maximum": 130},
+        "gender": {"enum": ["M", "F", null]},
+        "village": {"type": ["string", "null"]},
+        "district": {"type": ["string", "null"]},
+        "pin": {"type": ["string", "null"]},
+        "hospital": {"type": ["string", "null"]}
+      }
+    },
+    "RecordResult": {
+      "type": "object",
+      "required": ["record_id", "findings", "evidence"],
+      "properties": {
+        "record_id": {"type": "string"},
+        "findings": {"type": "array", "items": {"$ref": "#/$defs/Finding"}},
+        "evidence": {"$ref": "#/$defs/Evidence"}
+      }
+    },
+    "Replacement": {
+      "type": "object",
+      "required": ["text", "status"],
+      "properties": {
+        "text": {"type": ["string", "null"]},
+        "status": {"enum": ["sanitized", "generalized", "suppressed"]}
+      }
+    }
+  }
+}

@@ -1,0 +1,73 @@
+[
+  {
+    "record_id": "notes/nn_01.txt#doc",
+    "names": [
+      {
+        "text": "Shahid",
+        "norm": "shahid",
+        "script": "hinglish",
+        "role": "patient",
+        "relation": null
+      },
+      {
+        "text": "Zubair",
+        "norm": "zubair",
+        "script": "hinglish",
+        "role": "relative",
+        "relation": "S/o"
+      }
+    ],
+    "ids": [],
+    "dob": null,
+    "age": null,
+    "gender": "M",
+    "village": null,
+    "district": null,
+    "pin": null,
+    "hospital": "asr"
+  },
+  {
+    "record_id": "registration/arogya_legacy_export.csv#row:4",
+    "names": [
+      {
+        "text": "Shahid Mohammad",
+        "norm": "shahid mohammad",
+        "script": "latin",
+        "role": "patient",
+        "relation": null
+      },
+      {
+        "text": "Zubair Mohammad",
+        "norm": "zubair mohammad",
+        "script": "latin",
+        "role": "relative",
+        "relation": "S/o"
+      }
+    ],
+    "ids": [
+      {
+        "type": "MRN",
+        "norm": "010607"
+      }
+    ],
+    "dob": "1961-03-02",
+    "age": 64,
+    "gender": "M",
+    "village": "bilgram",
+    "district": "hardoi",
+    "pin": "241301",
+    "hospital": "asr"
+  },
+  {
+    "record_id": "opd/x.json#/visits/0",
+    "names": [],
+    "ids": [],
+    "dob": null,
+    "age": null,
+    "gender": null,
+    "village": null,
+    "district": null,
+    "pin": null,
+    "hospital": null
+  }
+]

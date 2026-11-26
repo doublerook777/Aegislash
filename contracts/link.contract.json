@@ -1,0 +1,53 @@
+{
+  "name": "link",
+  "provider": "link",
+  "consumer": "io",
+  "cases": [
+    {
+      "case": "example evidence: Shahid note + registration row linked, empty record unlinked",
+      "call": "aegis.link:resolve",
+      "args": [{"$file": "contracts/examples/link_request.json"}],
+      "env": {"RAKSHA_SECRET": "practice"},
+      "expect": "return",
+      "deterministic": true,
+      "checks": ["keys_match_arg0_record_ids", "reversed_input_same_output"],
+      "response_schema": {"type": "object", "additionalProperties": {"type": ["string", "null"]}},
+      "example_only": {"equals": {"$file": "contracts/examples/link_response.json"}}
+    },
+    {
+      "case": "empty list",
+      "call": "aegis.link:resolve",
+      "args": [[]],
+      "env": {"RAKSHA_SECRET": "practice"},
+      "expect": "return",
+      "response_schema": {"type": "object", "maxProperties": 0}
+    },
+    {
+      "case": "secret missing raises secret_missing",
+      "call": "aegis.link:resolve",
+      "args": [{"$file": "contracts/examples/link_request.json"}],
+      "env": {"RAKSHA_SECRET": ""},
+      "expect": "raise",
+      "exception": "RuntimeError",
+      "message": "secret_missing"
+    },
+    {
+      "case": "pseudonym format",
+      "call": "aegis.link:pseudonym",
+      "args": ["k:7f3a"],
+      "env": {"RAKSHA_SECRET": "practice"},
+      "expect": "return",
+      "deterministic": true,
+      "response_schema": {"type": "string", "pattern": "^PSN-[0-9A-HJKMNP-TV-Z]{6}$"}
+    },
+    {
+      "case": "pseudonym changes with a different secret",
+      "call": "aegis.link:pseudonym",
+      "args": ["k:7f3a"],
+      "env": {"RAKSHA_SECRET": "practice"},
+      "expect": "return",
+      "checks": ["differs_under_env:RAKSHA_SECRET=other-secret"],
+      "response_schema": {"type": "string"}
+    }
+  ]
+}

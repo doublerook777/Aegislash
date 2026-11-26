@@ -1,0 +1,31 @@
+{
+  "name": "detect",
+  "provider": "detect",
+  "consumer": "io",
+  "cases": [
+    {
+      "case": "example note: patient, relative, phone found; Dr. Ramesh kept",
+      "call": "aegis.detect:detect_file",
+      "args": [{"$file": "contracts/examples/detect_request.json"}],
+      "expect": "return",
+      "deterministic": true,
+      "checks": ["same_length_as_arg0", "spans_match_arg0"],
+      "response_schema": {"type": "array", "items": {"$ref": "#/$defs/RecordResult"}},
+      "example_only": {"equals": {"$file": "contracts/examples/detect_response.json"}}
+    },
+    {
+      "case": "empty list",
+      "call": "aegis.detect:detect_file",
+      "args": [{"$file": "contracts/examples/detect_request_empty.json"}],
+      "expect": "return",
+      "response_schema": {"type": "array", "maxItems": 0}
+    },
+    {
+      "case": "internal error raises (mock: any file containing 'bad'); io quarantines with detect_error",
+      "call": "aegis.detect:detect_file",
+      "args": [{"$file": "contracts/examples/detect_request_bad.json"}],
+      "expect": "raise",
+      "mock_only": true
+    }
+  ]
+}

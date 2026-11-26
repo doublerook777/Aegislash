@@ -1,0 +1,82 @@
+[
+  {
+    "record_id": "notes/nn_01.txt#@file",
+    "findings": [],
+    "evidence": {
+      "record_id": "notes/nn_01.txt#@file",
+      "names": [],
+      "ids": [],
+      "dob": null,
+      "age": null,
+      "gender": null,
+      "village": null,
+      "district": null,
+      "pin": null,
+      "hospital": null
+    }
+  },
+  {
+    "record_id": "notes/nn_01.txt#doc",
+    "findings": [
+      {
+        "path": "text",
+        "start": 0,
+        "end": 6,
+        "type": "PATIENT_NAME",
+        "text": "Shahid",
+        "norm": "shahid",
+        "role": "patient"
+      },
+      {
+        "path": "text",
+        "start": 63,
+        "end": 69,
+        "type": "RELATIVE_NAME",
+        "text": "Zubair",
+        "norm": "zubair",
+        "role": "relative"
+      },
+      {
+        "path": "text",
+        "start": 74,
+        "end": 84,
+        "type": "PHONE",
+        "text": "9876543210",
+        "norm": "9876543210",
+        "role": "patient"
+      }
+    ],
+    "evidence": {
+      "record_id": "notes/nn_01.txt#doc",
+      "names": [
+        {
+          "text": "Shahid",
+          "norm": "shahid",
+          "script": "hinglish",
+          "role": "patient",
+          "relation": null
+        },
+        {
+          "text": "Zubair",
+          "norm": "zubair",
+          "script": "hinglish",
+          "role": "relative",
+          "relation": "S/o"
+        }
+      ],
+      "ids": [
+        {
+          "type": "PHONE",
+          "norm": "9876543210"
+        }
+      ],
+      "dob": null,
+      "age": null,
+      "gender": "M",
+      "village": null,
+      "district": null,
+      "pin": null,
+      "hospital": null
+    }
+  }
+]
