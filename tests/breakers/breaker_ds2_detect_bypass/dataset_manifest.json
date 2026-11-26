@@ -1,0 +1,42 @@
+{
+  "schema": "raksha-dataset/1",
+  "name": "breaker_ds2_detect_bypass",
+  "description": "Detect blindspots: lowercase PAN, slash/paren phones & STD landlines, invalid-checksum synthetic Aadhaar, unseen headers/keys, URL-encoded PII, Cyrillic homoglyphs",
+  "counts": {
+    "files": 6,
+    "units": 13,
+    "entities": 42
+  },
+  "attacks": [
+    {
+      "file": "billing/lowercase_pan_claims.csv",
+      "attack": "Lowercase and mixed-case PAN identifiers",
+      "fails_because": "aegis/detect/ids.py:20 compiles PAN = [A-Z]{5}\\d{4}[A-Z] without re.I, causing lowercase/mixed-case PANs to bypass unlabelled PAN detection."
+    },
+    {
+      "file": "notes/escalation_unseen_phones.txt",
+      "attack": "Slash-separated phones, parenthesized mobiles, STD landlines behind unseen labels (caller=, dial:, helpline#)",
+      "fails_because": "ids.py:25-30 _PHONE_BODY lacks '/' and '(xxx) xxx-xxxx' patterns and STD landlines; ids.py:59 _LABELLED omits caller/dial/helpline#/emergency_num."
+    },
+    {
+      "file": "registration/synthetic_aadhaar_variants.csv",
+      "attack": "Mixed-separator Aadhaar, leading-1 Aadhaar, numeric-only MRN + unseen Hindi headers (pehchaan_sankhya, parchi_no, dak_code, rogee_vyakti)",
+      "fails_because": "ids.py:19 AADHAAR backreference \\1 rejects '4567-8901 2345', [2-9] rejects '1234...', MRN_SHAPES rejects pure digits without known MRN header."
+    },
+    {
+      "file": "misc/unscanned_json_keys.json",
+      "attack": "Patient names placed as JSON object keys under 'escalation_map' and 'ward_assignments'",
+      "fails_because": "aegis/detect/engine.py restricts JSON-key name extraction to specific parent patterns (like 'by_*'), missing names inside arbitrary maps."
+    },
+    {
+      "file": "notes/url_homoglyph_medical_trap.txt",
+      "attack": "URL-encoded path (%5C/_), Cyrillic lookalike characters in name, and same-name Dr./Patient homonym with medical eponyms",
+      "fails_because": "%5C delimiters fuse path tokens preventing name match; Cyrillic U+0430 breaks Latin dictionaries/tokenizers; Dr./patient homonym risks either leaking patient or redacting clinician."
+    },
+    {
+      "file": "opd/deva_digits_and_doctor_col.csv",
+      "attack": "Devanagari slash-phone digits + unseen column headers + doctor column with <50% Dr. prefixes (1 of 3)",
+      "fails_because": "Devanagari slash-phone bypasses PHONE patterns; PR #8 doctor-column heuristic checks if >50% of names appear with 'Dr.' elsewhere, misclassifying unprefixed clinicians."
+    }
+  ]
+}

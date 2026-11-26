@@ -1,0 +1,6 @@
+{
+  "doc_type": "consent_and_referral",
+  "data_uri_note": "data:text/plain;base64,Q29uc2VudCBzaWduZWQgYnkgRmFyemFuYSBCZWd1bSwgQWFkaGFhciA0NTY3IDg5MDEgMjM0NSwgbW9iIDk4MjIzMzQ0NTUsIENBTkFSWV9EUzFfQjY0VVJJ",
+  "wrapped_referral_b64": "UmVmZXJyYWwgZm9yIE1haGVuZHJhIFNp\nbmdoIFJhd2F0LCBQaG9uZSA5ODIyMzM0\nNDY2LCBNUk4gS0dNVS8yNi85OTEwNA==",
+  "clinical_summary": "Cholecystectomy planned, NPO after midnight"
+}

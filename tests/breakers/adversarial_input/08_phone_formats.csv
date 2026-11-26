@@ -1,0 +1,11 @@
+id,name,contact,village
+1,Patient1,"+91-98765-43210",Village1
+2,Patient2,"+91 9876543211",Village2
+3,Patient3,"0091-9876543212",Village3
+4,Patient4,"(987) 654-3213",Village4
+5,Patient5,"987.654.3214",Village5
+6,Patient6,"9876 543 215",Village6
+7,Patient7,"98765-43216",Village7
+8,Patient8,"Tel: 9876543217",Village8
+9,Patient9,"Ph.No.9876543218",Village9
+10,Patient10,"Mob:9876543219",Village10

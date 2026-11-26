@@ -1,0 +1,43 @@
+{
+  "schema": "raksha-report/1",
+  "files": [
+    {
+      "input_sha256": "cac80c7f662c7e2bf565da333b70eb1fd751e238b3fd5a470b1c3deeabffdfcf",
+      "output": "sanitized/hosp_a/jhansi_reg.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "3afbb08be0d5432ec53ab44d0e0ef8f331a8152796ad5fac9804011884ce2a63",
+      "output": "sanitized/hosp_b/hindi_opd.tsv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "b8b6ea734f63d4ec1d5eaf40979d6893005aeb8621615f6398f951ed417a7cc5",
+      "output": "sanitized/hosp_c/lab_note.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "1d52b498c04009d92dbd64775292817f3613c5922189a3a92a397a6c34a10aca",
+      "output": "sanitized/hosp_d/ward_followup.json",
+      "status": "sanitized"
+    }
+  ],
+  "counts": {
+    "files_total": 4,
+    "files_sanitized": 4,
+    "files_quarantined": 0,
+    "records_processed": 14,
+    "identifiers_detected": 0,
+    "records_linked": 0,
+    "records_generalized": 0,
+    "records_suppressed": 0,
+    "records_quarantined": 0
+  },
+  "entities": {},
+  "timing": {
+    "seconds": 0.06
+  },
+  "resources": {
+    "peak_rss_mb": 0.0
+  }
+}

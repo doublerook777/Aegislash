@@ -1,0 +1,79 @@
+{
+  "attack_vectors": [
+    {
+      "file": "01_base64_hidden_pii.json",
+      "attack": "PII inside base64 blob",
+      "fails_if": "detect misses encoded name/phone"
+    },
+    {
+      "file": "02_unicode_escape_name.json",
+      "attack": "\\u-escaped Devanagari name",
+      "fails_if": "detect misses unicode-escaped name"
+    },
+    {
+      "file": "03_zero_width_chars.csv",
+      "attack": "Zero-width chars in name",
+      "fails_if": "leakgate or detect fails to strip/match ZWC"
+    },
+    {
+      "file": "Zubair_Hussain_Dialysis_2024.csv",
+      "attack": "PII in filename",
+      "fails_if": "@file record not flagged, output file not renamed"
+    },
+    {
+      "file": "05_pii_in_header.csv",
+      "attack": "PII in CSV column header",
+      "fails_if": "@file record doesn't include header names"
+    },
+    {
+      "file": "06_deep_nested.json",
+      "attack": "1000-level deep JSON",
+      "fails_if": "RecursionError crash instead of quarantine"
+    },
+    {
+      "file": "07_mixed_delimiters.csv",
+      "attack": "Header=comma, rows=semicolon",
+      "fails_if": "_sniff_delimiter picks wrong delimiter"
+    },
+    {
+      "file": "08_phone_formats.csv",
+      "attack": "10 phone number formats",
+      "fails_if": "any phone leaks through"
+    },
+    {
+      "file": "09_aadhaar_formats.csv",
+      "attack": "6 Aadhaar formats",
+      "fails_if": "any Aadhaar leaks through"
+    },
+    {
+      "file": "10_split_name.json",
+      "attack": "Name split across first/last fields",
+      "fails_if": "detect only checks concatenated text, misses split"
+    },
+    {
+      "file": "11_medical_confusion.txt",
+      "attack": "Dr./C/O/H/O medical context mix",
+      "fails_if": "Dr. Suresh or C/O names flagged as patient PII"
+    },
+    {
+      "file": "12_homoglyphs.csv",
+      "attack": "Cyrillic lookalike chars in name",
+      "fails_if": "name not caught due to non-ASCII chars"
+    },
+    {
+      "file": "13_large_5000_records.csv",
+      "attack": "5000 record performance stress",
+      "fails_if": "timeout, OOM, or non-deterministic output"
+    },
+    {
+      "file": "14_k_anon_violator.csv",
+      "attack": "Unique quasi-identifier (k=1)",
+      "fails_if": "k-anonymity violation not generalized/suppressed"
+    },
+    {
+      "file": "15_pii_in_json_keys.json",
+      "attack": "Patient name as JSON object key",
+      "fails_if": "detect only scans values, misses keys"
+    }
+  ]
+}

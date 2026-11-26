@@ -1,0 +1,6 @@
+id,name,phone,age,gender,village,diagnosis
+1,Shahid Khan,9876543210,34,M,Rampur,Diabetes
+2,Priya Devi,9876543211,34,F,Rampur,Hypertension
+3,Arjun Mehra,9876543212,34,M,Rampur,CKD
+4,Govind Lal,9876543213,78,M,Bhogpur,CKD
+5,Sunita Devi,9876543214,34,F,Rampur,Anemia

@@ -1,0 +1,32 @@
+{
+  "schema": "raksha-dataset/1",
+  "name": "breaker_ds3_link_privacy",
+  "description": "Linkage fragmentation (cross-script phonetic/initial/nickname) + privacy k-anonymity bypass (micro-batch <10 profiles + unredacted Tehsil/Block quasi-identifiers)",
+  "counts": {
+    "files": 4,
+    "units": 14,
+    "entities": 81
+  },
+  "attacks": [
+    {
+      "file": "hosp_a/jhansi_reg.csv",
+      "attack": "8-patient micro-batch (<10 profiles) + rare diseases + elderly (89, 92, 134) + Tehsil/Block quasi-identifiers + same-name homonym pair",
+      "fails_because": "privacy/engine.py:163 sets enforce_k = len(profiles) >= 10 -> False, disabling ALL k-anonymity suppression/widening; and Tehsil/Block survive even when [DISTRICT] is suppressed."
+    },
+    {
+      "file": "hosp_b/hindi_opd.tsv",
+      "attack": "Cross-script phonetic spelling difference (Tiwari vs तिवाडी) + unseen Hindi headers without strong IDs",
+      "fails_because": "aegis/link/resolver.py struggles to link cross-script phonetic variants when strong IDs are absent and Hindi columns omit standard anchors."
+    },
+    {
+      "file": "hosp_c/lab_note.txt",
+      "attack": "Initial-only name ('S. Tiwari') + slash-phone ('981/000/1001') + 1-year age drift",
+      "fails_because": "Initial-only names + unrecognized slash phones reduce linkage evidence, fragmenting P1 and P6 across files."
+    },
+    {
+      "file": "hosp_d/ward_followup.json",
+      "attack": "Nickname ('Shailu' for 'Shailendra') + same-name/age/gender/district homonym pair differentiated only by phone/relative/tehsil",
+      "fails_because": "Nickname fragments PT001 into an orphan cluster; homonym pair tests strict phone guard without false merges."
+    }
+  ]
+}

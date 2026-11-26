@@ -1,0 +1,53 @@
+{
+  "schema": "raksha-report/1",
+  "files": [
+    {
+      "input_sha256": "9f64f90e933d9140b17d94641c662e5503f7e912d1c8261059fd87de1d9d5284",
+      "output": "sanitized/billing/lowercase_pan_claims.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "82bedd00929408eb34e3e1e08d4906eb050aeb7340337dd56f29bc82e51866cc",
+      "output": "sanitized/misc/unscanned_json_keys.json",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "3082b4aa9dada35bd9767017759ea2e631d74d1314c26d189feb787a616e7e1d",
+      "output": "sanitized/notes/escalation_unseen_phones.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "cbc3263cea311ce9b2aaeed7c6e4e873b76f2715e10341bff6687a89d94b8955",
+      "output": "sanitized/notes/url_homoglyph_medical_trap.txt",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "89bebcd4835aa910ff0be80f370c8c29f574f76a03240fe89ad02c88d01f712e",
+      "output": "sanitized/opd/deva_digits_and_doctor_col.csv",
+      "status": "sanitized"
+    },
+    {
+      "input_sha256": "7cd460f3c958a7d8f2b777f4170223d2020f4d213f4de46cd46e92946fc494b4",
+      "output": "sanitized/registration/synthetic_aadhaar_variants.csv",
+      "status": "sanitized"
+    }
+  ],
+  "counts": {
+    "files_total": 6,
+    "files_sanitized": 6,
+    "files_quarantined": 0,
+    "records_processed": 13,
+    "identifiers_detected": 0,
+    "records_linked": 0,
+    "records_generalized": 0,
+    "records_suppressed": 0,
+    "records_quarantined": 0
+  },
+  "entities": {},
+  "timing": {
+    "seconds": 0.1
+  },
+  "resources": {
+    "peak_rss_mb": 0.0
+  }
+}
