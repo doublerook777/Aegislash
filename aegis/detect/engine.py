@@ -1,0 +1,370 @@
+"""detect_file: the real implementation of contracts/detect.md.
+
+For one file:
+  1. work out the role of every column / JSON key (labels.py, then the values themselves)
+  2. collect candidates for every field (structured rules + free-text rules)
+  3. copy names and record numbers found anywhere to everywhere else in the file
+     (file names, headers, metadata, narrative text)
+  4. drop overlaps, then build the Evidence for linking
+
+Pure: no printing, files or network. No iteration over sets (output must be deterministic).
+"""
+from __future__ import annotations
+
+import re
+
+from aegis.detect import address, dates, evidence, fields, ids, names
+from aegis.detect.labels import classify, tokens
+from aegis.detect.normalize import DEVA, fold, norm_name
+from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
+from aegis.types import STRONG_ID_TYPES, Record, RecordResult, empty_evidence
+
+NAME_TYPES = ("PATIENT_NAME", "RELATIVE_NAME")
+# two or more of these words mean the sentence is Hinglish (Hindi written in Latin letters)
+_HINGLISH = re.compile(r"\b(?:ka|ki|ke|ko|ne|hai|hain|nahi|raha|rahe|rahi|gaya|gayi|diya|liya|se|mein|aur|ji|sahab|behenji|bhai)\b")
+_CONDITION_KEYS = ("diagnosis", "diagnoses", "condition", "dx", "icd", "निदान")
+_LABEL_LINE = re.compile(r"^\s*(?:[-*•]\s*)?(?P<label>[^:=\n]{1,40}?)\s*(?::(?!\d|//)|=| - | – )[ \t]*(?P<value>.*)$")
+
+
+# ---------------------------------------------------------------- 1. roles
+
+def _segments(path: str) -> list[str]:
+    return [p.replace("~1", "/").replace("~0", "~") for p in path.split("/")[1:]]
+
+
+def _json_label(path: str) -> tuple[str, tuple[str, ...]]:
+    keys = [p for p in _segments(path) if not p.isdigit()]
+    if not keys:
+        return "", ()
+    return keys[-1], tuple(keys[:-1])
+
+
+def _fhir_types(records: list[Record]) -> dict[str, str]:
+    """pointer of an object -> its FHIR resourceType."""
+    return {f["path"].rsplit("/", 1)[0]: f["value"] for r in records for f in r["fields"]
+            if f["path"].startswith("/") and f["path"].endswith("/resourceType")}
+
+
+def _fhir_role(path: str, role: str | None, types: dict[str, str]) -> str | None:
+    parts = path.split("/")
+    for i in range(len(parts) - 1, 0, -1):
+        kind = types.get("/".join(parts[:i]))
+        if kind:
+            below = [p for p in parts[i:] if not p.isdigit()]
+            break
+    else:
+        return role
+    if "subject" in below and below[-1] == "display":
+        return "patient_name"
+    if below[-1] == "display" and any(p in below for p in ("author", "performer", "requester", "recorder", "asserter")):
+        return "doctor"
+    if "name" in below:
+        if kind in ("Practitioner", "PractitionerRole"):
+            return "doctor"
+        if kind not in ("Patient", "RelatedPerson", "Person"):
+            return "keep"
+        if kind == "RelatedPerson" or "contact" in below:
+            return "relative_name"
+        return {"given": "first_name", "family": "last_name"}.get(below[-1], "patient_name")
+    if "relationship" in below:
+        return "relation"
+    return role
+
+
+_PAIR_VALUE = re.compile(r"^(?:value[A-Za-z]*|answer|val|data_value)$")
+_PAIR_LABEL = ("url", "field", "label", "key", "name", "attribute", "question")
+
+
+def _pair_role(path: str, by_path: dict[str, str]) -> str | None:
+    """{"url": ".../mothers-name", "valueString": X}  or  {"field": "mobile", "value": X}."""
+    holder, _, key = path.rpartition("/")
+    if not _PAIR_VALUE.match(key):
+        return None
+    for label_key in _PAIR_LABEL:
+        label = by_path.get(f"{holder}/{label_key}")
+        if label:
+            role = classify(re.split(r"[/#]", label.rstrip("/"))[-1])
+            return None if role in ("keep", "free", "date", "name") else role
+    return None
+
+
+def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
+    types = _fhir_types(records)
+    roles: dict[tuple[str, str], str | None] = {}
+    by_path = {f["path"]: f["value"] for r in records for f in r["fields"] if f["path"].startswith("/")}
+    columns: dict[str, list[tuple[str, str]]] = {}
+    for r in records:
+        for f in r["fields"]:
+            key = (r["record_id"], f["path"])
+            if f["kind"] != "value":
+                continue
+            if f["path"].startswith("col:"):
+                role = classify(f["context"] or "")
+                columns.setdefault(f["path"], []).append(key)
+            else:
+                label, parents = _json_label(f["path"])
+                role = classify(label, parents)
+                if types:
+                    role = _fhir_role(f["path"], role, types)
+                role = _pair_role(f["path"], by_path) or role
+                columns.setdefault(re.sub(r"/\d+(?=/|$)", "/*", f["path"]), []).append(key)
+            roles[key] = role
+    # unknown column: decide from its values (hidden data renames headers)
+    values = {(r["record_id"], f["path"]): f["value"] for r in records for f in r["fields"]}
+    for keys in columns.values():
+        if roles[keys[0]] is None:
+            guess = _guess_role([values[k] for k in keys if values[k].strip()])
+            for k in keys:
+                roles[k] = guess
+    return roles
+
+
+_COMMON_SURNAMES = frozenset("""kumar singh devi yadav sharma verma gupta mishra tiwari pandey patel ansari khan bano
+siddiqui qureshi chauhan chaudhary choudhary paswan nishad lodhi maurya rajput thakur shukla dubey srivastava kaur
+masih ahmed ali begum prasad lal ram das""".split())
+
+
+def _guess_role(vals: list[str]) -> str | None:
+    if len(vals) < 3:
+        return None
+    people = [v for v in vals if re.fullmatch(r"[A-Z][A-Za-z.']*(?: [A-Z][A-Za-z.']*){1,3}", v.strip())]
+    with_surname = [v for v in people if set(v.casefold().split()) & _COMMON_SURNAMES]
+    if len(people) >= 0.7 * len(vals) and len(with_surname) >= 0.4 * len(vals):
+        return "patient_name"
+    return None
+
+
+# ---------------------------------------------------------------- 2. candidates
+
+def _labelled(text: str, dmy: bool) -> list[Cand]:
+    """'Patient Name: X        Age/Sex: 52/F' lines inside free text."""
+    out = []
+    pos = 0
+    for line in text.split("\n"):
+        # several "label: value" pairs can share a line, separated by wide gaps or pipes
+        for m in re.finditer(r"(?:(?! {3}|\t|\|).)+", line):
+            lab = _LABEL_LINE.match(m.group(0))
+            if not lab:
+                continue
+            label = lab.group("label")
+            dashed = not re.match(r"\s*[:=]", m.group(0)[lab.end("label"):])
+            # a dash is a weak separator ("Ward 4 - ..."): require the label to be short and digit-free
+            if dashed and (len(label.split()) > 5 or any(ch.isdigit() for ch in label)):
+                continue
+            role = classify(label)
+            if role in (None, "free", "keep", "doctor", "date", "relation", "tehsil"):
+                continue
+            base = pos + m.start()
+            found = fields.structured(text, base + lab.start("value"), base + lab.end("value"), role, dmy)
+            if role in fields.NAME_ROLES:
+                relation = fields.relation_of(label)
+                father = re.search(r"father|पिता", label, re.I)
+                found = [c._replace(relation=c.relation or relation or ("S/o" if father else None)) for c in found]
+            out.extend(found)
+        pos += len(line) + 1
+    return out
+
+
+def _conditions(text: str, role: str | None, label: str, parents: tuple[str, ...]) -> list[Cand]:
+    """CONDITION is information for privacy (rare-disease handling), not an identifier."""
+    out = []
+    if set(tokens(label)) & set(_CONDITION_KEYS) or (set(parents) & set(_CONDITION_KEYS) and label in ("display", "code", "text")):
+        if text.strip():
+            out.append(Cand(0, len(text), "CONDITION", " ".join(text.casefold().split()), None))
+    for m in re.finditer(r"\bK/C/O +(?P<c>[^\n.;,|]{2,50}?)(?=$|[\n.;,|]| x \d)", text):
+        if not m.group("c").startswith(("DM/HTN", ":")):
+            out.append(Cand(m.start("c"), m.end("c"), "CONDITION", m.group("c").casefold(), None))
+    return out
+
+
+def _next_to_mrn(text: str, found: list[Cand]) -> list[Cand]:
+    """In headers, keys and file names, a word right after a record number is the patient's name."""
+    out = []
+    for c in found:
+        if c.type == "MRN":
+            m = re.compile(r"[ _:|-]+(?P<name>[A-Z][a-z]+(?:[ _][A-Z][a-z]+){0,2})(?![A-Za-z])").match(text, c.end)
+            if m and m.group("name").casefold() not in names.STOP:
+                out.append(Cand(m.start("name"), m.end("name"), "PATIENT_NAME", None, "patient"))
+    return out
+
+
+def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
+    text = fold(f["value"])
+    kind = f["kind"]
+    label, parents = ("", ())
+    if kind == "value":
+        label, parents = (f["context"] or "", ()) if f["path"].startswith("col:") else _json_label(f["path"])
+
+    found = ids.find_ids(text)
+    if role in fields.ID_ROLES:
+        found = []  # structured() returns the same ids, or the whole value if no shape matched
+    if role in ("doctor", "keep", "relation", "tehsil", "gender", "district", "village"):
+        extra: list[Cand] = []
+    else:
+        extra = dates.find_dates(text, dmy, is_dob_field=role == "dob")
+    found += extra
+    if role not in (None, "free"):
+        found += fields.structured(text, 0, len(text), role, dmy)
+
+    if role in (None, "free", "date"):
+        found += dates.find_ages(text)
+        found += address.find_places(text)
+        found += names.find_names(text)
+        found += _labelled(text, dmy)
+    found += names.find_path_names(text)
+    if kind in ("header", "key", "filename"):
+        found += _next_to_mrn(text, found)
+    if kind == "key":
+        # {"by_name": {"<person>": ...}}: the key itself is the person's name
+        holder = f["path"][4:].rsplit("/", 1)[0].rsplit("/", 1)[-1]
+        if classify(holder.replace("by_", "")) in ("patient_name", "name") and holder.startswith("by_"):
+            found += fields.name_value(text, 0, len(text), "name")
+    found += _conditions(text, role, label, parents)
+
+    blocked = names.protected_spans(text)
+    return [c for c in found
+            if not (c.type in NAME_TYPES and any(c.start < e and s < c.end for s, e in blocked))]
+
+
+# ---------------------------------------------------------------- 3. propagation
+
+def _word_pattern(words: list[str]) -> str:
+    body = r"[ _.-]+".join(re.escape(w) for w in words)
+    if DEVA.search(body):
+        return rf"(?<![ऀ-ॿ]){body}(?![ऀ-ॿ])"
+    return rf"(?<![A-Za-z]){body}(?![A-Za-z])"
+
+
+# Speed: a known value is only searched for in fields that contain its first word.
+# Without this index a 2,000-row export takes (rows x names) regex searches.
+_TOKEN = re.compile(r"[A-Za-z]+|[ऀ-ॿ]+|\d+")
+
+
+def _anchor(value: str) -> str:
+    m = _TOKEN.search(value)
+    return m.group(0).casefold() if m else ""
+
+
+def _known_values(cands: list[Cand], text: str) -> list[tuple[str, str, Cand, bool]]:
+    """(first word, regex, template candidate, file-wide?) for every value worth searching for again."""
+    out = []
+    for c in cands:
+        surface = text[c.start:c.end]
+        if c.type in NAME_TYPES:
+            words = [w for w in surface.split() if w]
+            useful = [w.strip(".") for w in words if len(w.strip(".")) >= 3
+                      and w.strip(".").casefold() not in names.GENERIC | (names.STOP - {"asha"})]
+            if len(words) > 1:
+                out.append((_anchor(words[0]), _word_pattern(words), c, True))
+            for w in useful:
+                out.append((_anchor(w), _word_pattern([w]), c, False))
+        elif c.type == "MRN" and c.norm:
+            runs = re.findall(r"\d+", surface)
+            cores = [c.norm] + ([runs[-1]] if runs else [])
+            for core in dict.fromkeys(cores):
+                if len(core) >= 6:
+                    out.append((core, rf"(?<!\d){core}(?!\d)", c, True))
+        elif c.type == "VILLAGE" and len(surface) >= 4:
+            out.append((_anchor(surface), _word_pattern(surface.split()), c, False))
+    return out
+
+
+def _add(index: dict, anchor: str, pattern: str, c: Cand) -> None:
+    index.setdefault(anchor, {}).setdefault(pattern, c)
+
+
+def _propagate(records: list[Record], per_field: dict) -> None:
+    single = sum(r["loc"] != "@file" for r in records) <= 1
+    wide: dict = {}                    # first word -> {regex: candidate}, usable anywhere in the file
+    local: dict[str, dict] = {}        # record_id -> same shape, usable inside that record
+    any_record: dict = {}              # every local value, for file names / headers / keys / metadata
+    for (rid, path), (text, cands) in per_field.items():
+        for anchor, pattern, c, file_wide in _known_values(cands, text):
+            if file_wide or single:
+                _add(wide, anchor, pattern, c)
+            else:
+                _add(local.setdefault(rid, {}), anchor, pattern, c)
+                _add(any_record, anchor, pattern, c)
+    compiled: dict[str, re.Pattern] = {}
+    info = {(r["record_id"], f["path"]): (f["kind"], r["loc"]) for r in records for f in r["fields"]}
+    for (rid, path), (text, cands) in per_field.items():
+        kind, loc = info[(rid, path)]
+        # file names, headers, keys and file metadata may mention anyone in the file
+        scope = any_record if kind in ("filename", "header", "key") or loc == "@file" else local.get(rid, {})
+        wanted: dict[str, Cand] = {}
+        for token in dict.fromkeys(t.casefold() for t in _TOKEN.findall(text)):
+            for index in (wide, scope):
+                for pattern, c in index.get(token, {}).items():
+                    wanted.setdefault(pattern, c)
+        if not wanted:
+            continue
+        blocked = names.protected_spans(text)
+        for pattern, c in wanted.items():
+            rx = compiled.get(pattern) or compiled.setdefault(pattern, re.compile(pattern, re.I))
+            for m in rx.finditer(text):
+                if c.type in NAME_TYPES:
+                    if any(m.start() < e and s < m.end() for s, e in blocked):
+                        continue
+                    if not (DEVA.search(m.group(0)) or m.group(0)[0].isupper()):
+                        continue
+                    norm = None
+                else:
+                    norm = c.norm
+                cands.append(Cand(m.start(), m.end(), c.type, norm, c.role, prio=PROPAGATED, relation=c.relation))
+
+
+# ---------------------------------------------------------------- 4. results
+
+def detect_file(records: list[Record]) -> list[RecordResult]:
+    if not records:
+        return []
+    roles = field_roles(records)
+    texts = [fold(f["value"]) for r in records for f in r["fields"]]
+    headers = [f["context"] or f["value"] for r in records for f in r["fields"]
+               if f["kind"] == "header" or f["path"].startswith("col:")]
+    dmy = dates.day_first(texts, list(dict.fromkeys(headers)))
+
+    per_field = {}
+    for r in records:
+        for f in r["fields"]:
+            key = (r["record_id"], f["path"])
+            per_field[key] = (fold(f["value"]), candidates(f, roles.get(key), dmy))
+    _propagate(records, per_field)
+
+    out: list[RecordResult] = []
+    whole_text = "\n".join(texts)
+    for r in records:
+        findings, meta = [], {}
+        relation_value = None
+        for f in r["fields"]:
+            key = (r["record_id"], f["path"])
+            role = roles.get(key)
+            if role == "relation":
+                relation_value = fields.relation_of(f["value"]) or relation_value
+            for c in resolve(per_field[key][1]):
+                surface = f["value"][c.start:c.end]
+                norm = c.norm
+                who = c.role
+                if c.type in STRONG_ID_TYPES or c.type == "AADHAAR_MASKED":
+                    who = who or "patient"
+                if c.type in NAME_TYPES:
+                    norm = norm_name(surface) or None
+                    who = "relative" if c.type == "RELATIVE_NAME" else "patient"
+                    hinglish = c.hinglish or len(_HINGLISH.findall(f["value"])) >= 2
+                    script = "deva" if DEVA.search(surface) else ("hinglish" if hinglish else "latin")
+                    part = role if role in ("first_name", "last_name") else None
+                    meta[(f["path"], c.start)] = (script, c.relation, part)
+                findings.append({"path": f["path"], "start": c.start, "end": c.end, "type": c.type,
+                                 "text": surface, "norm": norm, "role": who})
+        if r["loc"] == "@file":
+            ev = empty_evidence(r["record_id"])
+        else:
+            record_text = "\n".join(fold(f["value"]) for f in r["fields"])
+            if r["fmt"] in ("text", "fhir"):
+                record_text = whole_text
+            ev = evidence.build(r["record_id"], findings, meta, record_text, r["file"])
+            for mention in ev["names"]:
+                if mention["role"] == "relative" and mention["relation"] is None:
+                    mention["relation"] = relation_value
+        out.append({"record_id": r["record_id"], "findings": findings, "evidence": ev})
+    return out
