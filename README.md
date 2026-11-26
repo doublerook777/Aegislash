@@ -79,6 +79,19 @@ Export: sanitized/ + report.json + records.jsonl (verified by final leak gate)
 - **Fail-closed behavior:** Unknown finding types map to `[REDACTED]`; unparseable dates map to `[DATE]`; broken/unsupported files are quarantined rather than copied raw.
 - **Determinism:** Records and profiles are processed in sorted order with no set-iteration ordering dependence, ensuring byte-identical outputs for identical inputs and secrets.
 
+## Measured Results (`dev/input`, `main` integration)
+
+| Metric | Measured Value | Source |
+|---|---|---|
+| Personal data leaked (overall / Hindi / Hinglish) | `1.1%` (`35/3230`; `latin 1.2%`, `deva 0.0%`, `hinglish 0.0%`; `content 0.0%`, `filename 72.9%`) | `check_dev.py` |
+| Planted canaries leaked | `0 / 4` | `check_dev.py` |
+| Medical values preserved | `100.0%` (`4496 / 4497`) | `check_dev.py` |
+| Patient linking (precision / recall / F0.5) | `0.99 / 0.90 / 0.97` (`765 / 819` records linked, `1` wrong merge) | `check_dev.py` |
+| Equivalence classes & A2/A4 / A5 risk | `35/49` unique on `(age_band, gender, district)`; A2/A4 est. `conf >= 0.5`: `32.7%`; A5 rare+narrow-QI hits: `0 / 18` | `scripts/risk_report.py` |
+| Unseen-label self-test (perturbed headers/keys/labels) | `3.2%` leaked (`102/3230`), `0/4` canaries, `100.0%` medical kept (`4312/4313`); `38/38` `aegis.detect.selftest` | `check_dev.py` / `selftest.py` |
+| Runtime & determinism | `6.05 s` (`200` files, `819` records); byte-identical repeat runs & secret-keyed unlinkability verified | `report.json` / 3-run check |
+| Contracts & privacy unit tests | `13/13` contract cases passing; `6/6` `aegis/privacy/test_privacy.py` passing | `check_contracts.py` / `unittest` |
+
 ## Known Limitations
 
 - All four modules (`io`, `detect`, `link`, `privacy`) are integrated on `main` (`1.1%` overall leak in `check_dev.py` driven by `35` filename leaks and `0.0%` content leaks; `100.0%` medical values kept; `0.97` linking F0.5). Some compact age strings (`54/F`, `97/M`, `Age: 0/F`) and filename tokens remain unflagged by `detect`, which elevates simulated A2/A4 registry uniqueness (`32.7%` est. `conf >= 0.5`).
