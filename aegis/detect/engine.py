@@ -15,7 +15,7 @@ import re
 
 from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
 from aegis.detect.labels import classify, tokens
-from aegis.detect.normalize import DEVA, fold, norm_name
+from aegis.detect.normalize import DEVA, fold, norm_name, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
 from aegis.types import STRONG_ID_TYPES, Record, RecordResult, empty_evidence
 
@@ -141,8 +141,10 @@ def _guess_role(vals: list[str]) -> str | None:
                                                      for c in address.find_places(fold(v)))]
     if len(addresses) >= 0.6 * len(vals) and all(len(v) <= 90 for v in vals):
         return "address"
-    people = [v for v in vals if re.fullmatch(r"[A-Z][A-Za-z.']*(?: [A-Z][A-Za-z.']*){1,3}", v.strip())]
-    with_surname = [v for v in people if set(v.casefold().split()) & gazetteer.SURNAMES]
+    folded = [fold(v).strip() for v in vals]
+    people = [v for v in folded
+              if re.fullmatch(r"[A-Z][A-Za-z.']*(?: [A-Z][A-Za-z.']*){1,3}", v) or fields.surname_first(v)]
+    with_surname = [v for v in people if set(v.casefold().replace(",", " ").split()) & gazetteer.SURNAMES]
     if len(people) >= 0.7 * len(vals) and len(with_surname) >= 0.4 * len(vals):
         return "patient_name"
     return None
@@ -259,7 +261,8 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
         found += dates.find_ages(text)
         found += address.find_places(text)
         found += names.find_names(text)
-        found += gazetteer.find_listed_names(text, names.STOP)
+        # in a file name "_" separates words
+        found += gazetteer.find_listed_names(text.replace("_", " ") if kind == "filename" else text, names.STOP)
         found += _labelled(text, dmy)
     found += names.find_path_names(text)
     if kind in ("header", "key", "filename"):
@@ -310,7 +313,10 @@ def _known_values(cands: list[Cand], text: str) -> list[tuple[str, str, Cand, bo
     for c in cands:
         surface = text[c.start:c.end]
         if c.type in NAME_TYPES:
-            words = [w for w in surface.split() if w]
+            words = surface.replace(",", " ").split()
+            if "," in surface and len(words) > 1:           # "Surname, Given" is usually written "Given Surname"
+                given_first = words[1:] + words[:1]
+                out.append((_anchor(given_first[0]), _word_pattern(given_first), c, True))
             useful = [w.strip(".") for w in words if len(w.strip(".")) >= 3
                       and w.strip(".").casefold() not in names.GENERIC | (names.STOP - {"asha"})]
             if len(words) > 1:
@@ -381,6 +387,30 @@ def _propagate(records: list[Record], per_field: dict) -> None:
 # ---------------------------------------------------------------- 4. results
 
 def detect_file(records: list[Record]) -> list[RecordResult]:
+    """Hidden characters are removed before detection; findings point back into the original values."""
+    originals: dict[tuple[str, str], tuple[str, list[int]]] = {}
+    cleaned = []
+    for r in records:
+        fields_ = []
+        for f in r["fields"]:
+            text, kept = visible(f["value"])
+            if kept is not None:
+                originals[(r["record_id"], f["path"])] = (f["value"], kept)
+                f = {**f, "value": text}
+            fields_.append(f)
+        cleaned.append({**r, "fields": fields_})
+    results = _detect(cleaned)
+    for result in results:
+        for finding in result["findings"]:
+            key = (result["record_id"], finding["path"])
+            if key in originals:
+                value, kept = originals[key]
+                start, end = kept[finding["start"]], kept[finding["end"] - 1] + 1
+                finding.update(start=start, end=end, text=value[start:end])
+    return results
+
+
+def _detect(records: list[Record]) -> list[RecordResult]:
     if not records:
         return []
     roles = field_roles(records)
@@ -413,7 +443,8 @@ def detect_file(records: list[Record]) -> list[RecordResult]:
                 if c.type in STRONG_ID_TYPES or c.type == "AADHAAR_MASKED":
                     who = who or "patient"
                 if c.type in NAME_TYPES:
-                    norm = norm_name(surface) or None
+                    last, comma, given = surface.partition(",")
+                    norm = norm_name(f"{given} {last}" if comma else surface) or None
                     who = "relative" if c.type == "RELATIVE_NAME" else "patient"
                     hinglish = c.hinglish or len(_HINGLISH.findall(f["value"])) >= 2
                     script = "deva" if DEVA.search(surface) else ("hinglish" if hinglish else "latin")

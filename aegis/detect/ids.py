@@ -17,7 +17,8 @@ EMAIL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+
 ABHA_ADDR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._]*@(?:abdm|sbx|ndhm|abha)" + _R, re.I)
 ABHA_NUM = re.compile(_L + r"\d{2}([- ])\d{4}\1\d{4}\1\d{4}(?!\d)")
 AADHAAR_MASKED = re.compile(r"(?<![A-Za-z0-9])(?:[Xx*•]{4}[- ]?){2}\d{4}(?!\d)")
-AADHAAR = re.compile(_L + r"(?<![\d][- /.])[2-9]\d{3}([- ]?)\d{4}\1\d{4}(?![- /.]?\d)" + _R)
+# grouped 4-4-4 (the two separators may differ: "1234-5678 9012") or not grouped at all
+AADHAAR = re.compile(_L + r"(?<![\d][- /.])[2-9]\d{3}(?:[- ]\d{4}[- ]\d{4}|\d{8})(?![- /.]?\d)" + _R)
 PAN = re.compile(_L + r"[A-Z]{5}\d{4}[A-Z]" + _R, re.I)
 INSURANCE = re.compile(
     _L + r"(?:[A-Z]{2,10}-POL(?:[-/]\d+){1,4}|PMJAY(?:[-/ ]?[A-Z]{2,3})?(?:[-/]\d{2,4})?[-/ ]?\d{6,}"
@@ -27,13 +28,16 @@ _PHONE_BODY = (r"(?:[6-9]\d{4}[- .]?\d{5}"            # 98765 43210
                r"|[6-9]\d{2}[- .]\d{3}[- .]\d{4}"      # 987-654-3210
                r"|[6-9]\d{3}[- .]\d{3}[- .]\d{3}"       # 9876-543-210
                r"|[6-9]\d\.\d{2}\.\d{2}\.\d{4}"            # 98.76.54.3210
-               r"|[6-9]\d(?: \d{2}){4})")                         # 98 76 54 32 10
+               r"|[6-9]\d(?: \d{2}){4}"                          # 98 76 54 32 10
+               r"|[6-9]\d(?:\.\d{2}){4})")                      # 98.76.54.32.10
 PHONE = re.compile(r"(?<![A-Za-z0-9])(?:(?:\(\+?91\)|\+91|0091|91(?=[- ])|0)[- .]{0,2})?"
                    + _PHONE_BODY + r"(?!\d|[-/]\d|[A-Za-z])")
 
 # "(912) 455-7781", "934/221/6650": brackets round the first three digits, or slashes between 3-3-4
 PHONE_GROUPED = re.compile(r"(?<![A-Za-z0-9/])(?:\+91[- .]?)?(?:\([6-9]\d{2}\)[- .]?\d{3}[- .]?\d{4}|[6-9]\d{2}/\d{3}/\d{4})"
                            r"(?!\d|[-/]\d|[A-Za-z])")
+# after "+91" the ten digits may be grouped any way: "+91/9788/002233"
+PHONE_INTL = re.compile(r"(?<![A-Za-z0-9])\+91[- ./]{0,2}[6-9](?:[- ./]?\d){9}(?!\d|[-/]\d|[A-Za-z])")
 # landlines: an STD code starting with 0, then the number, 10 or 11 digits in all
 # ("0512-2345678", "(0581) 456789", "022 2567 8901")
 LANDLINE = re.compile(r"(?<![A-Za-z0-9/.-])(?:\(0[1-9]\d{1,3}\)[- ]?\d{6,8}|0[1-9]\d{1,3}-\d{6,8}"
@@ -105,7 +109,7 @@ def find_ids(text: str) -> list[Cand]:
     for m in AADHAAR.finditer(text):
         d = digits(m.group(0))
         # "91 + mobile" is also 12 digits: only call it Aadhaar if grouped 4-4-4 or the checksum fits
-        looks_phone = d.startswith("91") and d[2] in "6789" and not m.group(1) and not _verhoeff_ok(d)
+        looks_phone = d.startswith("91") and d[2] in "6789" and m.group(0).isdigit() and not _verhoeff_ok(d)
         if not looks_phone:
             out.append(Cand(m.start(), m.end(), "AADHAAR", d))
     for kind, pattern in _LABELLED:
@@ -120,6 +124,8 @@ def find_ids(text: str) -> list[Cand]:
     for m in PHONE.finditer(text):
         out.append(Cand(m.start(), m.end(), "PHONE", phone_norm(m.group(0))))
     for m in PHONE_GROUPED.finditer(text):
+        out.append(Cand(m.start(), m.end(), "PHONE", phone_norm(m.group(0))))
+    for m in PHONE_INTL.finditer(text):
         out.append(Cand(m.start(), m.end(), "PHONE", phone_norm(m.group(0))))
     for m in LANDLINE.finditer(text):
         d = digits(m.group(0))

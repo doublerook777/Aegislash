@@ -76,12 +76,25 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   all words from real identifiers. Dataset 4 was **not** rerun (not in the repo), and is no longer unseen for detect.
 - Known false positive: `Lot no 0912-334455` reads as a landline.
 
+## Fixes after the retest of `a7faabf`
+- Added: `98.76.54.32.10` phones; any grouping after `+91`; Aadhaar with two different separators; hidden characters
+  (removed for detection, positions mapped back); look-alike Cyrillic / Greek letters in words that also have Latin
+  letters; accented letters matched as plain ones; `_` splits words in file names; `Surname, Given` in name columns;
+  a bare year in a birth column (`DOB`, `norm` null); `yob`, `rogee`, `postal6`-style and `pehchaan_sankhya` labels
+  (the last two are narrow, chosen after seeing the failing cases).
+- Leaks on the committed sets, before -> after, on Linux: `tests/adversarial` 19 -> 6 of 157; breaker set 2 8 -> 1 of 40;
+  set 3 4 -> 3 of 80; set 1 5 -> 5 of 35. Medical values kept: same counts. Dev output identical (apart from
+  `report.json` timing and memory). **These are not unseen results:** the fixes were written from these failures.
+- Left: URL-encoded names, wrapped / `data:` base64 and base64 file names (look like `io` work); names with no
+  label or surname clue; a person as a key or under `reviewer`.
+- Known false positive: `2025-2026 2027` reads as Aadhaar (with matching separators it already did).
+
 ## Next (generalisation)
 1. Another round of fresh unseen cases; fix general causes, never single sentences.
 2. Known blind spots: one-word names with no clue (nicknames, "<name> signed"); full names whose surname is not in
-   `gazetteer.py` and that have no cue; "Surname, Given" order; a doctor written without "Dr." in running text can be
+   `gazetteer.py` and that have no cue; "Surname, Given" order in running text; a doctor written without "Dr." in running text can be
    removed as a patient name (also true for a doctor column with an unreadable header: it counts as doctors only if
   more than half its names appear as `Dr. <name>` elsewhere, so that patients are never exposed by one shared name);
   lowercase names with an unlisted surname; a person used as a JSON key outside the tables above;
-   year-of-birth fields; zero-width characters and look-alike letters.
+   a zero-width character used in place of the space between two names.
 3. The 1 lost medical value and 1 wrong merge on practice data (find which module causes each).
