@@ -15,7 +15,7 @@ import base64
 import binascii
 import re
 
-from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
+from aegis.detect import address, dates, evidence, fields, gazetteer, hl7, ids, names
 from aegis.detect.labels import _owner, category_column, classify, extra_checks, names_a_relative, tokens
 from aegis.detect.normalize import DEVA, decode_view, digits, fold, norm_name, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
@@ -449,8 +449,13 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
     found = [c for c in found if not (c.type == "DATE" and any(h.start <= c.start and c.end <= h.end for h in houses))]
 
     blocked = names.protected_spans(text)
-    return [c for c in found
-            if not (c.type in NAME_TYPES and any(c.start < e and s < c.end for s, e in blocked))]
+    found = [c for c in found
+             if not (c.type in NAME_TYPES and any(c.start < e and s < c.end for s, e in blocked))]
+    # an HL7 v2 message: the segment and field position decide (not filtered by word lists)
+    if kind in ("text", "value") and hl7.is_message(text):
+        structured_found, stamps = hl7.find(text)
+        found = [c for c in found if not any(c.start < e and s < c.end for s, e in stamps)] + structured_found
+    return found
 
 
 # ---------------------------------------------------------------- 3. propagation
@@ -625,7 +630,7 @@ def _detect(records: list[Record]) -> list[RecordResult]:
                     who = who or "patient"
                 if c.type in NAME_TYPES:
                     last, comma, given = surface.partition(",")
-                    norm = norm_name(f"{given} {last}" if comma else surface) or None
+                    norm = c.full_name or norm_name(f"{given} {last}" if comma else surface) or None
                     who = "relative" if c.type == "RELATIVE_NAME" else "patient"
                     hinglish = c.hinglish or len(_HINGLISH.findall(f["value"])) >= 2
                     script = "deva" if DEVA.search(surface) else ("hinglish" if hinglish else "latin")

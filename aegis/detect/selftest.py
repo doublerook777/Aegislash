@@ -535,6 +535,77 @@ def _run_filenames() -> int:
     return failed
 
 
+# HL7 v2 messages saved as text (invented data): each segment is {field number: text}; the separator between segments
+# is given per message (\n, \r or \r\n). (segments, separator, strings that MUST be found, strings that MUST survive)
+_MSH = "MSH|^~" + _BS + "&|ADT1|CITYCLINIC|LIS|CITYCLINIC|20250614093015||ORU^R01|C20991|P|2.5"
+
+
+def _seg(name: str, fields: dict[int, str]) -> str:
+    return name + "".join("|" + fields.get(i, "") for i in range(1, max(fields) + 1))
+
+
+HL7_MESSAGES = [
+    ([_MSH,
+      _seg("PID", {1: "1", 2: "88120045", 3: "702194^^^CC^MR~551203998877^^^GOV^NI", 5: "GUPTA^NEELAM^KAMLA", 6: "MISHRA^SAVITRI",
+                   7: "19720809", 8: "F", 11: "14 Gandhi Marg^Behind Post Office^Raebareli^UP^229001^IN",
+                   13: "0535-2271904^PRN^PH~9936120045^PRN^CP", 19: "334-55-9021"}),
+      _seg("NK1", {1: "1", 2: "TIWARI^ASHOK", 3: "BRO", 4: "7 Station Road^^Raebareli^UP^229001", 5: "9936555010"}),
+      _seg("PV1", {1: "1", 2: "I", 3: "MEDWARD^12^B", 7: "4455^SHARMA^KIRAN", 44: "20250613120000"}),
+      _seg("OBR", {1: "1", 2: "ORD551", 3: "FIL778", 4: "CBC^Complete Blood Count", 7: "20250614080000"}),
+      _seg("OBX", {1: "1", 2: "NM", 3: "718-7^Hemoglobin^LN", 5: "9.8", 6: "g/dL", 7: "12.0-15.5", 8: "L", 11: "F"}),
+      _seg("OBX", {1: "2", 2: "ST", 3: "630-4^Culture^LN", 5: "No growth after 48 hours", 11: "F"}),
+      _seg("NTE", {1: "1", 3: "Result discussed with Neelam Gupta."})],
+     "\n",
+     ["GUPTA", "NEELAM", "KAMLA", "MISHRA", "SAVITRI", "702194", "551203998877", "19720809", "334-55-9021", "14 Gandhi Marg",
+      "Behind Post Office", "Raebareli", "229001", "0535-2271904", "9936120045", "TIWARI", "ASHOK", "7 Station Road", "9936555010",
+      "Neelam Gupta"],
+     ["Hemoglobin", "9.8", "g/dL", "12.0-15.5", "718-7", "No growth after 48 hours", "MEDWARD", "Complete Blood Count",
+      "20250614093015", "20250614080000", "20250613120000", "CITYCLINIC", "ORD551", "FIL778"]),
+    # segments ending in a bare carriage return (the HL7 standard), and a guarantor and an insured person
+    ([_MSH.replace("20250614093015", "202507021415"),
+      _seg("EVN", {1: "A04", 2: "202507021415"}),
+      _seg("PID", {1: "1", 3: "KM-904170^^^SUN^MR", 5: "VERMA^SUNITA", 7: "19881104", 8: "F", 11: "22 Lake View^^Mohan Nagar^MP^462003",
+                   13: "(0755)4017733"}),
+      _seg("GT1", {1: "1", 3: "VERMA^PRAKASH", 5: "5 Temple Rd^^Mohan Nagar^MP^462003", 6: "9425011100"}),
+      _seg("IN1", {1: "1", 2: "PLAN9", 4: "STAR CARE", 16: "VERMA^SUNITA", 17: "SELF", 18: "19881104", 36: "POL4455120"}),
+      _seg("OBX", {1: "1", 2: "NM", 3: "2160-0^Creatinine^LN", 5: "1.1", 6: "mg/dL", 7: "0.6-1.2", 8: "N"})],
+     "\r",
+     ["VERMA", "SUNITA", "PRAKASH", "KM-904170", "19881104", "22 Lake View", "Mohan Nagar", "462003", "(0755)4017733", "5 Temple Rd",
+      "9425011100", "POL4455120"],
+     ["Creatinine", "1.1", "mg/dL", "0.6-1.2", "2160-0", "202507021415", "PLAN9", "STAR CARE", "SUNRISEMED"]),
+    # not a message: pipes in ordinary text, and a message with no MSH line, are read as free text only
+    (["Rx|Tab Paracetamol 500 mg|1-0-1", "BP|112/78|mmHg"], "\n", [], ["Paracetamol", "112/78"]),
+]
+
+
+def _run_hl7() -> int:
+    failed = 0
+    for segments, sep, must_find, must_keep in HL7_MESSAGES:
+        text = sep.join(segments) + sep
+        record = {"record_id": "m.txt#doc", "file": "m.txt", "loc": "doc", "fmt": "text",
+                  "fields": [{"path": "text", "kind": "text", "context": None, "value": text}]}
+        findings = detect_file([record])[0]["findings"]
+        kept = [f for f in findings if f["type"] not in ("CONDITION", "DISTRICT", "GENDER")]
+        found = [f["text"] for f in kept]
+        missed = [x for x in must_find if not any(x in f for f in found)]
+        eaten = [x for x in must_keep if any(x in f or f in x for f in found)]
+        # every finding replaced by a placeholder: same segments, same number of fields, same separators in each
+        out = text
+        for f in sorted(kept, key=lambda f: -f["start"]):
+            out = out[:f["start"]] + "[X]" + out[f["end"]:]
+        was, now = text.split(sep), out.split(sep)
+        shape = len(was) == len(now) and all(a.count("|") == b.count("|") and a.count("~") == b.count("~")
+                                             and (len(a.split("|")[0]) == 3) == (len(b.split("|")[0]) == 3)
+                                             and (a.split("|")[0] == b.split("|")[0]) for a, b in zip(was, now))
+        if segments[0].startswith("MSH"):
+            shape = shape and all(a.count("^") >= b.count("^") for a, b in zip(was, now)) and all(
+                a.count("^") == b.count("^") for a, b in zip(was, now) if not a.startswith("NTE"))
+        if missed or eaten or not shape:
+            failed += 1
+            print(f"FAIL  HL7 message {segments[2][:30]}...: missed={missed} wrongly_removed={eaten} shape_kept={shape}")
+    return failed
+
+
 def main() -> int:
     failed = 0
     for line, must_find, must_keep in CASES:
@@ -551,6 +622,9 @@ def main() -> int:
     table_failures += cell_failures
     doc_failures = _run_docs() + _run_filenames()
     print(f"{len(DOCS)} JSON documents and {len(FILENAMES)} file names checked, {doc_failures} problems")
+    hl7_failures = _run_hl7()
+    print(f"{len(HL7_MESSAGES)} HL7 v2 messages checked, {hl7_failures} problems")
+    doc_failures += hl7_failures
     print(f"{len(CASES) - failed}/{len(CASES)} cases passed")  # keep last: tools read the last line
     return 1 if failed or table_failures or doc_failures else 0
 

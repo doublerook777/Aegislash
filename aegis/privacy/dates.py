@@ -36,6 +36,7 @@ _DMY_MON_RX = re.compile(
     r"^(\d{1,2})([-\s])([A-Za-z]+)\2(\d{2,4})"
     r"((?:\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[APap][Mm])?)?)$"
 )
+_COMPACT_RX = re.compile(r"^((?:18|19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(\d{4}(?:\d{2})?)?$")
 _MDY_MON_RX = re.compile(
     r"^([A-Za-z]+)\s+(\d{1,2})(,?\s*)(\d{4})"
     r"((?:\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[APap][Mm])?)?)$"
@@ -180,6 +181,16 @@ def shift_date_text(text: str, norm: str | None, offset_days: int) -> str | None
                     mon_fmt = _format_month_word(new_d.month, mon_word)
                     d_fmt = f"{new_d.day:02d}" if len(d_s) == 2 else str(new_d.day)
                     shifted_out = f"{mon_fmt} {d_fmt}{mid_sep}{new_d.year:04d}{suffix}"
+
+    # 5. Compact YYYYMMDD[HHMM[SS]] (HL7 v2 DT / TS): the shifted date, same length
+    if shifted_out is None:
+        m = _COMPACT_RX.match(ascii_text)
+        if m:
+            y_s, m_s, d_s, rest = m.groups()
+            parsed = ref_date or _safe_date(int(y_s), int(m_s), int(d_s))
+            if parsed is not None:
+                new_d = parsed + dt.timedelta(days=offset_days)
+                shifted_out = f"{new_d.year:04d}{new_d.month:02d}{new_d.day:02d}{rest or ''}"
 
     if shifted_out is None:
         return None

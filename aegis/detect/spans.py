@@ -23,6 +23,7 @@ class Cand(NamedTuple):
     prio: Optional[int] = None
     relation: Optional[str] = None  # S/o, D/o, W/o, C/O (relatives only; used for Evidence)
     hinglish: bool = False
+    full_name: Optional[str] = None  # names inside one structured field (HL7 family^given): the whole name's norm
 
 
 def resolve(cands: list[Cand]) -> list[Cand]:

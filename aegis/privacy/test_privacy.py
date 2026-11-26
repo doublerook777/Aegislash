@@ -6,6 +6,7 @@ import os
 import unittest
 
 from aegis.privacy import plan, replace, stats
+from aegis.privacy.dates import shift_date_text
 from aegis.types import empty_evidence
 
 
@@ -236,6 +237,15 @@ class PrivacyTests(unittest.TestCase):
         st = stats(p)
         self.assertEqual(st["records_generalized"], 8)
         self.assertEqual(st["records_suppressed"], 0)
+
+
+class CompactDateTests(unittest.TestCase):
+    def test_hl7_compact_dates_keep_their_shape(self) -> None:
+        self.assertEqual(shift_date_text("19881104", None, 10), "19881114")
+        self.assertEqual(shift_date_text("202507021415", None, -2), "202506301415")
+        self.assertEqual(shift_date_text("20250702141500", "2025-07-02", 1), "20250703141500")
+        self.assertIsNone(shift_date_text("19881304", None, 1))
+        self.assertIsNone(shift_date_text("12345678", None, 1))
 
 
 if __name__ == "__main__":

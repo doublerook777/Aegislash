@@ -11,7 +11,7 @@ from link ([types](../../contracts/types.md)).
 
 Implementation layout (`__init__.py` is wired to `engine.py`):
 - `engine.py` — `plan()`, `replace()`, `stats()` and k-anonymity / rare-condition tiering
-- `dates.py` — HMAC-SHA256 keyed per-patient/per-record date shifting & format preservation
+- `dates.py` — HMAC-SHA256 keyed per-patient/per-record date shifting & format preservation (also compact `YYYYMMDD[HHMM[SS]]`, the HL7 v2 date)
 - `generalize.py` — age banding (`85+` top-coding), PIN prefixing, and village generalization
 - `policy.py` — `config/policy.yaml` loader with defaults
 - `test_privacy.py` — unit tests for contracts, date formats, k-anonymity, and `risk_report.py`

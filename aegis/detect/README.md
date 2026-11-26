@@ -23,6 +23,7 @@ Contract it provides: [detect](../../contracts/detect.md). Shapes: [types](../..
 | `engine.py` | `detect_file`: the five steps above |
 | `labels.py` | label words -> role |
 | `fields.py` | what to flag in a value whose role is known |
+| `hl7.py` | HL7 v2 messages saved as text: roles by segment and field position (PID, NK1, GT1, IN1) |
 | `ids.py` | phone, Aadhaar, ABHA, PAN, email, insurance, record numbers |
 | `dates.py` | dates (day/month order decided per file), date of birth, age |
 | `address.py` | house, locality, landmark, village, district, PIN |
@@ -237,3 +238,22 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   function words such as `के`, `को`, `साथ` are not names). Before, only the Latin name after a cue was found.
 - Checks: selftest 184/184 (6 new cases, 4 of them fail before); committed sets: outputs byte-identical to the base, no run
   found in any of the 268 parseable committed input files (no false positive from the base64 rule).
+
+## HL7 v2 messages saved as text (`hl7.py`)
+- A value (a `.txt` file, or a JSON string) with a line starting `MSH|` is read as an HL7 v2 message. Segments are split on
+  `\r`, `\n` or `\r\n` (also behind an MLLP `0x0b`); the separators come from MSH-2 (default `^~\&`).
+- A field's role comes from its **segment and position**, not from words: PID-2/3/4 identifier lists (the ID before the
+  first `^`, every `~` repetition; Aadhaar / ABHA / PAN shapes keep their type, the rest is `MRN`), PID-5 / PID-9 names
+  (family, given, middle: one finding per word, so `^` stays), PID-6 mother's maiden name and NK1-2, GT1-3/4, IN1-16
+  names (relatives), PID-7 and NK1-16 / GT1-19 / IN1-18 dates of birth, PID-8 sex, PID-11 / NK1-4 / GT1-5 / IN1-19 addresses
+  (street -> `HOUSE`, other designation and city -> `LOCALITY`, zip -> `PIN`; state and country stay), PID-13/14,
+  NK1-5/6, GT1-6/7 phones (number, area, local number, e-mail), PID-19/20, GT1-12, IN2-2 national ids, IN1-36 policy
+  number, PID-23 birth place. Name findings carry `Cand.full_name` (given family) so every word of one name gives the
+  same evidence name; the words then propagate through the file like other names.
+- Never touched: MSH, OBR / OBX values, codes, units, ranges, PV1 locations and doctors, titles / suffixes in names.
+  A field that is only a time stamp (`202503011030`) and has no role is no longer taken for a 12-digit Aadhaar number.
+- The sanitized text keeps its segments, its number of fields and every separator. `privacy/dates.py` shifts compact
+  `YYYYMMDD[HHMM[SS]]` dates, so the date of birth stays a valid HL7 date.
+- Selftest: `HL7_MESSAGES` (three invented messages: `\n` and `\r` separators, guarantor, insured person, OBX content).
+- Left alone: HL7 inside base64 or a CSV cell is only read if the cell itself starts with `MSH|`; escape sequences
+  (`\F\`, `\S\`) inside names are not decoded; ORC / OBR / PV1 doctor names stay (staff).
