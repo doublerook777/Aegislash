@@ -162,6 +162,11 @@ _ABOUT_PATIENT = (r"(?:(?:ka|ki|ke|ko) +(?i:bp|blood pressure|pulse|temp|tempera
                   r"|ko +(?:[a-z0-9]+ +){0,4}(?:bukhar|chakkar|khansi|dard|ulti|kamzori|dast|sujan|takleef|saans)\b"
                   r"|ko +\d+ +(?:din|hafte|mahine|saal)\b)")
 _cue(rf"(?:^|\n|[.!?] |- )(?P<name>{_CAP}(?: {_CAP}){{0,2}}) +(?={_ABOUT_PATIENT})", "patient", None, True)
+# family and helper words that may stand where a name does ("Uncle signed the consent"); not in STOP because other cues use them
+_NOT_THE_PATIENT = frozenset("uncle aunt aunty cousin neighbour neighbor grandfather grandmother grandson granddaughter "
+                             "nephew niece bua mausi chacha mama dada dadi nana nani counsellor counselor technician "
+                             "pharmacist dietician dietitian physiotherapist receptionist cashier driver".split())
+
 # Hindi titles: "श्रीमती <name>". A following particle (को, का, ने ...) is not part of the name.
 _HINDI_PARTICLE = r"(?:को|का|की|के|ने|से|है|में|पर|जी)(?![ऀ-ॿ])"
 _cue(rf"(?<![ऀ-ॿ])(?:श्रीमती|श्री|कुमारी|सुश्री) +(?P<name>{_DEVA_WORD}(?: (?!{_HINDI_PARTICLE}){_DEVA_WORD}){{0,2}})",
@@ -169,7 +174,7 @@ _cue(rf"(?<![ऀ-ॿ])(?:श्रीमती|श्री|कुमारी|�
 # titles and report headings
 _cue(rf"\b(?:Mr|Mrs|Ms|Smt|Shri|Km|Master)\b\.? +(?P<name>{LATIN_NAME})", "patient")
 _cue(rf"(?P<name>(?:Mohd|Md)\.? {LATIN_NAME})", "patient")
-_cue(rf"\b(?i:report of|note for|summary of|results? for|record of|patient|insured|claimant|policy ?holder) *:? +(?P<name>{LATIN_NAME})", "patient")
+_cue(rf"\b(?i:report of|note for|summary of|results? for|record of|patient|insured|claimant|policy ?holder)(?: *:? +| *= *)(?P<name>{LATIN_NAME})", "patient")
 # "14:00 - Brajesh Yadav - K/C/O typhoid"
 _cue(rf"(?P<name>{LATIN_NAME}) +- +(?:K/C/O|H/O|C/O)\b", "patient")
 # a Hindi sentence "<name> को 9 दिन से बुखार है"
@@ -225,7 +230,14 @@ def find_url_pii(text: str) -> list[Cand]:
         if role in ("patient_name", "relative_name", "name"):
             kind = "RELATIVE_NAME" if role == "relative_name" else "PATIENT_NAME"
             who = "relative" if role == "relative_name" else "patient"
-            out.append(Cand(m.start("v"), m.end("v"), kind, norm_name(dec) or None, who, prio=PRIORITY[kind] + 3))
+            end = m.end("v")
+            # in decoded text "Priyanka%20Sengupta" reads "Priyanka Sengupta": take the following name words too
+            more = re.compile(rf"(?: {_CAP}){{1,3}}").match(text, end) if raw_v[:1].isupper() else None
+            if more:
+                span = trim_name(text, m.start("v"), more.end())
+                if span and span[0] == m.start("v"):
+                    end, dec = span[1], text[m.start("v"):span[1]]
+            out.append(Cand(m.start("v"), end, kind, norm_name(dec) or None, who, prio=PRIORITY[kind] + 3))
         elif role == "phone":
             d = digits(dec)
             if len(d) >= 7:
@@ -302,7 +314,7 @@ woh wo yeh ye unhone inhone maine humne koi sabhi वह यह उन्हो�
 
 def _valid_action_name(raw: str) -> bool:
     words = [w.strip(".,").casefold() for w in raw.split()]
-    if not words or any(w in (STOP - {"asha"}) | ORG | _NEVER_IN_NAME | _PRONOUNS for w in words):
+    if not words or any(w in (STOP - {"asha"}) | ORG | _NEVER_IN_NAME | _PRONOUNS | _NOT_THE_PATIENT for w in words):
         return False
     # "Repeat CBC": a lab or test short form next to ordinary words is not a name
     shouted = [w.isascii() and len(w.strip(".")) > 1 and w.strip(".").isupper() for w in raw.split()]

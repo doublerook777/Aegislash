@@ -244,6 +244,24 @@ def _deva(text: str) -> list[Cand]:
     return out
 
 
+# "Rukhsana_Bhattacharya" in an export path or a URL: capitalised words joined by "_"; more "_word" parts may follow
+_JOINED = re.compile(r"(?<![A-Za-z0-9])[A-Z][a-z]+(?:_[A-Z][a-z]+)+(?![A-Za-z])")
+
+
+def find_joined_names(text: str, stop: frozenset[str]) -> list[Cand]:
+    """A given name and a listed surname written with "_" between them. "_" becomes a space (same length), then the
+    usual rules decide; only candidates that cover an "_" are kept, the rest are found elsewhere."""
+    if "_" not in text:
+        return []
+    out = []
+    for m in _JOINED.finditer(text):
+        piece = m.group(0).replace("_", " ")
+        for c in find_listed_names(piece, stop):
+            if "_" in m.group(0)[c.start:c.end]:
+                out.append(c._replace(start=c.start + m.start(), end=c.end + m.start()))
+    return out
+
+
 def find_listed_names(text: str, stop: frozenset[str]) -> list[Cand]:
     """`stop` is the caller's list of words that are never names (medicines, report words)."""
     never = stop - SURNAMES - {"asha"}

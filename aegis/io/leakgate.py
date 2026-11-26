@@ -16,7 +16,10 @@ LITERAL_TYPES = ("EMAIL", "PAN", "ABHA_ADDRESS", "INSURANCE_ID", "OTHER_ID")
 NAME_TYPES = ("PATIENT_NAME", "RELATIVE_NAME")
 
 _DIGIT_RUN = re.compile(r"(?<![0-9०-९])[0-9०-९](?:[0-9०-९]|[ \-./](?=[0-9०-९])){4,}")
-_TOKEN = re.compile(r"[\wऀ-ॿ]+")
+# a word is letters/digits/Devanagari; "_" separates words ("Agustín_Fonseca" in a file name is two words)
+_TOKEN = re.compile(r"(?:[^\W_]|[ऀ-ॿ])+")
+# "%20", "%5C", "%2B" ...: an escaped space or punctuation mark also separates words ("Priyanka%20Sengupta")
+_PCT_SEP = re.compile(r"%(?:[2][0-9A-Fa-f]|3[AaBbCcDdEeFf]|40|5[BbCcDdEeFf]|60|7[BbCcDdEe])")
 _DEVA_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
 REDACTED = "[REDACTED]"
 
@@ -27,6 +30,11 @@ def _fold(s: str) -> str:
 
 def _digits(s: str) -> str:
     return "".join(c for c in s.translate(_DEVA_DIGITS) if c.isdigit())
+
+
+def _unescaped(s: str) -> str:
+    """Same length as `s`: escaped separators ("%20") become spaces, so offsets still match the original."""
+    return _PCT_SEP.sub("   ", s) if "%" in s else s
 
 
 class LeakGate:
@@ -46,9 +54,16 @@ class LeakGate:
             if len(t) >= 6 and not t.isdigit():
                 self.literals.add(t)
         if ftype in NAME_TYPES:
-            toks = tuple(_fold(m.group(0)) for m in _TOKEN.finditer(text))
+            toks = tuple(_fold(m.group(0)) for m in _TOKEN.finditer(_unescaped(text)))
             if 2 <= len(toks) <= 4 and sum(map(len, toks)) >= 6:
                 self.names.add(toks)
+                # "Fonseca, Agustín" (surname first) is also written "Agustín Fonseca"
+                last, comma, given = _unescaped(text).partition(",")
+                if comma:
+                    rest = tuple(_fold(m.group(0)) for m in _TOKEN.finditer(given))
+                    head = tuple(_fold(m.group(0)) for m in _TOKEN.finditer(last))
+                    if rest and head and len(rest + head) <= 4:
+                        self.names.add(rest + head)
 
     def finalize(self) -> None:
         self._literal_rx = (re.compile("|".join(re.escape(x) for x in sorted(self.literals, key=lambda s: (-len(s), s))),
@@ -65,19 +80,27 @@ class LeakGate:
             return value
         out = value
         if self.digits:
-            out = _DIGIT_RUN.sub(lambda m: self._count(REDACTED) if self._digit_hit(m.group(0)) else m.group(0), out)
+            out = self._scrub_digits(out)
         if self._literal_rx is not None:
             out = self._literal_rx.sub(lambda m: self._count(REDACTED), out)
         if self.names:
             out = self._scrub_names(out)
         return out
 
+    def _digit_spans(self, value: str) -> list[tuple[int, int]]:
+        return [m.span() for m in _DIGIT_RUN.finditer(_unescaped(value)) if self._digit_hit(m.group(0))]
+
+    def _scrub_digits(self, value: str) -> str:
+        for s, e in reversed(self._digit_spans(value)):
+            value = value[:s] + self._count(REDACTED) + value[e:]
+        return value
+
     def _count(self, s: str) -> str:
         self.hits += 1
         return s
 
     def _scrub_names(self, value: str) -> str:
-        toks = [(m.start(), m.end(), _fold(m.group(0))) for m in _TOKEN.finditer(value)]
+        toks = [(m.start(), m.end(), _fold(m.group(0))) for m in _TOKEN.finditer(_unescaped(value))]
         spans, i = [], 0
         while i < len(toks):
             for n in (4, 3, 2):
@@ -94,7 +117,7 @@ class LeakGate:
 
     # ------------------------------------------------------------------ verification
     def contains_leak(self, text: str) -> bool:
-        if self.digits and any(self._digit_hit(m.group(0)) for m in _DIGIT_RUN.finditer(text)):
+        if self.digits and self._digit_spans(text):
             return True
         if self._literal_rx is not None and self._literal_rx.search(text):
             return True
