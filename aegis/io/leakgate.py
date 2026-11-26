@@ -20,6 +20,8 @@ _DIGIT_RUN = re.compile(r"(?<![0-9०-९])[0-9०-९](?:[0-9०-९]|[ \-./](?
 _TOKEN = re.compile(r"(?:[^\W_]|[ऀ-ॿ])+")
 # "%20", "%5C", "%2B" ...: an escaped space or punctuation mark also separates words ("Priyanka%20Sengupta")
 _PCT_SEP = re.compile(r"%(?:[2][0-9A-Fa-f]|3[AaBbCcDdEeFf]|40|5[BbCcDdEeFf]|60|7[BbCcDdEe])")
+# a name right after a doctor's title ("Dr. R. Suresh Pandey") is the doctor, who is kept; detect protects the same span
+_DOCTOR_TITLE = re.compile(r"(?:\b(?:dr|doctor|prof)\b\.?|डॉ\.?|डा\.|डॉक्टर)[ \t]*(?:[A-Za-z]\.[ \t]*){0,2}$", re.IGNORECASE)
 _DEVA_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
 REDACTED = "[REDACTED]"
 
@@ -105,7 +107,8 @@ class LeakGate:
         while i < len(toks):
             for n in (4, 3, 2):
                 if i + n <= len(toks) and tuple(t[2] for t in toks[i:i + n]) in self.names:
-                    spans.append((toks[i][0], toks[i + n - 1][1]))
+                    if not _DOCTOR_TITLE.search(value[max(0, toks[i][0] - 16):toks[i][0]]):
+                        spans.append((toks[i][0], toks[i + n - 1][1]))
                     i += n
                     break
             else:

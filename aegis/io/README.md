@@ -39,3 +39,26 @@ Check a change: `.venv/bin/python -m pytest -q aegis/io`, then the usual `main.p
 - Still open: base64 inside CSV cells or running text (only whole JSON string values are decoded); a data URI
   embedded in a longer string; UTF-16 text inside base64; names with an accent typed as separate marks (NFD) in the
   gate (detect handles those).
+
+## Quarantine and leak-gate fixes from the audit (`report/vulnerability_audit_report.md`: V7, V8, V9, V11)
+- **V8, binary files.** `decode()` looks for a NUL byte in the whole file, not only in the first 4 KB. A file with a NUL that is
+  not UTF-16 (a binary trailer after byte 4,096) is quarantined as `undecodable_text` instead of exported with its bytes.
+- **V7, deep JSON.** Nesting deeper than `MAX_JSON_DEPTH` (1,000 levels, counted without recursion) is quarantined as
+  `json_too_deep`, for JSON and JSON Lines alike. The cap sits just above the 950 levels the practice sets expect to be read
+  and below the 1,500-level bombs (the kit accepts either outcome for those). The audit suggested 256-500, which would
+  quarantine a file the kit expects to be sanitized. JSON deeper than 64 levels is written without indentation: with
+  `indent=2`, 950 levels grew from a few KB to 1.8 MB. Shallower JSON is written exactly as before.
+- **V9, export metadata keys.** A top-level key that describes the export (`patient_export_source`, `patient_count`,
+  `patientTotal`, `*_version`, `*_batch` ...) is no longer taken for the file's own subject, so the `visits` array of such a
+  file is split into one record per patient again. A real subject key (`patient`, `patient_name`, `uhid`, `mobile`) still
+  makes the file one document.
+- **V11, doctors in the leak gate.** A name that follows a doctor's title (`Dr.`, `Dr R.`, `Prof`, `डॉ.`) is not scrubbed by the
+  gate, nor does it make `contains_leak` quarantine the file: detect already protects that span, and the gate used to turn
+  `Dr. Suresh Pandey` into `Dr. [REDACTED]` whenever a patient had the same name. The same name elsewhere is still removed.
+- **Checker note:** `check_dev.py` counts `Suresh Pandey` inside `Dr. Suresh Pandey` as a leak when a patient has that name.
+  The official rule (`docs/kit/SCORING.md`, "allowed") does not. The numbers in the PR use the official rule.
+- Not done: the audit's wider ideas (a `LeakGate` that folds homoglyphs and zero-width characters, decoding base64 or URL text
+  inside `contains_leak`) and V10 (delimiter sniffing from line 0 only).
+- Side effect, expected: a file that used to be exported and is now quarantined leaves its patient's cluster, and the patient
+  key is a hash of the cluster's record ids (V13), so that one patient gets a new PSN and date shift. On `dev/input` this is
+  the patient whose name and mobile sit at the bottom of `misc/deep_export.json`.

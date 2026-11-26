@@ -202,3 +202,86 @@ def test_name_learned_in_one_file_is_removed_from_another_in_any_form(tmp_path, 
     for text in _outputs(out).values():
         assert "Quispe" not in text and "Mariela" not in text
     assert all("Quispe" not in n for n in _outputs(out))
+
+
+# ---------------------------------------------------------------- binary files, deep JSON, metadata keys, doctors
+from aegis.io.decode import decode  # noqa: E402
+
+
+def test_nul_byte_anywhere_means_binary_but_utf16_is_still_text():
+    text = "Progress note: stable vitals, BP 118/76. " * 150           # well past 4,096 bytes
+    assert decode((text + "\n").encode()) is not None
+    assert decode((text + "\n\x00\x00PK\x03\x04BINARY").encode("latin-1")) is None          # trailer after 4 KB
+    assert decode(b"short note\x00more") is None
+    assert decode("Brief note, no NUL".encode("utf-16")) is not None                         # BOM
+    assert decode("Brief note, no NUL".encode("utf-16-le")) is not None                      # no BOM
+    assert decode(("café " * 2000).encode("cp1252")) is not None
+
+
+def test_binary_trailer_file_is_quarantined_end_to_end(tmp_path, monkeypatch):
+    note = "Clinical note for Kavya Rastogi, phone 9811100029. " * 100 + "\x00\x00PK\x03\x04TRAILER"
+    out, report = _sanitize(tmp_path, monkeypatch, {"notes/late.txt": note.encode("latin-1"),
+                                                    "notes/fine.txt": "BP 118/76, Tab Aspirin 75 mg.\n"})
+    assert list(_outputs(out)) == ["notes/fine.txt"]
+    assert [e.get("reason") for e in report["files"] if e["status"] == "quarantined"] == ["undecodable_text"]
+
+
+def _nested(depth: int, leaf) -> str:
+    return '{"level":' * (depth - 1) + json.dumps(leaf) + "}" * (depth - 1)
+
+
+@pytest.mark.parametrize("depth, ok", [(50, True), (950, True), (1000, True), (1001, False), (1500, False)])
+def test_json_depth_cap(depth, ok):
+    text = _nested(depth, {"patient": "Kavya Rastogi", "mobile": "9811100030"})
+    if ok:
+        assert formats.parse("a.json", text).fmt == "json"
+    else:
+        with pytest.raises(formats.Unsupported, match="json_too_deep"):
+            formats.parse("a.json", text)
+
+
+def test_deep_json_lines_are_quarantined_too():
+    line = _nested(1200, "x")
+    with pytest.raises(formats.Unsupported, match="json_too_deep"):
+        formats.parse("a.csv", line + "\n" + line + "\n")
+
+
+def test_deep_json_is_written_without_a_size_explosion_and_shallow_json_is_not_changed(tmp_path, monkeypatch):
+    deep = _nested(900, {"patient": "Kavya Rastogi", "mobile": "9811100030", "dx": "Anemia"})
+    shallow = json.dumps({"patient": "Tarun Kulkarni", "mobile": "9811100031", "dx": "Asthma"})
+    out, _ = _sanitize(tmp_path, monkeypatch, {"x/deep.json": deep, "x/shallow.json": shallow})
+    files = _outputs(out)
+    assert len(files["x/deep.json"]) < 10 * len(deep) and "Rastogi" not in files["x/deep.json"] and "Anemia" in files["x/deep.json"]
+    assert files["x/shallow.json"].startswith('{\n  "patient"')           # indent=2 as before
+
+
+def test_export_metadata_key_does_not_collapse_a_list_of_patients():
+    doc = {"patient_export_source": "HIS-Lucknow-Ward-3", "export_date": "2026-07-11",
+           "visits": [{"patient_name": "Kavya Rastogi", "mobile": "9811100032"},
+                      {"patient_name": "Tarun Kulkarni", "mobile": "9811100033"},
+                      {"patient_name": "Meenal Dasgupta", "mobile": "9811100034"}]}
+    pf = formats.parse("reg/wrapped.json", json.dumps(doc))
+    assert [r["loc"] for r in pf.records] == ["@file", "/visits/0", "/visits/1", "/visits/2"] and pf.doc_record_id is None
+    for key in ("patient_count", "patientTotal", "patient_source", "patient_export_version", "patient_batch"):
+        assert not formats._person_key(key)
+    for key in ("patient", "patient_name", "uhid", "mobile", "guardian"):     # real subjects still are
+        assert formats._person_key(key)
+    one = {"patient_name": "Kavya Rastogi", "visits": [{"patient_name": "Kavya Rastogi", "mobile": "9811100032"}]}
+    assert formats.parse("reg/one.json", json.dumps(one)).doc_record_id is not None      # a subject of its own: one document
+
+
+def test_gate_keeps_the_doctor_but_removes_the_patient_with_the_same_name():
+    g = LeakGate()
+    g.add("PATIENT_NAME", "Suresh Pandey", None)
+    g.finalize()
+    s = g.scrub("Dr. Suresh Pandey examined Suresh Pandey (45/M). Dr R. Suresh Pandey signed. डॉ. Suresh Pandey. Prof Suresh Pandey.")
+    assert s.count("Suresh Pandey") == 4 and s.count("[REDACTED]") == 1 and "examined [REDACTED] (45/M)" in s
+    assert not g.contains_leak("Dr. Suresh Pandey reviewed the chart") and g.contains_leak("Mr Suresh Pandey reviewed the chart")
+
+
+def test_doctor_with_a_patient_name_end_to_end(tmp_path, monkeypatch):
+    out, _ = _sanitize(tmp_path, monkeypatch, {
+        "reg/people.csv": "patient_name,age,dx\nSuresh Pandey,45,Parkinson's disease\n",
+        "notes/n.txt": "Dr. Suresh Pandey examined Suresh Pandey (45/M) and diagnosed Parkinson's disease.\n"})
+    note = _outputs(out)["notes/n.txt"]
+    assert note.startswith("Dr. Suresh Pandey examined ") and note.count("Pandey") == 1 and "Parkinson's disease" in note

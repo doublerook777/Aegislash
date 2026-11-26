@@ -18,6 +18,8 @@ from typing import Any
 from aegis.types import Field, Record
 
 SUPPORTED_EXT = (".csv", ".tsv", ".json", ".txt")
+MAX_JSON_DEPTH = 1000      # deeper JSON is quarantined ("json_too_deep"); the practice sets expect 950 levels to be read
+COMPACT_ABOVE_DEPTH = 64   # deeper JSON is written without indentation: indent=2 would multiply its size by hundreds
 
 
 class Unsupported(Exception):
@@ -241,8 +243,15 @@ _PERSON_KEY = re.compile(r"patient|uhid|mrn|(^|_)name|naam|mobile|phone|aadha|ab
                          r"birth|reg_?no|ipd|beneficiar|member|subject|person|मरीज|नाम")
 
 
+# A key that describes the export, not the person: "patient_export_source": "HIS-Lucknow-Ward-3" is no subject
+_META_WORDS = frozenset("export exported exports source meta metadata count total version schema format generated "
+                        "extract dump batch page pages size created updated".split())
+
+
 def _person_key(k: str) -> bool:
-    return bool(_PERSON_KEY.search(re.sub(r"[^\w]+", "_", k.casefold())))
+    words = re.sub(r"[^\w]+", "_", k.casefold())
+    parts = re.sub(r"[^\w]+", "_", re.sub(r"(?<=[a-z])(?=[A-Z])", "_", k)).casefold().split("_")   # camelCase too
+    return bool(_PERSON_KEY.search(words)) and not set(parts) & _META_WORDS
 
 
 def _person_records(v: Any) -> bool:
@@ -268,6 +277,20 @@ def _record_pointers(data: Any) -> list[str]:
     return out
 
 
+def _json_depth(data: Any, limit: int = MAX_JSON_DEPTH) -> int:
+    """Nesting depth (a scalar is 1), counted without recursion; stops early once it passes `limit`."""
+    deepest, stack = 1, [(data, 1)]
+    while stack:
+        node, d = stack.pop()
+        if d > deepest:
+            deepest = d
+            if deepest > limit:
+                return deepest
+        children = node.values() if isinstance(node, dict) else node if isinstance(node, list) else ()
+        stack.extend((c, d + 1) for c in children if isinstance(c, (dict, list)))
+    return deepest
+
+
 def _leaf_text(v: Any) -> str:
     return v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
 
@@ -283,6 +306,8 @@ def _parse_json(rel: str, text: str, lines: list[dict] | None = None) -> ParsedF
             raise Unsupported("json_too_deep") from None
         except ValueError:
             raise Unsupported("malformed_json") from None
+    if _json_depth(data) > MAX_JSON_DEPTH:
+        raise Unsupported("json_too_deep")
     fmt = "fhir" if isinstance(data, dict) and data.get("resourceType") == "Bundle" else "json"
     frec = _file_record(rel, fmt)
     pf = ParsedFile(rel, fmt, [frec], frec["record_id"], data=data, jsonl=lines is not None)
@@ -426,7 +451,8 @@ def write(pf: ParsedFile, new: dict[tuple[str, str], str]) -> str:
         obj.update(items)
     if pf.jsonl:
         return "".join(json.dumps(obj, ensure_ascii=False) + "\n" for obj in pf.data)
-    return json.dumps(pf.data, ensure_ascii=False, indent=2) + "\n"
+    deep = _json_depth(pf.data, COMPACT_ABOVE_DEPTH) > COMPACT_ABOVE_DEPTH
+    return json.dumps(pf.data, ensure_ascii=False, indent=None if deep else 2) + "\n"
 
 
 def _restore_type(orig: Any, text: str) -> Any:
