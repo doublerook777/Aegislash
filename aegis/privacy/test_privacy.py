@@ -186,6 +186,31 @@ class PrivacyTests(unittest.TestCase):
             self.assertEqual(rep["simulated_known_facts_attack"]["rare_cond_with_narrow_qi_hits"], 1)
             self.assertEqual(rep["simulated_known_facts_attack"]["exact_date_overlap_hits"], 1)
 
+    def test_risk_report_missing_attacker_file_is_an_error(self) -> None:
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+        from scripts.risk_report import analyze_release
+
+        root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td)
+            (out / "sanitized").mkdir()
+            (out / "records.jsonl").write_text("", encoding="utf-8")
+            missing = out / "no_such_registry.csv"
+            with self.assertRaises(FileNotFoundError):
+                analyze_release(out, registry_path=missing)
+            with self.assertRaises(FileNotFoundError):
+                analyze_release(out, known_facts_path=out / "no_such_facts.jsonl")
+            run = subprocess.run(
+                [sys.executable, str(root / "scripts" / "risk_report.py"), "--output", str(out), "--registry", str(missing)],
+                capture_output=True, text=True, cwd=root,
+            )
+            self.assertEqual(run.returncode, 2)
+            self.assertIn("--registry file not found", run.stderr)
+            self.assertNotIn("Simulated registry attack", run.stdout)
+
     def test_risk_report_handles_deep_json(self) -> None:
         import json
         import tempfile

@@ -15,3 +15,7 @@ Implementation layout (`__init__.py` is wired to `engine.py`):
 - `generalize.py` — age banding (`85+` top-coding), PIN prefixing, and village generalization
 - `policy.py` — `config/policy.yaml` loader with defaults
 - `test_privacy.py` — unit tests for contracts, date formats, k-anonymity, and `risk_report.py`
+
+`scripts/risk_report.py`: the attacker files are `dev/attacker/registry.csv` and `dev/attacker/known_facts.jsonl`. A
+`--registry` or `--known-facts` path that does not exist is an error (exit 2, message on stderr). Before, it was skipped
+without a word and the attack sections were simply missing from the report.
