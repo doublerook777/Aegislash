@@ -155,3 +155,36 @@ def test_split_first_last_names_and_order_independence() -> None:
     assert out1 == out2
     assert out1["csv#row:1"] is not None and out1["csv#row:1"] == out1["txt#doc"]
     assert out1["empty#doc"] is None
+
+
+def test_multi_patient_index_record_never_bridges() -> None:
+    recs = [
+        _ev("p1#0", names=[_nm("Neha Paswan")], ids=[{"type": "MRN", "norm": "0076893"}]),
+        _ev("p1#1", names=[_nm("Neha Paswan")], ids=[{"type": "MRN", "norm": "0076893"}]),
+        _ev("p2#0", names=[_nm("Sarita Tiwari")], ids=[{"type": "MRN", "norm": "0077386"}]),
+        _ev("p2#1", names=[_nm("Sarita Tiwari")], ids=[{"type": "MRN", "norm": "0077386"}]),
+        _ev(
+            "misc/index.json#doc",
+            names=[_nm("Neha Paswan"), _nm("Sarita Tiwari")],
+            ids=[{"type": "MRN", "norm": "0076893"}, {"type": "MRN", "norm": "0077386"}],
+        ),
+    ]
+    out = resolve(recs)
+    assert out["p1#0"] == out["p1#1"] is not None
+    assert out["p2#0"] == out["p2#1"] is not None
+    assert out["p1#0"] != out["p2#0"]
+    assert out["misc/index.json#doc"] is None
+
+
+def test_digits_only_mrn_links_across_hospitals_when_names_match() -> None:
+    recs = [
+        _ev("lab#row:0", names=[_nm("ASHOK PATEL")], ids=[{"type": "MRN", "norm": "010610"}], hospital="snj"),
+        _ev("reg#row:0", names=[_nm("Ashok Patel")], ids=[{"type": "MRN", "norm": "010610"}], hospital="asr"),
+    ]
+    out = resolve(recs)
+    assert out["lab#row:0"] is not None and out["lab#row:0"] == out["reg#row:0"]
+
+
+def test_mohd_md_prefix_cross_script() -> None:
+    assert full_names_match(normalize_tokens("Mohd. Shahid"), normalize_tokens("मोहम्मद शाहिद"))
+    assert full_names_match(normalize_tokens("Md. Shahid"), normalize_tokens("Mohammad Shahid"))
