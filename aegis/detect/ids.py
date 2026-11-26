@@ -18,13 +18,14 @@ ABHA_ADDR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._]*@(?:abdm|sbx|ndhm|abha)" + _R,
 ABHA_NUM = re.compile(_L + r"\d{2}([- ])\d{4}\1\d{4}\1\d{4}(?!\d)")
 AADHAAR_MASKED = re.compile(r"(?<![A-Za-z0-9])(?:[Xx*•]{4}[- ]?){2}\d{4}(?!\d)")
 AADHAAR = re.compile(_L + r"(?<![\d][- /.])[2-9]\d{3}([- ]?)\d{4}\1\d{4}(?![- /.]?\d)" + _R)
-PAN = re.compile(_L + r"[A-Z]{3}[ABCFGHLJPT][A-Z]\d{4}[A-Z]" + _R)
+PAN = re.compile(_L + r"[A-Z]{5}\d{4}[A-Z]" + _R)
 INSURANCE = re.compile(
     _L + r"(?:PMJAY(?:[-/ ]?[A-Z]{2,3})?[-/ ]?\d{6,}|(?:POL|POLICY|INS|TPA|MEDI|CGHS|ESIC?)(?:[-/]\d+){1,4})" + _R, re.I)
 
 _PHONE_BODY = (r"(?:[6-9]\d{4}[- .]?\d{5}"            # 98765 43210
                r"|[6-9]\d{2}[- .]\d{3}[- .]\d{4}"      # 987-654-3210
-               r"|[6-9]\d{3}[- .]\d{3}[- .]\d{3})")    # 9876-543-210
+               r"|[6-9]\d{3}[- .]\d{3}[- .]\d{3}"       # 9876-543-210
+               r"|[6-9]\d\.\d{2}\.\d{2}\.\d{4})")           # 98.76.54.3210
 PHONE = re.compile(r"(?<![A-Za-z0-9])(?:(?:\(\+?91\)|\+91|0091|91(?=[- ])|0)[- .]{0,2})?"
                    + _PHONE_BODY + r"(?!\d|[-/]\d|[A-Za-z])")
 
@@ -37,6 +38,22 @@ MRN_SHAPES = [
     re.compile(_L + r"[A-Z]{2,5}[/-](?:\d{2}|\d{4})[/-]\d{4,8}(?![-/]?\d)" + _R),
     re.compile(_L + r"[A-Z]{3,5}(?:19|20)\d{2}[-/]\d{4,}" + _R),
     re.compile(_L + r"[A-Z]{3,5}[-/]\d{6,}(?![-/]?\d)" + _R),
+]
+
+
+# A number announced by its label, whatever its format ("Rec# : HOSP/2023/07/00123", "Aadhaar No: 1111-2222-3333").
+_SEP = r"\.?\s*[:#=\-]*\s*"
+_LABELLED = [
+    ("MRN", re.compile(
+        r"(?<![A-Za-z])(?i:uhid|mrn|c\.? ?r\.? ?no|reg(?:istration|n)?\.? ?(?:no|id|number)|rec(?:ord)?\.? ?(?:no#?|id|#)"
+        r"|hosp(?:ital)?\.? ?(?:no|id)|pt\.? ?id|patient (?:id|no)|ipd? ?no|admission (?:no|number)|file no)" + _SEP
+        + r"(?P<v>#?(?=[A-Za-z/\-]*\d[A-Za-z/\-]*\d)[A-Za-z0-9](?:[A-Za-z0-9/\-]{1,28}[A-Za-z0-9]))")),
+    ("AADHAAR", re.compile(r"(?:(?i:aadh?aa?r|adhar)|आधार)(?i: ?(?:card)? ?(?:no|number|id)?)" + _SEP
+                           + r"(?P<v>\d{4}[ -]?\d{4}[ -]?\d{4})(?!\d)")),
+    ("ABHA_NUMBER", re.compile(r"(?:(?i:abha|health ?id)|एबीएचए)(?i: ?(?:id|no|number)?)" + _SEP
+                               + r"(?P<v>\d(?:[ -]?\d){11,15})(?!\d)")),
+    ("PHONE", re.compile(r"(?:(?<![A-Za-z])(?i:mob(?:ile)?|ph(?:one)?|contact(?: no)?|tel|whatsapp|call(?:ed)? on)"
+                         r"|मोबाइल|फ़ोन|फोन|संपर्क|\((?:H|M|R|O)(?=:))" + _SEP + r"(?P<v>\+?\d(?:[ .\-]?\d){9,12})(?!\d)")),
 ]
 
 
@@ -73,6 +90,11 @@ def find_ids(text: str) -> list[Cand]:
         looks_phone = d.startswith("91") and d[2] in "6789" and not m.group(1) and not _verhoeff_ok(d)
         if not looks_phone:
             out.append(Cand(m.start(), m.end(), "AADHAAR", d))
+    for kind, pattern in _LABELLED:
+        for m in pattern.finditer(text):
+            value = m.group("v")
+            norm = phone_norm(value) if kind == "PHONE" else digits(value)
+            out.append(Cand(m.start("v"), m.end("v"), kind, norm, "patient"))
     for m in PAN.finditer(text):
         out.append(Cand(m.start(), m.end(), "PAN", m.group(0)))
     for m in INSURANCE.finditer(text):

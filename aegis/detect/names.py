@@ -106,7 +106,10 @@ def trim_name(text: str, start: int, end: int) -> tuple[int, int] | None:
 _KIN_REL = "bhaiya|chacha|chachu|chachi|mama|mami|papa|tau|tai|mummy|beta|beti"
 _KIN_PAT = "ji|jee|sahab|saheb|sahib|bhai|behen|behenji|behanji|didi|amma|babu|bhabhi|uncle|aunty|aunti"
 _DEVA_HON = "जी|साहब|साहिब|बहन|बहनजी|भाई|अम्मा|दीदी|बाबू"
-_PERSON_WORD = r"(?:attendant|relative|informant|caretaker|care ?giver|son|daughter|wife|husband|brother|father|mother)"
+# "sister" is left out on purpose: "Sister Mary" is usually a nurse
+_PERSON_WORD = (r"(?:attendant|attender|relative|informant|caretaker|care ?giver|guardian|neighbou?r|son-in-law|"
+                r"daughter-in-law|grand(?:son|daughter|father|mother)|nephew|niece|uncle|aunt|bua|mausi|chacha|"
+                r"son|daughter|wife|husband|brother|father|mother)")
 
 # (regex with group "name", role, relation, hinglish?)
 _CUES: list[tuple[re.Pattern, str, str | None, bool]] = []
@@ -125,7 +128,7 @@ _cue(rf"\b(?i:son|daughter|wife|husband|father|mother) (?:of|name:?) (?:(?:{_TIT
 _cue(rf"(?:पुत्र|पुत्री|पत्नी|सुपुत्र)[ :]+(?:श्री )?(?P<name>{DEVA_NAME})", "relative")
 # "Attendant: X", "called by X", "witnessed by X"
 _cue(rf"\b(?i:{_PERSON_WORD}|informed by|called by|witnessed by|accompanied by|brought by|raised by|reported by)"
-     rf"(?:\s*[:\-] *| +)(?P<name>{LATIN_NAME})", "relative")
+     rf"(?: *\([^)\n]{{0,30}}\))?(?:\s*[:\-] *| +)(?P<name>{LATIN_NAME})", "relative")
 _cue(rf"(?P<name>{LATIN_NAME})'s +(?i:{_PERSON_WORD})", "patient")
 _cue(rf"(?P<name>{LATIN_NAME}) *\( *(?i:{_PERSON_WORD})", "relative")
 # Hinglish honorifics: "Shahid sahab", "Anita behenji", "Kamal Bhaiya"
@@ -139,10 +142,14 @@ _ABOUT_PATIENT = (r"(?:(?:ka|ki|ke|ko) +(?i:bp|blood pressure|pulse|temp|tempera
                   r"|ko +(?:[a-z0-9]+ +){0,4}(?:bukhar|chakkar|khansi|dard|ulti|kamzori|dast|sujan|takleef|saans)\b"
                   r"|ko +\d+ +(?:din|hafte|mahine|saal)\b)")
 _cue(rf"(?:^|\n|[.!?] |- )(?P<name>{_CAP}(?: {_CAP}){{0,2}}) +(?={_ABOUT_PATIENT})", "patient", None, True)
+# Hindi titles: "श्रीमती <name>". A following particle (को, का, ने ...) is not part of the name.
+_HINDI_PARTICLE = r"(?:को|का|की|के|ने|से|है|में|पर|जी)(?![ऀ-ॿ])"
+_cue(rf"(?<![ऀ-ॿ])(?:श्रीमती|श्री|कुमारी|सुश्री) +(?P<name>{_DEVA_WORD}(?: (?!{_HINDI_PARTICLE}){_DEVA_WORD}){{0,2}})",
+     "patient")
 # titles and report headings
 _cue(rf"\b(?:Mr|Mrs|Ms|Smt|Shri|Km|Master)\b\.? +(?P<name>{LATIN_NAME})", "patient")
 _cue(rf"(?P<name>(?:Mohd|Md)\.? {LATIN_NAME})", "patient")
-_cue(rf"\b(?i:report of|note for|summary of|results? for|record of|patient) *:? +(?P<name>{LATIN_NAME})", "patient")
+_cue(rf"\b(?i:report of|note for|summary of|results? for|record of|patient|insured|claimant|policy ?holder) *:? +(?P<name>{LATIN_NAME})", "patient")
 # "14:00 - Brajesh Yadav - K/C/O typhoid"
 _cue(rf"(?P<name>{LATIN_NAME}) +- +(?:K/C/O|H/O|C/O)\b", "patient")
 # a Hindi sentence "<name> को 9 दिन से बुखार है"

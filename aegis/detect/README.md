@@ -40,15 +40,16 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 ```
 
 ## Where it stands (2026-11-26)
-- Practice data (with mock link and privacy): 0 / 3230 leaked, 0 canaries, 4855 / 4855 medical values kept.
-  2,000-row CSV: about 3 s. All 771 must-link records carry a strong ID or name + second clue.
-- **Treat the practice score as optimistic:** the rules were written while looking at practice data. Hidden data
-  has unseen names, labels and formats.
+- Practice data with real link and privacy: 0 / 3230 leaked, 0 canaries, 4854 / 4855 medical values kept, linking
+  F0.5 0.99 (1 wrong merge). 2,000-row CSV: about 3.5 s.
+- **Treat the practice score as optimistic:** the rules were written while looking at practice data.
+- Unseen-format round 1 (28 cases written by other AI models from a task description only): 21 disagreements at
+  first, 1 after fixing general causes. Those cases are now partly in `selftest.py`, so they no longer count as unseen:
+  generate fresh ones to measure again.
 - `check_contracts.py --mock` fails one case on purpose: only the mock raises for a file named "bad".
 
-## Next (generalisation, in this order)
-1. Grow `selftest.py` with unseen formats: other column names and label styles, other record-number, phone and
-   date formats, names with only weak clues, more over-removal traps. Fix what fails with *general* rules.
+## Next (generalisation)
+1. Another round of fresh unseen cases; fix general causes, never single sentences.
 2. Known blind spots: a name with no clue anywhere in its file; year-of-birth fields; zero-width characters and
    look-alike letters; unfamiliar honorifics; labels in languages / spellings missing from `labels.py`.
-3. After real `link` and `privacy` merge, rerun everything above.
+3. The 1 lost medical value and 1 wrong merge on practice data (find which module causes each).

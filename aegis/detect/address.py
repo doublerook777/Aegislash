@@ -24,7 +24,7 @@ LOCALITY = re.compile(
 _LANDMARK_NOUN = (r"(?:Mandir|Temple|Masjid|Mosque|Gurudwara|Church|School|College|Tanki|Bhawan|Bhavan|Chowk|Crossing|Station|"
                   r"Office|Bank|Market|Bazar|Bazaar|Talab|Pond|Tower|Stand|Gate|Park|Hospital|PHC|Chauraha|Well|Tree)")
 LANDMARK = re.compile(
-    rf"\b(?i:near|nr\.?|opp\.?|opposite|behind|beside|next to) +(?:{_PLACE_WORD} ){{0,3}}{_LANDMARK_NOUN}\b"
+    rf"\b(?i:near|nr\.?|opp\.?|opposite|behind|beside|next to)(?: *: *| +)(?:{_PLACE_WORD} ){{0,3}}{_LANDMARK_NOUN}\b"
     rf"|(?:{_DEVA_W} ){{1,3}}(?:के पास|के पीछे|के सामने|के बगल(?: में)?)")
 VILLAGE_CUE = re.compile(
     rf"(?:\b(?i:village|vill\.?|gram(?! panchayat)|gaon|r/o)|(?<![ऀ-ॿ])(?:ग्राम|गाँव|गांव))[ :.-]+"
@@ -52,7 +52,10 @@ _LOCALITY_TAIL = re.compile(r"(?:Nagar|Colony|Tola|Basti|Purwa|Mohalla|Enclave|V
                             r"(?:नगर|कॉलोनी|टोला|बस्ती|गली|मार्ग|रोड)")
 
 
-def find_places(text: str) -> list[Cand]:
+_CARE_OF_ADDRESS = re.compile(r"(?<![A-Za-z/])(?i:c/o)[ :.-]+(?P<a>\d{1,4}[A-Z]?(?:/\d+)?, *[^;\n|]{5,120})")
+
+
+def find_places(text: str, care_of: bool = True) -> list[Cand]:
     """Places announced by a clear cue, safe to run on any free text."""
     out = []
     for kind, pattern in (("HOUSE", HOUSE), ("LOCALITY", LOCALITY), ("LANDMARK", LANDMARK)):
@@ -62,6 +65,9 @@ def find_places(text: str) -> list[Cand]:
         out.append(Cand(m.start("v"), m.end("v"), "VILLAGE", norm_name(m.group("v")), "patient"))
     for m in DISTRICT_CUE.finditer(text):
         out.append(Cand(m.start("d"), m.end("d"), "DISTRICT", norm_name(m.group("d")), "patient"))
+    # "c/o- 14, Nehru Marg, ...": care-of followed by a number is an address, not a complaint or a person
+    for m in _CARE_OF_ADDRESS.finditer(text) if care_of else ():
+        out.extend(parse_address(text, m.start("a"), m.end("a")))
     for pattern in (PIN_CUE, _PIN_TAIL):
         for m in pattern.finditer(text):
             out.append(Cand(m.start("p"), m.end("p"), "PIN", m.group("p").replace(" ", ""), "patient"))
@@ -72,7 +78,7 @@ def parse_address(text: str, offset: int = 0, end: int | None = None) -> list[Ca
     """Every part of an address gets a type. When unsure, it is a locality (remove it)."""
     end = len(text) if end is None else end
     part = text[offset:end]
-    found = [c for c in find_places(part) + find_names(part)]
+    found = find_places(part, care_of=False) + find_names(part)
     for m in re.finditer(r"(?i:ward)(?: no\.?)? ?\d+|वार्ड(?: नं\.?)? ?\d+", part):
         found.append(Cand(m.start(), m.end(), "LOCALITY", norm_name(m.group(0)) or None, "patient"))
     for m in _PIN_ANY.finditer(part):

@@ -142,7 +142,8 @@ def _labelled(text: str, dmy: bool) -> list[Cand]:
     pos = 0
     for line in text.split("\n"):
         # several "label: value" pairs can share a line, separated by wide gaps or pipes
-        for m in re.finditer(r"(?:(?! {3}|\t|\|).)+", line):
+        # a comma or semicolon followed by "something:" starts the next label
+        for m in re.finditer(r"(?:(?! {3}|\t|\||[;,](?=[^,;:|\n]{1,30}:(?!\d))|;).)+", line):
             lab = _LABEL_LINE.match(m.group(0))
             if not lab:
                 continue
