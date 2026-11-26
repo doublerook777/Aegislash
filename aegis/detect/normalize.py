@@ -1,7 +1,8 @@
-"""Text normalising: digit folding, script detection, Devanagari -> Latin.
+"""Text normalising: digit folding, look-alike letters, hidden characters, Devanagari -> Latin.
 
 `fold` changes characters one-for-one, so an offset found in the folded text is the same
-offset in the original. Never add a rule here that changes the length of the text.
+offset in the original. Never add a rule to `fold` that changes the length of the text.
+`visible` does shorten text; it returns the original position of every character it keeps.
 """
 from __future__ import annotations
 
@@ -17,12 +18,43 @@ for _c in "‐‑‒–—―−":
 for _c in "    ":
     _FOLD[ord(_c)] = " "
 _FOLD[ord("’")] = "'"
+# accented Latin letters are matched as their base letter ("í" -> "i"); name patterns are plain A-Z
+for _n in range(0x00C0, 0x0250):
+    _base = unicodedata.normalize("NFD", chr(_n))[0]
+    if _base != chr(_n) and _base.isascii() and _base.isalpha():
+        _FOLD[_n] = _base
 
 DEVA = re.compile(r"[ऀ-ॿ]")
 
 
+# Cyrillic and Greek letters that look like Latin ones. Only replaced inside a word that also has real Latin
+# letters, so a micro sign or a word written wholly in another script is left alone.
+_LOOKALIKE = str.maketrans("аеорсухіјѕԁһӏАВЕЅІЈКМНОРСТУХ" "οαιΑΒΕΖΗΙΚΜΝΟΡΤΥΧ",
+                           "aeopcyxijsdhlABESIJKMHOPCTYX" "oaiABEZHIKMNOPTYX")
+_WORD = re.compile(r"[A-Za-z\u0370-\u03ff\u0400-\u052f]+")
+
+
+def _unmask(m: re.Match) -> str:
+    word = m.group(0)
+    return word.translate(_LOOKALIKE) if re.search(r"[A-Za-z]", word) else word
+
+
 def fold(s: str) -> str:
-    return s.translate(_FOLD)
+    s = s.translate(_FOLD)
+    return s if s.isascii() else _WORD.sub(_unmask, s)
+
+
+# zero-width characters, direction marks and soft hyphens; also accents typed as separate marks after a letter
+_HIDDEN = re.compile(r"[\u00ad\u200b-\u200f\u2060-\u2064\ufeff]|(?<=[A-Za-z])[\u0300-\u036f]+")
+
+
+def visible(s: str) -> tuple[str, list[int] | None]:
+    """`s` without hidden characters, and where each kept character was in `s` (None: nothing removed)."""
+    if s.isascii() or not _HIDDEN.search(s):
+        return s, None
+    dropped = {i for m in _HIDDEN.finditer(s) for i in range(m.start(), m.end())}
+    kept = [i for i in range(len(s)) if i not in dropped]
+    return "".join(s[i] for i in kept), kept
 
 
 def digits(s: str) -> str:
@@ -81,7 +113,7 @@ def to_latin(s: str) -> str:
 
 def norm_name(s: str) -> str:
     """Casefolded Latin form used in Finding.norm and Evidence."""
-    return " ".join(re.sub(r"[^a-z ]+", " ", to_latin(s).casefold()).split())
+    return " ".join(re.sub(r"[^a-z ]+", " ", to_latin(fold(s)).casefold()).split())
 
 
 def script_of(s: str) -> str:
