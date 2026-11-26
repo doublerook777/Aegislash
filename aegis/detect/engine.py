@@ -291,6 +291,10 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
     if role == "mrn" and kind == "value" and not re.search(r"\d", text):
         role = None
 
+    # the header is only a hint: a "PIN" column may really hold the whole address ("Home Place & PIN")
+    if role == "pin" and kind == "value" and address.holds_address(text):
+        role = "address"
+
     found = ids.find_ids(text)
     if role in fields.ID_ROLES:
         found = []  # structured() returns the same ids, or the whole value if no shape matched
@@ -304,7 +308,7 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
     if role not in (None, "free"):
         found += fields.structured(text, 0, len(text), role, dmy)
 
-    if role in (None, "free", "date"):
+    if role in (None, "free", "date", "bed_patient"):
         found += dates.find_ages(text)
         found += address.find_places(text)
         found += names.find_names(text)

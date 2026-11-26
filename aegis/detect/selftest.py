@@ -109,6 +109,23 @@ CASES = [
     ("pichle das din se pet dard, lal chakte, x ray normal, khan pan theek", [],
      ["das din", "pet dard", "lal chakte", "x ray normal", "khan pan"]),
     ("patient has chest pain and mild fever, advised rest at home", [], ["chest pain", "mild fever", "rest at home"]),
+    # lowercase "h.no"; "q4h no 2" is a dose schedule, not a house
+    ("Lives at h.no 58/C, since 2019.", ["h.no 58/C"], []),
+    ("Old record says hno. 212 only.", ["hno. 212"], []),
+    ("Syrup q4h no 2 more doses today.", [], ["q4h no 2"]),
+    # "r/o" also means "rule out": a disease after it is not a village
+    ("Tremor, r/o Parkinson's disease, advise MRI.", [], ["Parkinson"]),
+    ("Fever 3 days, r/o Dengue.", [], ["Dengue"]),
+    ("Chest pain, r/o MI.", [], ["MI"]),
+    ("Persistent cough, R/O TB.", [], ["TB"]),
+    ("Weakness, r/o Guillain Barre syndrome.", [], ["Guillain"]),
+    ("RLQ pain, r/o Appendicitis.", [], ["Appendicitis"]),
+    ("65 yr male R/o Barhalganj, seen in OPD.", ["Barhalganj"], []),
+    ("Pt r/o Sikandarpur fever since 3 days.", ["Sikandarpur"], []),
+    # a real village must still go, whatever follows it or however its name ends
+    ("R/o Barhalganj Patient stable today.", ["Barhalganj"], []),
+    ("Woman r/o Sikandarpur heart disease on treatment.", ["Sikandarpur"], []),
+    ("Man r/o Phuluria for ten years.", ["Phuluria"], []),
     # dotted and "+91/" phones, mixed Aadhaar separators
     ("Call 97.31.20.45.88 or +91/8123/004455; Na 138.5", ["97.31.20.45.88", "+91/8123/004455"], ["138.5"]),
     ("ID seen 5821-7734 9012 at desk, HbA1c 7.2", ["5821-7734 9012"], ["HbA1c 7.2"]),
@@ -216,6 +233,43 @@ def _run_tables() -> int:
     return failed
 
 
+# one column: (header, cell, strings that MUST be found, strings that MUST survive). The header is only a hint:
+# a "PIN" column may hold the whole address, and "Ward / Patient" holds a bed number and a person
+CELLS = [
+    ("res_pin", "7/21, Teliarganj, 211004", ["7/21", "Teliarganj", "211004"], []),
+    ("Postal Entry", "Flat 6-C, Ulubari, 781007", ["Flat 6-C", "Ulubari", "781007"], []),
+    ("Dwelling/PIN", "Kachhi Basti, opp. Water Tank, 302016", ["Kachhi Basti", "opp. Water Tank", "302016"], []),
+    ("PIN Code", "211004", ["211004"], []),
+    ("pin_code", "PIN 211004", ["211004"], ["PIN"]),
+    ("Pincode", "not recorded, ask later", [], ["not recorded", "ask later"]),
+    ("Ward / Patient", "Bed 21 - Ishrat Jahan Ansari", ["Ishrat Jahan Ansari"], ["Bed 21"]),
+    ("bed_patient", "Cot 3: Thangkhal Haokip", ["Thangkhal Haokip"], ["Cot 3"]),
+    ("Patient", "Bed 8 - Devika Ranganathan", ["Devika Ranganathan"], ["Bed 8"]),
+    ("Patient", "Ward 3 Bed 8 - Devika Ranganathan", ["Devika Ranganathan"], ["Ward 3", "Bed 8"]),
+    ("Ward / Patient", "Female Medical Ward", [], ["Female Medical Ward"]),
+    ("Ward / Patient", "Surgical Ward B", [], ["Surgical Ward"]),
+    ("bed_patient", "Bed 14", [], ["Bed 14"]),
+    ("Ward / Patient", "Ward 4 - Male Surgical", [], ["Male Surgical"]),
+    ("Ward / Patient", "Ishrat Jahan Ansari", ["Ishrat Jahan Ansari"], []),
+    ("patient_ward", "Maternity", [], ["Maternity"]),
+]
+
+
+def _run_cells() -> int:
+    failed = 0
+    for header, value, must_find, must_keep in CELLS:
+        record = {"record_id": "t.csv#row:1", "file": "t.csv", "loc": "row:1", "fmt": "csv",
+                  "fields": [{"path": "col:0", "kind": "value", "context": header, "value": value}]}
+        found = [f["text"] for f in detect_file([record])[0]["findings"]
+                 if f["type"] not in ("CONDITION", "DISTRICT", "GENDER")]
+        missed = [x for x in must_find if not any(x in f for f in found)]
+        eaten = [x for x in must_keep if any(x in f or f in x for f in found)]
+        if missed or eaten:
+            failed += 1
+            print(f"FAIL  {header}: {value}\n      missed={missed} wrongly_removed={eaten}")
+    return failed
+
+
 # JSON cases: (pointer -> value or key, strings that MUST be found, strings that MUST survive)
 DOCS = [
     # an unlisted two-word value is a person only when its label says so
@@ -298,6 +352,9 @@ def main() -> int:
             print(f"FAIL  {line}\n      missed={missed} wrongly_removed={eaten}")
     table_failures = _run_tables()
     print(f"{len(TABLES)} column tables checked, {table_failures} problems")
+    cell_failures = _run_cells()
+    print(f"{len(CELLS)} single cells checked, {cell_failures} problems")
+    table_failures += cell_failures
     doc_failures = _run_docs() + _run_filenames()
     print(f"{len(DOCS)} JSON documents and {len(FILENAMES)} file names checked, {doc_failures} problems")
     print(f"{len(CASES) - failed}/{len(CASES)} cases passed")  # keep last: tools read the last line
