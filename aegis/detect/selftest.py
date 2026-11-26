@@ -110,6 +110,9 @@ TABLES = [
       ["Lalita Oraon", "Birsu Oraon", "Neha Kapoor", "H.No. 4, Station Road, Ranchi", "834001", "Dr. Neha Kapoor advised rest"],
       ["Joseph Kurien", "Anna Kurien", "Farhan Qureshi", "Flat 9, Gandhi Nagar, Near Bus Stand", "682020", "stable"]],
      {"P_NOM": "PATIENT_NAME", "K_SUP": "RELATIVE_NAME", "M_RXR": None, "Q_LOC": "HOUSE", "Z_6D": "PIN"}),
+    # one patient shares a doctor's name: the column is still the patients
+    (["P_NOM", "MEMO"], [["Amit Sharma", "stable"], ["Renu Bhagat", "stable"], ["Suraj Oraon", "stable"],
+                         ["Lalita Nair", "seen by Dr. Amit Sharma"]], {"P_NOM": "PATIENT_NAME"}),
     (["fullName", "familyHeadRelation", "orderingClinician", "labRchId", "Village/Mohalla"],
      [["Renu Bhagat", "Father Suraj Bhagat", "Gautam Pillai", "RCH-JH-25-11902", "Rampur Kalan"]],
      {"familyHeadRelation": "RELATIVE_NAME", "orderingClinician": None, "labRchId": "MRN", "Village/Mohalla": "VILLAGE"}),
