@@ -9,4 +9,9 @@ rare-condition / small-cell handling (k-anonymity), `config/policy.yaml`. Also o
 Contract it provides: [privacy](../../contracts/privacy.md). Reads findings from detect and keys
 from link ([types](../../contracts/types.md)).
 
-The real code goes in this folder; switch the import in `__init__.py` from `mock` when ready.
+Implementation layout (`__init__.py` is wired to `engine.py`):
+- `engine.py` — `plan()`, `replace()`, `stats()` and k-anonymity / rare-condition tiering
+- `dates.py` — HMAC-SHA256 keyed per-patient/per-record date shifting & format preservation
+- `generalize.py` — age banding (`85+` top-coding), PIN prefixing, and village generalization
+- `policy.py` — `config/policy.yaml` loader with defaults
+- `test_privacy.py` — unit tests for contracts, date formats, k-anonymity, and `risk_report.py`
