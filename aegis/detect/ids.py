@@ -20,12 +20,14 @@ AADHAAR_MASKED = re.compile(r"(?<![A-Za-z0-9])(?:[Xx*•]{4}[- ]?){2}\d{4}(?!\d)
 AADHAAR = re.compile(_L + r"(?<![\d][- /.])[2-9]\d{3}([- ]?)\d{4}\1\d{4}(?![- /.]?\d)" + _R)
 PAN = re.compile(_L + r"[A-Z]{5}\d{4}[A-Z]" + _R)
 INSURANCE = re.compile(
-    _L + r"(?:PMJAY(?:[-/ ]?[A-Z]{2,3})?[-/ ]?\d{6,}|(?:POL|POLICY|INS|TPA|MEDI|CGHS|ESIC?)(?:[-/]\d+){1,4})" + _R, re.I)
+    _L + r"(?:[A-Z]{2,10}-POL(?:[-/]\d+){1,4}|PMJAY(?:[-/ ]?[A-Z]{2,3})?(?:[-/]\d{2,4})?[-/ ]?\d{6,}"
+    r"|(?:POL|POLICY|INS|TPA|MEDI|CGHS|ESIC?)(?:[-/][A-Z]{2,5})?(?:[-/]\d+){1,4})" + _R, re.I)
 
 _PHONE_BODY = (r"(?:[6-9]\d{4}[- .]?\d{5}"            # 98765 43210
                r"|[6-9]\d{2}[- .]\d{3}[- .]\d{4}"      # 987-654-3210
                r"|[6-9]\d{3}[- .]\d{3}[- .]\d{3}"       # 9876-543-210
-               r"|[6-9]\d\.\d{2}\.\d{2}\.\d{4})")           # 98.76.54.3210
+               r"|[6-9]\d\.\d{2}\.\d{2}\.\d{4}"            # 98.76.54.3210
+               r"|[6-9]\d(?: \d{2}){4})")                         # 98 76 54 32 10
 PHONE = re.compile(r"(?<![A-Za-z0-9])(?:(?:\(\+?91\)|\+91|0091|91(?=[- ])|0)[- .]{0,2})?"
                    + _PHONE_BODY + r"(?!\d|[-/]\d|[A-Za-z])")
 
@@ -33,8 +35,14 @@ PHONE = re.compile(r"(?<![A-Za-z0-9])(?:(?:\(\+?91\)|\+91|0091|91(?=[- ])|0)[- .
 _NOT_MRN_PREFIX = {"BL", "BILL", "INV", "OPD", "OP", "AMB", "HD", "LAB", "POL", "PMJAY", "TPA", "INS", "REF", "VISIT",
                    "RX", "RPT", "CLM", "ORD", "TXN", "DOC", "ICD", "COVID", "LOINC", "ISO", "FHIR"}
 MRN_SHAPES = [
-    re.compile(_L + r"[A-Z]{2,5}[-/ ]?(?:IPD|IP|UHID|MRN|CR|REG)[-/ ]?(?:\d{2,4}[-/])?\d{4,}" + _R, re.I),
-    re.compile(_L + r"(?:UHID|MRN|MRD|CRN|CR|REG|IPD|IP|ADM)(?:[-/ ]?(?:NO|ID)\.?)?[-/ ]?(?:\d{2,4}[-/])?\d{5,}" + _R, re.I),
+    # "IP#NICU-26-419"; and hospital/branch/year/number: "APH/PUN/26/88104"
+    re.compile(_L + r"(?:IP|IPD|UHID)#(?=(?:[A-Z/-]*\d){3})(?:[A-Z0-9]{1,6}[-/]){0,4}\d{3,}" + _R, re.I),
+    re.compile(_L + r"[A-Z]{2,5}/[A-Z]{2,5}/(?:\d{2}|\d{4})/\d{4,8}(?![-/]?\d)" + _R),
+    # a record-number prefix, then any mix of short blocks: MRN-BLR-77102, IPD#26/88310, MRN#KMC-44812-A, IPD-2023-045
+    re.compile(_L + r"(?:UHID|MRN|MRD|CRN|IPD)(?:#[ ]?|[-/])(?=(?:[A-Z/-]*\d){4})(?:[A-Z0-9]{1,6}[-/]){0,4}\d{3,}"
+               r"(?:[-/][A-Z](?![A-Za-z0-9]))?" + _R, re.I),
+    re.compile(_L + r"[A-Z]{2,5}[-/ ]?(?:IPD|IP|UHID|MRN|CR|REG)[-/ ]?(?:\d{2,4}[-/])?\d{4,}(?![-/]?\d)" + _R, re.I),
+    re.compile(_L + r"(?:UHID|MRN|MRD|CRN|CR|REG|IPD|IP|ADM)(?:[-/ ]?(?:NO|ID)\.?)?[-/ ]?(?:\d{2,4}[-/])?\d{5,}(?![-/]?\d)" + _R, re.I),
     re.compile(_L + r"[A-Z]{2,5}[/-](?:\d{2}|\d{4})[/-]\d{4,8}(?![-/]?\d)" + _R),
     re.compile(_L + r"[A-Z]{3,5}(?:19|20)\d{2}[-/]\d{4,}" + _R),
     re.compile(_L + r"[A-Z]{3,5}[-/]\d{6,}(?![-/]?\d)" + _R),
@@ -48,12 +56,14 @@ _LABELLED = [
         r"(?<![A-Za-z])(?i:uhid|mrn|c\.? ?r\.? ?no|reg(?:istration|n)?\.? ?(?:no|id|number)|rec(?:ord)?\.? ?(?:no#?|id|#)"
         r"|hosp(?:ital)?\.? ?(?:no|id)|pt\.? ?id|patient (?:id|no)|ipd? ?no|admission (?:no|number)|file no)" + _SEP
         + r"(?P<v>#?(?=[A-Za-z/\-]*\d[A-Za-z/\-]*\d)[A-Za-z0-9](?:[A-Za-z0-9/\-]{1,28}[A-Za-z0-9]))")),
+    ("MRN", re.compile(r"(?:आईपीडी|आईपी|यूएचआईडी|पंजीकरण)(?: ?(?:नंबर|नं\.?|संख्या|क्रमांक))?" + _SEP
+                       + r"(?P<v>(?=[A-Z/\-]*\d(?:[A-Z/\-]*\d){2})[A-Z0-9](?:[A-Z0-9/\-]{1,28}[A-Z0-9]))")),
     ("AADHAAR", re.compile(r"(?:(?i:aadh?aa?r|adhar)|आधार)(?i: ?(?:card)? ?(?:no|number|id)?)" + _SEP
                            + r"(?P<v>\d{4}[ -]?\d{4}[ -]?\d{4})(?!\d)")),
     ("ABHA_NUMBER", re.compile(r"(?:(?i:abha|health ?id)|एबीएचए)(?i: ?(?:id|no|number)?)" + _SEP
                                + r"(?P<v>\d(?:[ -]?\d){11,15})(?!\d)")),
     ("PHONE", re.compile(r"(?:(?<![A-Za-z])(?i:mob(?:ile)?|ph(?:one)?|contact(?: no)?|tel|whatsapp|call(?:ed)? on)"
-                         r"|मोबाइल|फ़ोन|फोन|संपर्क|\((?:H|M|R|O)(?=:))" + _SEP + r"(?P<v>\+?\d(?:[ .\-]?\d){9,12})(?!\d)")),
+                         r"|मोबाइल|फ़ोन|फोन|संपर्क|\((?:H|M|R|O)(?=:))" + _SEP + r"(?P<v>\+?\d(?:[ .\-/]?\d){9,12})(?!\d)")),
 ]
 
 

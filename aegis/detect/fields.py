@@ -14,7 +14,7 @@ NAME_ROLES = ("patient_name", "relative_name", "name", "first_name", "last_name"
 ID_ROLES = {"phone": "PHONE", "aadhaar": "AADHAAR", "abha": "ABHA_NUMBER", "abha_address": "ABHA_ADDRESS",
             "email": "EMAIL", "pan": "PAN", "insurance": "INSURANCE_ID", "mrn": "MRN"}
 _RELATION_PREFIX = re.compile(r"^\s*(?P<rel>[SDWCsdwc]/[Oo])\b[.:]?\s*")
-_TITLES = re.compile(rf"^\s*(?:{_TITLE}\s*)+")
+_TITLES = re.compile(rf"^\s*(?:(?!Mohd\b|Md\b){_TITLE}\s*)+")
 _NOT_A_NAME = re.compile(r"^(?:n/?a|na|nil|none|null|unknown|-+|self|same|test)$", re.I)
 
 
@@ -38,6 +38,19 @@ def _strip(text: str, s: int, e: int) -> tuple[int, int]:
     while e > s and text[e - 1] in " \t\r\n\"',;.|":
         e -= 1
     return s, e
+
+
+_KIN_THEN_NAME = re.compile(
+    r"^\s*(?:(?i:spouse|husband|wife|father|mother|son|daughter|brother|sister|(?:brother|sister|father|mother|son|daughter)-in-law|"
+    r"cousin|uncle|aunt|guardian|[hwsdfm]/o)|पति|पत्नी|पिता|माता|पुत्र|पुत्री|बेटा|बेटी|भाई|बहन|बहू|शौहर)\b[ :.\-]+(?P<n>.+)$")
+
+
+def kin_and_name(text: str) -> list[Cand]:
+    """A "relation" column may hold the person too: "Father <name>"."""
+    m = _KIN_THEN_NAME.match(text)
+    if not m or not (DEVA.search(m.group("n")) or m.group("n")[:1].isupper()):
+        return []
+    return name_value(text, m.start("n"), m.end("n"), "relative_name")
 
 
 def name_value(text: str, s: int, e: int, role: str) -> list[Cand]:
@@ -89,9 +102,17 @@ def structured(text: str, s: int, e: int, role: str, dmy: bool) -> list[Cand]:
     if role in ID_ROLES:
         kind = ID_ROLES[role]
         found = [c._replace(start=c.start + s, end=c.end + s) for c in find_ids(value)]
+        # the column holds one number: take all of it, even if only a part has a known shape ("RCH-JH-26-44109")
+        if (kind in ("MRN", "INSURANCE_ID") and re.fullmatch(r"[A-Za-z0-9#/_.-]{5,30}", value)
+                and len(digits(value)) >= 4 and all(c.type in ("MRN", "INSURANCE_ID", "PHONE") for c in found)
+                and not any(c.start == s and c.end == e for c in found)):
+            norm = re.sub(r"[^A-Z0-9]", "", value.upper()) if kind == "INSURANCE_ID" else digits(value)
+            return [Cand(s, e, kind, norm, "patient", prio=PRIORITY[kind] + 2)]
         if found:
             return found
         needs_at = kind in ("EMAIL", "ABHA_ADDRESS")
+        if len(re.findall(r"[a-z]{3,}", value)) >= 2 and not needs_at:
+            return []
         if (needs_at and "@" not in value) or (not needs_at and len(digits(value)) < 5) or len(value) > 40:
             return []
         if kind == "AADHAAR" and re.search(r"[Xx*•]", value):
