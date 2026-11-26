@@ -21,7 +21,11 @@ NUMERIC = re.compile(r"(?<![\d./-])(\d{1,2})([/.-])(\d{1,2})\2((?:19|20)\d{2}|\d
 TEXT_DMY = re.compile(r"(?<![\d])(\d{1,2})(?:st|nd|rd|th)?[ -](" + _MONTH_RE + r")\b\.?(?:[ ,-]+((?:19|20)\d{2}|'?\d{2})(?!\d))?", re.I)
 TEXT_MDY = re.compile(r"\b(" + _MONTH_RE + r")\.? (\d{1,2})(?:st|nd|rd|th)?(?!\d)(?:,? ((?:19|20)\d{2}))?", re.I)
 
-_DOB_BEFORE = re.compile(r"(?:\bd\.?o\.?b\b|date of birth|birth ?date|\bborn(?: on)?\b|जन्म[^\n:]{0,20})\W{0,6}$", re.I)
+_DOB_BEFORE = re.compile(
+    r"(?:\bd\.?o\.?b\b|date of birth|birth ?date|birth ?year|\byob\b|\bborn(?: on)?\b"
+    r"|janam ?din(?:ank)?|janm ?(?:din|tithi|tarikh)|janam ?tithi|जन्म[^\n:]{0,20})\W{0,6}$",
+    re.I,
+)
 
 
 def _iso(y: int, m: int, d: int) -> str | None:

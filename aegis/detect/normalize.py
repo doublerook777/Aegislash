@@ -14,15 +14,69 @@ for _zero in (0x0966, 0xFF10, 0x09E6, 0x0A66, 0x0AE6):  # Devanagari, fullwidth,
         _FOLD[_zero + _i] = str(_i)
 for _c in "‐‑‒–—―−":
     _FOLD[ord(_c)] = "-"
-for _c in "    ":
+for _c in " \u00a0\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000":
     _FOLD[ord(_c)] = " "
 _FOLD[ord("’")] = "'"
+_FOLD[ord("‘")] = "'"
 
+# 1-to-1 Cyrillic/Greek homoglyph and Latin diacritic folding (preserves string length & offsets)
+_HOMOGLYPHS = {
+    "а": "a", "А": "A", "в": "B", "В": "B", "е": "e", "Е": "E", "ё": "e", "Ё": "E",
+    "з": "3", "З": "3", "і": "i", "І": "I", "ї": "i", "Ї": "I", "к": "k", "К": "K",
+    "м": "m", "М": "M", "н": "H", "Н": "H", "о": "o", "О": "O", "р": "p", "Р": "P",
+    "с": "c", "С": "C", "т": "t", "Т": "T", "у": "y", "У": "Y", "х": "x", "Х": "X",
+    "α": "a", "Α": "A", "β": "B", "Β": "B", "ε": "e", "Ε": "E", "ζ": "Z", "Ζ": "Z",
+    "η": "n", "Η": "H", "ι": "i", "Ι": "I", "κ": "k", "Κ": "K", "μ": "m", "Μ": "M",
+    "ν": "v", "Ν": "N", "ο": "o", "Ο": "O", "ρ": "p", "Ρ": "P", "ς": "c", "τ": "t",
+    "Τ": "T", "υ": "u", "Υ": "Y", "χ": "x", "Χ": "X",
+}
+for _src, _dst in _HOMOGLYPHS.items():
+    _FOLD[ord(_src)] = _dst
+
+for _src, _dst in (
+    ("áàâäãåāăą", "a"), ("éèêëēĕėęě", "e"), ("íìîïĩīĭįı", "i"),
+    ("óòôöõøōŏő", "o"), ("úùûüũūŭůűų", "u"), ("ñńņň", "n"),
+    ("çćĉċč", "c"), ("ýÿŷ", "y"), ("śŝşš", "s"), ("źżž", "z"),
+    ("řŕŗ", "r"), ("ťţŧ", "t"), ("ďđ", "d"), ("łĺļľ", "l"), ("ğĝġģ", "g"),
+):
+    for _ch in _src:
+        _FOLD[ord(_ch)] = _dst
+        if _ch.upper() != _ch and len(_ch.upper()) == 1:
+            _FOLD[ord(_ch.upper())] = _dst.upper()
+
+_ZW_STRIP = frozenset("\u200b\ufeff\u00ad")
+_ZW_JOIN = frozenset("\u200c\u200d")
 DEVA = re.compile(r"[ऀ-ॿ]")
 
 
 def fold(s: str) -> str:
     return s.translate(_FOLD)
+
+
+def strip_evasion_with_map(s: str) -> tuple[str, list[int] | None]:
+    """Strip zero-width obfuscation (and non-Devanagari combining marks) while returning an offset map.
+
+    Returns ``(clean, idx_map)`` where ``idx_map`` is ``None`` on the fast path (nothing stripped),
+    or a list of original character indices for every character in ``clean``.
+    """
+    if not any(c in _ZW_STRIP or c in _ZW_JOIN or (unicodedata.combining(c) and not ("\u0900" <= c <= "\u097f")) for c in s):
+        return s, None
+    out_chars: list[str] = []
+    idx_map: list[int] = []
+    n = len(s)
+    for i, ch in enumerate(s):
+        if ch in _ZW_STRIP:
+            continue
+        if ch in _ZW_JOIN:
+            prev_deva = i > 0 and "\u0900" <= s[i - 1] <= "\u097f"
+            next_deva = i + 1 < n and "\u0900" <= s[i + 1] <= "\u097f"
+            if not (prev_deva and next_deva):
+                continue
+        if unicodedata.combining(ch) and not ("\u0900" <= ch <= "\u097f"):
+            continue
+        out_chars.append(ch)
+        idx_map.append(i)
+    return "".join(out_chars), idx_map
 
 
 def digits(s: str) -> str:

@@ -14,20 +14,28 @@ _L = r"(?<![A-Za-z0-9])"   # left boundary
 _R = r"(?![A-Za-z0-9])"    # right boundary
 
 EMAIL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
+# Scrubadub-inspired obfuscated email ("ramesh at gmail dot com")
+EMAIL_OBF = re.compile(
+    r"\b[A-Za-z0-9][A-Za-z0-9._+-]{1,40}\s+at\s+[A-Za-z0-9-]+(?:\s*(?:\.|dot)\s*[A-Za-z0-9-]+)*"
+    r"\s*(?:\.|dot)\s*(?:com|in|org|net|edu|gov|co|io|info|biz)\b",
+    re.I,
+)
 ABHA_ADDR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._]*@(?:abdm|sbx|ndhm|abha)" + _R, re.I)
 ABHA_NUM = re.compile(_L + r"\d{2}([- ])\d{4}\1\d{4}\1\d{4}(?!\d)")
 AADHAAR_MASKED = re.compile(r"(?<![A-Za-z0-9])(?:[Xx*•]{4}[- ]?){2}\d{4}(?!\d)")
-AADHAAR = re.compile(_L + r"(?<![\d][- /.])[2-9]\d{3}([- ]?)\d{4}\1\d{4}(?![- /.]?\d)" + _R)
-PAN = re.compile(_L + r"[A-Z]{5}\d{4}[A-Z]" + _R)
+AADHAAR = re.compile(r"(?<![A-Za-z0-9%])(?<![\d][- /.])[2-9]\d{3}([- ]?)\d{4}\1\d{4}(?![- /.]?\d)" + _R)
+PAN = re.compile(_L + r"[A-Za-z]{5}\d{4}[A-Za-z]" + _R)
 INSURANCE = re.compile(
     _L + r"(?:[A-Z]{2,10}-POL(?:[-/]\d+){1,4}|PMJAY(?:[-/ ]?[A-Z]{2,3})?(?:[-/]\d{2,4})?[-/ ]?\d{6,}"
     r"|(?:POL|POLICY|INS|TPA|MEDI|CGHS|ESIC?)(?:[-/][A-Z]{2,5})?(?:[-/]\d+){1,4})" + _R, re.I)
 
-_PHONE_BODY = (r"(?:[6-9]\d{4}[- .]?\d{5}"            # 98765 43210
-               r"|[6-9]\d{2}[- .]\d{3}[- .]\d{4}"      # 987-654-3210
-               r"|[6-9]\d{3}[- .]\d{3}[- .]\d{3}"       # 9876-543-210
-               r"|[6-9]\d\.\d{2}\.\d{2}\.\d{4}"            # 98.76.54.3210
-               r"|[6-9]\d(?: \d{2}){4})")                         # 98 76 54 32 10
+_PHONE_BODY = (r"(?:\([6-9]\d{2}\)[- .]?\d{3}[- .]\d{4}"  # (795) 633-0006
+               r"|[6-9]\d{4}[- ./]?\d{5}"                 # 98765 43210
+               r"|[6-9]\d{2}[- ./]\d{3}[- ./]\d{4}"       # 987-654-3210 / 989/900/1122
+               r"|[6-9]\d{3}[- ./]\d{3}[- ./]\d{3}"       # 9876-543-210
+               r"|[6-9]\d(?:\.\d{2}){2}\.\d{4}"           # 98.76.54.3210
+               r"|[6-9]\d(?:\.\d{2}){4}"                  # 98.45.01.12.23
+               r"|[6-9]\d(?: \d{2}){4})")                 # 98 76 54 32 10
 PHONE = re.compile(r"(?<![A-Za-z0-9])(?:(?:\(\+?91\)|\+91|0091|91(?=[- ])|0)[- .]{0,2})?"
                    + _PHONE_BODY + r"(?!\d|[-/]\d|[A-Za-z])")
 
@@ -62,8 +70,9 @@ _LABELLED = [
                            + r"(?P<v>\d{4}[ -]?\d{4}[ -]?\d{4})(?!\d)")),
     ("ABHA_NUMBER", re.compile(r"(?:(?i:abha|health ?id)|एबीएचए)(?i: ?(?:id|no|number)?)" + _SEP
                                + r"(?P<v>\d(?:[ -]?\d){11,15})(?!\d)")),
-    ("PHONE", re.compile(r"(?:(?<![A-Za-z])(?i:mob(?:ile)?|ph(?:one)?|contact(?: no)?|tel|whatsapp|call(?:ed)? on)"
-                         r"|मोबाइल|फ़ोन|फोन|संपर्क|\((?:H|M|R|O)(?=:))" + _SEP + r"(?P<v>\+?\d(?:[ .\-/]?\d){9,12})(?!\d)")),
+    ("PHONE", re.compile(r"(?:(?<![A-Za-z])(?i:mob(?:ile)?|ph(?:one)?|contact(?: no)?|tel|whatsapp|call(?:ed)? on|dial|caller)"
+                         r"|मोबाइल|फ़ोन|फोन|संपर्क|\((?:H|M|R|O)(?=:))" + _SEP
+                         + r"(?P<v>(?:\(\+?\d{2,4}\)[- .]?|\+?\d{1,4}[- .])?\d(?:[ .\-/]?\d){7,12})(?!\d)")),
 ]
 
 
@@ -90,6 +99,10 @@ def find_ids(text: str) -> list[Cand]:
     for m in EMAIL.finditer(text):
         end = m.end() - 1 if m.group(0).endswith(".") else m.end()
         out.append(Cand(m.start(), end, "EMAIL", text[m.start():end].casefold()))
+    for m in EMAIL_OBF.finditer(text):
+        norm_em = re.sub(r"\s+at\s+", "@", m.group(0).casefold())
+        norm_em = re.sub(r"\s*(?:\.|dot)\s*", ".", norm_em)
+        out.append(Cand(m.start(), m.end(), "EMAIL", norm_em))
     for m in ABHA_NUM.finditer(text):
         out.append(Cand(m.start(), m.end(), "ABHA_NUMBER", digits(m.group(0))))
     for m in AADHAAR_MASKED.finditer(text):
@@ -106,7 +119,7 @@ def find_ids(text: str) -> list[Cand]:
             norm = phone_norm(value) if kind == "PHONE" else digits(value)
             out.append(Cand(m.start("v"), m.end("v"), kind, norm, "patient"))
     for m in PAN.finditer(text):
-        out.append(Cand(m.start(), m.end(), "PAN", m.group(0)))
+        out.append(Cand(m.start(), m.end(), "PAN", m.group(0).upper()))
     for m in INSURANCE.finditer(text):
         out.append(Cand(m.start(), m.end(), "INSURANCE_ID", re.sub(r"[^A-Z0-9]", "", m.group(0).upper())))
     for m in PHONE.finditer(text):

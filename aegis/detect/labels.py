@@ -22,10 +22,10 @@ def _words(s: str) -> frozenset[str]:
 _DOCTOR = _words("doctor dr consultant physician surgeon nurse referred ref author practitioner clinician medico mo डॉक्टर चिकित्सक")
 _RELATIVE = _words("guardian relative relatives kin nok father fathers husband husbands mother mothers spouse attendant informant careof pita attender parivar sadasya gharwale gharwala gharwali "
                    "pati parent caregiver witness nominee पिता पति अभिभावक माता")
-_PHONE = _words("phone ph mobile mob tel telephone whatsapp cell callback contactno msisdn फ़ोन फोन मोबाइल दूरभाष")
+_PHONE = _words("phone ph mobile mob tel telephone whatsapp cell callback contactno contactdigits msisdn फ़ोन फोन मोबाइल दूरभाष संपर्क")
 _MRN = _words("uhid mrn umr crno uid_h भर्ती_संख्या पंजीकरण आईपीडी")
 _ID_WORDS = _words("id no num number ref code सं संख्या")
-_DOB = _words("dob birth birthdate janm जन्म")
+_DOB = _words("dob birth birthdate birthyear yob janm janam जन्म")
 _AGE = _words("age umar umr aayu yrs आयु उम्र")
 _GENDER = _words("gender sex ling लिंग")
 _PIN = _words("pin pincode zip zipcode postal postalcode पिन")
@@ -59,10 +59,13 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
     if not t:
         return None
     s = set(t)
+    # strip trailing digits from tokens like "postal6", "tel1" when matching role words
+    s_alpha = {re.sub(r"\d+$", "", tok) for tok in t if re.sub(r"\d+$", "", tok)}
+    s_all = s | s_alpha
     joined = "".join(t)
     up = {w for p in parents for w in tokens(p)}
 
-    if s & _DOCTOR and not s & _PHONE:
+    if s & _DOCTOR and not s_all & _PHONE:
         return "doctor"
     if s & _FREE and not s & _ADDRESS:
         return "free"
@@ -70,15 +73,15 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
         return "email"
     if "abha" in joined or "healthid" in joined or "आभा" in s:
         return "abha_address" if s & {"address", "addr"} else "abha"
-    if s & {"aadhaar", "aadhar", "adhaar", "adhar", "uidai", "आधार", "uid"} or "aadha" in joined:
+    if s & {"aadhaar", "aadhar", "adhaar", "adhar", "uidai", "आधार", "uid"} or "aadha" in joined or "aadh" in s:
         return "aadhaar"
     if "pan" in s or joined.endswith("panno"):
         return "pan"
     if s & {"policy", "pol", "pmjay", "insurance", "ayushman", "tpa", "abpmjay"}:
         return "insurance"
-    if s & _PHONE or re.search(r"(mobile|phone|contact(no|number|num))", joined):
+    if s_all & _PHONE or re.search(r"(mobile|phone|contact(no|number|num|digits))", joined):
         return "phone"
-    if s & _DOB or "dateofbirth" in joined:
+    if s_all & _DOB or "dateofbirth" in joined or "birthyear" in joined:
         return "dob"
     if s & {"relation", "relationship", "संबंध"}:
         return "relation"
@@ -98,9 +101,9 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
     if s & _GENDER:
         return "gender"
     # one column holding several address parts ("पता_ग्राम_पिन", "house, village and PIN")
-    if s & _PIN and s & (_ADDRESS | _VILLAGE):
+    if s_all & _PIN and s & (_ADDRESS | _VILLAGE):
         return "address"
-    if s & _PIN:
+    if s_all & _PIN:
         return "pin"
     if s & _DISTRICT:
         return "district"

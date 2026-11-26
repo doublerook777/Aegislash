@@ -203,3 +203,24 @@ def _deva(text: str) -> list[Cand]:
 def find_listed_names(text: str, stop: frozenset[str]) -> list[Cand]:
     """`stop` is the caller's list of words that are never names (medicines, report words)."""
     return _latin(text, stop - SURNAMES - {"asha"}) + _deva(text)
+
+
+_PERSON_KEY_RUN = re.compile(r"^(?:[A-Z][a-z]{1,20}(?: [A-Z][a-z]{1,20}){1,2}|[ऀ-ॣॱ-ॿ]{2,20}(?: [ऀ-ॣॱ-ॿ]{2,20}){1,2})$")
+
+
+def find_unlisted_person(text: str, stop: frozenset[str]) -> list[Cand]:
+    """Detect 2-3 word TitleCase or Devanagari person names without requiring a surname hit.
+
+    Intended for structured person-like slots (JSON keys, unknown non-clinical JSON fields)
+    guarded by the disallow-list (`stop | _PLACE_OR_ORG | _NOT_NAME`), inspired by Scrubadub's
+    disallowed-noun proper-noun filter.
+    """
+    s = text.strip()
+    if not _PERSON_KEY_RUN.fullmatch(s):
+        return []
+    words = [w.casefold() for w in s.split()]
+    disallow = (stop - {"asha"}) | _PLACE_OR_ORG | _DEVA_PLACE_OR_ORG | _NOT_NAME | _DEVA_NOT_NAME
+    if any(w in disallow for w in words):
+        return []
+    start = text.index(s)
+    return [Cand(start, start + len(s), "PATIENT_NAME", None, "patient", prio=PRIORITY["PATIENT_NAME"] - 2)]

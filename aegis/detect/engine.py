@@ -11,13 +11,15 @@ Pure: no printing, files or network. No iteration over sets (output must be dete
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 
 from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
 from aegis.detect.labels import classify, tokens
-from aegis.detect.normalize import DEVA, fold, norm_name
+from aegis.detect.normalize import DEVA, fold, norm_name, strip_evasion_with_map
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
-from aegis.types import STRONG_ID_TYPES, Record, RecordResult, empty_evidence
+from aegis.types import DIRECT_TYPES, QUASI_TYPES, STRONG_ID_TYPES, Record, RecordResult, empty_evidence
 
 NAME_TYPES = ("PATIENT_NAME", "RELATIVE_NAME")
 # two or more of these words mean the sentence is Hinglish (Hindi written in Latin letters)
@@ -136,13 +138,19 @@ def _guess_role(vals: list[str]) -> str | None:
         return None
     if all(re.fullmatch(r"[1-9]\d{2}(?!000)\d{3}", v.strip()) for v in vals):
         return "pin"
+    if all(re.fullmatch(r"(?:19[1-9]\d|20[0-2]\d)", v.strip()) for v in vals):
+        yrs = [int(v.strip()) for v in vals]
+        if max(yrs) - min(yrs) >= 5 or any(y < 2015 for y in yrs):
+            return "dob"
     # addresses: most values carry a house number, landmark or PIN together with a comma
     addresses = [v for v in vals if "," in v and any(c.type in ("HOUSE", "LANDMARK", "LOCALITY", "PIN")
                                                      for c in address.find_places(fold(v)))]
     if len(addresses) >= 0.6 * len(vals) and all(len(v) <= 90 for v in vals):
         return "address"
-    people = [v for v in vals if re.fullmatch(r"[A-Z][A-Za-z.']*(?: [A-Z][A-Za-z.']*){1,3}", v.strip())]
-    with_surname = [v for v in people if set(v.casefold().split()) & gazetteer.SURNAMES]
+    folded = [fold(v).strip() for v in vals]
+    people = [v for v in folded if re.fullmatch(
+        r"[A-Z][A-Za-z.']*(?:, [A-Z][A-Za-z.']*(?: [A-Z][A-Za-z.']*)?|(?: [A-Z][A-Za-z.']*){1,3})", v)]
+    with_surname = [v for v in people if set(v.replace(",", " ").casefold().split()) & gazetteer.SURNAMES]
     if len(people) >= 0.7 * len(vals) and len(with_surname) >= 0.4 * len(vals):
         return "patient_name"
     return None
@@ -209,8 +217,30 @@ def _next_to_mrn(text: str, found: list[Cand]) -> list[Cand]:
     return out
 
 
+_B64_STEM = re.compile(r"^[A-Za-z0-9+/]{16,}={0,2}$")
+
+
+def _b64_filename_cands(text: str, dmy: bool) -> list[Cand]:
+    stem, dot, _ext = text.rpartition(".")
+    if not dot:
+        stem = text
+    if not _B64_STEM.fullmatch(stem):
+        return []
+    try:
+        dec = base64.b64decode(stem + "=" * (-len(stem) % 4)).decode("utf-8")
+    except (binascii.Error, ValueError):
+        return []
+    if not dec or sum(c.isprintable() or c in "\n\r\t" for c in dec) < 0.95 * len(dec):
+        return []
+    inner = candidates({"path": "text", "kind": "text", "context": None, "value": dec}, None, dmy)
+    if any(c.type in DIRECT_TYPES or c.type in QUASI_TYPES for c in inner):
+        return [Cand(0, len(stem), "PATIENT_NAME", norm_name(dec) or None, "patient", prio=PRIORITY["PATIENT_NAME"] + 2)]
+    return []
+
+
 def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
-    text = fold(f["value"])
+    folded = fold(f["value"])
+    text, idx_map = strip_evasion_with_map(folded)
     kind = f["kind"]
     label, parents = ("", ())
     if kind == "value":
@@ -233,9 +263,13 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
         found += dates.find_ages(text)
         found += address.find_places(text)
         found += names.find_names(text)
-        found += gazetteer.find_listed_names(text, names.STOP)
+        scan_text = text.replace("_", " ") if kind in ("filename", "header", "key") else text
+        found += gazetteer.find_listed_names(scan_text, names.STOP)
         found += _labelled(text, dmy)
     found += names.find_path_names(text)
+    found += names.find_url_pii(text)
+    if kind == "filename":
+        found += _b64_filename_cands(text, dmy)
     if kind in ("header", "key", "filename"):
         found += _next_to_mrn(text, found)
     if kind == "key":
@@ -243,6 +277,11 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
         holder = f["path"][4:].rsplit("/", 1)[0].rsplit("/", 1)[-1]
         if classify(holder.replace("by_", "")) in ("patient_name", "name") and holder.startswith("by_"):
             found += fields.name_value(text, 0, len(text), "name")
+        elif role not in ("keep", "doctor"):
+            found += gazetteer.find_unlisted_person(text.replace("_", " "), names.STOP)
+    elif kind == "value" and role is None and not f["path"].startswith("col:"):
+        if not any(classify(k) in ("doctor", "keep") for k in (label, *parents)):
+            found += gazetteer.find_unlisted_person(text, names.STOP)
     found += _conditions(text, role, label, parents)
 
     # "Door No. 18-4-22" is a house number, not a date
@@ -250,8 +289,12 @@ def candidates(f: dict, role: str | None, dmy: bool) -> list[Cand]:
     found = [c for c in found if not (c.type == "DATE" and any(h.start <= c.start and c.end <= h.end for h in houses))]
 
     blocked = names.protected_spans(text)
-    return [c for c in found
+    kept = [c for c in found
             if not (c.type in NAME_TYPES and any(c.start < e and s < c.end for s, e in blocked))]
+    if idx_map is not None:
+        kept = [c._replace(start=idx_map[c.start], end=idx_map[c.end - 1] + 1)
+                for c in kept if 0 <= c.start < c.end <= len(idx_map)]
+    return kept
 
 
 # ---------------------------------------------------------------- 3. propagation
@@ -333,7 +376,7 @@ def _propagate(records: list[Record], per_field: dict) -> None:
                 if c.type in NAME_TYPES:
                     if any(m.start() < e and s < m.end() for s, e in blocked):
                         continue
-                    if not (DEVA.search(m.group(0)) or m.group(0)[0].isupper()):
+                    if not (DEVA.search(m.group(0)) or m.group(0)[0].isupper() or kind == "filename"):
                         continue
                     norm = None
                 else:

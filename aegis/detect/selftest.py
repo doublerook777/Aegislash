@@ -93,6 +93,22 @@ CASES = [
     ("Claim TPA-MEDI-771204 under PMJAY-MH-25-884210", ["TPA-MEDI-771204", "PMJAY-MH-25-884210"], []),
     ("Collected from Shastri Ward area, Nehru Nagar, 440012 yesterday.", ["Nehru Nagar", "440012"], []),
     ("सुखदेव उइके को भर्ती किया।", ["सुखदेव उइके"], []),
+    # Scrubadub-inspired improvements + English/Hindi/Hinglish translations
+    ("Contact ramesh.verma at gmail dot com or ph 98.45.01.12.23; BP 118/76.",
+     ["ramesh.verma at gmail dot com", "98.45.01.12.23"], ["118/76"]),
+    ("Patient: Ra\u200bhul\u200d Chatur\u200bvedi, Mob: 73053\u200b31651, Co-admitted: Dеvikа Rаo.",
+     ["Ra\u200bhul\u200d Chatur\u200bvedi", "73053\u200b31651", "Dеvikа Rаo"], []),
+    ("URL ref: https://portal.example/view?patient=Priyanka%20Sengupta&tel=%2B91%207759130735",
+     ["Priyanka%20Sengupta", "%2B91%207759130735"], []),
+    ("Satyendra discharged in stable condition on Tab Azithromycin 500 mg.",
+     ["Satyendra"], ["Azithromycin 500 mg"]),
+    ("Priyanka ne sign kiya aur Rohan ko chhutti mili; BP 120/80.",
+     ["Priyanka", "Rohan"], ["120/80"]),
+    ("रमेश ने हस्ताक्षर किए और प्रिया को छुट्टी दी गई; पैरासिटामोल 500mg जारी।",
+     ["रमेश", "प्रिया"], ["पैरासिटामोल 500mg"]),
+    ("Follow up with Pema Choden and Agustín Fonseca; PAN gxlpv2692s.",
+     ["Pema Choden", "Agustín Fonseca", "gxlpv2692s"], []),
+    ("Janam tithi 14/05/1988, जन्मतिथि 12-08-1992.", ["14/05/1988", "12-08-1992"], []),
 ]
 
 
