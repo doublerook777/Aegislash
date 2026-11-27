@@ -8,12 +8,17 @@ import re
 _UTF8_MULTIBYTE = re.compile(rb"[\xc2-\xf4][\x80-\xbf]+")
 
 
+def _text_or_none(text: str) -> str | None:
+    bad = sum(1 for c in text if (ord(c) < 32 and c not in "\n\r\t") or ord(c) == 0x7F)
+    return None if bad > max(4, len(text) // 50) else text
+
+
 def decode(raw: bytes) -> str | None:
     if raw.startswith(b"\xef\xbb\xbf"):
-        return raw[3:].decode("utf-8", errors="replace")
+        return _text_or_none(raw[3:].decode("utf-8", errors="replace"))
     if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
         try:
-            return raw.decode("utf-16")
+            return _text_or_none(raw.decode("utf-16"))
         except UnicodeDecodeError:
             return None
     head = raw[:4096]
@@ -24,21 +29,21 @@ def decode(raw: bytes) -> str | None:
             except UnicodeDecodeError:
                 continue
             if "\x00" not in text:
-                return text
+                return _text_or_none(text)
         return None
     if b"\x00" in raw:
         return None  # binary: a NUL anywhere (not only in the first 4 KB) means this is not a text file
     try:
-        return raw.decode("utf-8")
+        return _text_or_none(raw.decode("utf-8"))
     except UnicodeDecodeError:
         pass
     # Mostly UTF-8 with corrupt bytes (it already holds valid multi-byte sequences): replace the bad bytes.
     if _UTF8_MULTIBYTE.search(raw):
         text = raw.decode("utf-8", errors="replace")
         if text.count("�") <= max(4, len(text) // 50):
-            return text
+            return _text_or_none(text)
     try:
-        return raw.decode("cp1252")
+        return _text_or_none(raw.decode("cp1252"))
     except UnicodeDecodeError:
         text = raw.decode("utf-8", errors="replace")
         return text if text.count("�") <= max(4, len(text) // 50) else None

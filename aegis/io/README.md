@@ -53,8 +53,7 @@ Check a change: `.venv/bin/python -m pytest -q aegis/io`, then the usual `main.p
   `&#72;ector Pereira` count as the name. The final check also decodes every base64 run in the output and quarantines the
   file when a learned name, phone or ID is still inside one.
 - Still open: UTF-16 text inside base64; base64 in a header, a JSON key or a file name beyond the stem rule above; base64
-  inside base64 (one layer is decoded); names with an accent typed as separate marks (NFD) in the gate (detect handles
-  those); `\xNN` byte escapes and `U+0932` notation.
+  inside base64 (one layer is decoded); `\xNN` byte escapes and `U+0932` notation.
 
 ## Quarantine and leak-gate fixes from the audit (`report/vulnerability_audit_report.md`: V7, V8, V9, V11)
 - **V8, binary files.** `decode()` looks for a NUL byte in the whole file, not only in the first 4 KB. A file with a NUL that is
@@ -75,8 +74,12 @@ Check a change: `.venv/bin/python -m pytest -q aegis/io`, then the usual `main.p
   `Dr. Suresh Pandey` into `Dr. [REDACTED]` whenever a patient had the same name. The same name elsewhere is still removed.
 - **Checker note:** `check_dev.py` counts `Suresh Pandey` inside `Dr. Suresh Pandey` as a leak when a patient has that name.
   The official rule (`docs/kit/SCORING.md`, "allowed") does not. The numbers in the PR use the official rule.
-- Not done here: a `LeakGate` that folds homoglyphs and zero-width characters, and V10 (delimiter sniffing from line 0 only;
-  it did not reproduce in the PR #25 review). Decoding escapes and base64 inside the gate came with PR #25 (R2b, below).
+- **V10 & LeakGate follow-up (2026-11-27):**
+  - `decode()` also rejects files with high C0/DEL control-byte ratios outside `\n\r\t` (binary payloads without NUL bytes).
+  - `_sniff_delimiter()` inspects up to 25 non-empty lines via `csv.reader`, picking a consistent multi-column body delimiter when its column count matches the header (preventing comma-in-header failures without misaligning mismatched headers).
+  - `formats.write()` synchronizes FHIR `Bundle` `entry.fullUrl`, `resource.id` (FHIR-safe `[A-Za-z0-9\-\.]{1,64}`), and internal `reference` values (including `?query` / `#fragment` suffixes) whenever a resource ID is sanitized.
+  - `LeakGate` now folds Cyrillic/Greek homoglyphs, strips zero-width characters and NFD combining marks via `detect.normalize.fold`/`visible`, supports up to 8-token names, and excludes UUIDs and ISO dates (`YYYY-MM-DD`) from 6-digit MRN suffix scrubbing.
+  - `pipeline.run()` accurately counts `records_quarantined` (both `detect_error` and pass-2 quarantine) and rolls back `gate.hits` and per-file `entity_counts` if pass-2 export/leak-gate quarantines a file.
 - Side effect, expected: a file that used to be exported and is now quarantined leaves its patient's cluster, and the patient
   key is a hash of the cluster's record ids (V13), so that one patient gets a new PSN and date shift. On `dev/input` this is
   the patient whose name and mobile sit at the bottom of `misc/deep_export.json`.

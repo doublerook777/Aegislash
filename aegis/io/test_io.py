@@ -446,3 +446,119 @@ def test_run_inside_a_json_string_and_fhir_attachment_unchanged(tmp_path, monkey
     assert payload.startswith("Forwarded: ") and payload.endswith(" (end)")
     inside = _decode_all(payload)
     assert "Pushpa" not in inside and "9811100034" not in inside and "advised rest" in inside
+
+
+# ---------------------------------------------------------------- delimiter sniff, control bytes, LeakGate hardening, FHIR sync, quarantine counts
+def test_mixed_delimiter_csv_sniffs_body_delimiter_and_splits_columns():
+    # Comma inside a header text while all rows use ';' (matching column count): sniff ';' instead of ','
+    csv_text = "Patient, Name;Phone;Ward\nRitu Saxena;9855112233;Ward 2\nAlok Dubey;9855112234;Ward 3\n"
+    pf = formats.parse("legacy/semicolon.csv", csv_text)
+    assert pf.delimiter == ";" and pf.fmt == "csv"
+    assert [f["value"] for f in pf.records[1]["fields"]] == ["Ritu Saxena", "9855112233", "Ward 2"]
+    assert [f["context"] for f in pf.records[1]["fields"]] == ["Patient, Name", "Phone", "Ward"]
+
+    # Header/body delimiter mismatch (2 ';' fields in header vs 4 in body) must not misalign headers onto body cols
+    bad_hdr = "id,patient_name,notes;ward\n101;Ritu Saxena;9855112233;Fever\n102;Alok Dubey;9855112234;BP 132/84\n"
+    pf2 = formats.parse("legacy/mixed.csv", bad_hdr)
+    assert pf2.delimiter == ","
+
+
+def test_decode_rejects_control_byte_garbage_without_nul():
+    binary_without_nul = bytes([1, 2, 3, 4, 5, 6, 7, 14, 15, 16, 17, 18]) * 5
+    assert decode(binary_without_nul) is None
+    assert decode("Fever “acute” — OK\n".encode("cp1252")) is not None
+
+
+def test_gate_folds_homoglyphs_zero_width_nfd_and_five_token_names():
+    g = LeakGate()
+    g.add("PATIENT_NAME", "Ramesh Sharma", None)
+    g.add("PATIENT_NAME", "Thakur Bhanu Pratap Singh Chauhan", None)
+    g.add("PATIENT_NAME", "José Silva", None)
+    g.add("MRN", "123456", "123456")
+    g.finalize()
+    # Cyrillic 'а' (U+0430) + zero-width space (U+200B)
+    obf = "Patient: R\u0430\u200bmesh Sh\u0430rm\u0430 examined."
+    assert g.contains_leak(obf)
+    scrubbed = g.scrub(obf)
+    assert "Sh" not in scrubbed and "[REDACTED]" in scrubbed
+    # 5-token name
+    five = "Discharged Thakur Bhanu Pratap Singh Chauhan today."
+    assert g.contains_leak(five) and "[REDACTED]" in g.scrub(five)
+    # NFD accent at end of word leaves no orphaned combining mark
+    nfd = "Patient: Jose\u0301 Silva"
+    assert g.scrub(nfd) == "Patient: [REDACTED]"
+    # Doctor with homoglyph is still protected
+    doc = "Dr. Ramesh Sh\u0430rm\u0430 reviewed the chart."
+    assert not g.contains_leak(doc) and g.scrub(doc) == doc
+    # UUIDs and ISO dates are not mangled by 6-digit MRN suffix checks
+    safe = "uuid=11111111-2222-3333-4444-551234567890 date=2026-123456? no 2026-12-31"
+    assert g.scrub("id=11111111-2222-3333-4444-551234567890 date=2026-12-34") == "id=11111111-2222-3333-4444-551234567890 date=2026-12-34"
+    g2 = LeakGate()
+    g2.add("MRN", "260711", "260711")
+    g2.finalize()
+    assert g2.scrub("visit_date=2026-07-11") == "visit_date=2026-07-11"
+
+
+def test_sync_fhir_refs_keeps_bundle_references_resolvable():
+    bundle = {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "entry": [
+            {"fullUrl": "https://his.local/fhir/Patient/pat-901",
+             "resource": {"resourceType": "Patient", "id": "pat-901"}},
+            {"fullUrl": "urn:uuid:obs-1",
+             "resource": {"resourceType": "Observation", "id": "obs-1", "status": "final",
+                          "subject": {"reference": "Patient/pat-901?_format=json"}}},
+        ],
+    }
+    pf = formats.parse("fhir/b.json", json.dumps(bundle))
+    out = json.loads(formats.write(pf, {(pf.doc_record_id, "/entry/0/resource/id"): "[MRN]"}))
+    pat_entry, obs_entry = out["entry"]
+    assert pat_entry["resource"]["id"] == "MRN"
+    assert pat_entry["fullUrl"] == "https://his.local/fhir/Patient/MRN"
+    assert obs_entry["resource"]["subject"]["reference"] == "Patient/MRN?_format=json"
+
+
+def test_records_quarantined_and_gate_rollback(tmp_path, monkeypatch):
+    from aegis.io import pipeline
+    orig_detect = pipeline.detect.detect_file
+
+    def failing_detect(recs):
+        if recs[0]["file"] == "boom.csv":
+            raise RuntimeError("boom")
+        return orig_detect(recs)
+
+    monkeypatch.setenv("RAKSHA_SECRET", SECRET)
+    monkeypatch.setattr(pipeline.detect, "detect_file", failing_detect)
+    inp, out = tmp_path / "in", tmp_path / "out"
+    inp.mkdir()
+    (inp / "ok.txt").write_text("BP 120/80, Tab Paracetamol 500 mg.\n", encoding="utf-8")
+    (inp / "boom.csv").write_text("id,name\n1,Asha\n2,Ravi\n", encoding="utf-8")
+    assert run(inp, out) == 0
+    rep = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    assert rep["counts"]["files_quarantined"] == 1
+    assert rep["counts"]["records_quarantined"] == 2
+
+    # Pass-2 quarantine rolls back gate.hits and entity counts for the quarantined file
+    monkeypatch.setattr(pipeline.detect, "detect_file", orig_detect)
+    orig_write = pipeline.write
+
+    def leaking_write(pf, new):
+        if pf.rel == "leak.txt":
+            return "Patient Kavya Rastogi leaked here"
+        return orig_write(pf, new)
+
+    monkeypatch.setattr(pipeline, "write", leaking_write)
+    inp2, out2 = tmp_path / "in2", tmp_path / "out2"
+    inp2.mkdir()
+    (inp2 / "seed.csv").write_text("patient_name,phone\nKavya Rastogi,9811100021\n", encoding="utf-8")
+    (inp2 / "leak.txt").write_text("Patient: Kavya Rastogi, phone 9811100021.\n", encoding="utf-8")
+    assert run(inp2, out2) == 0
+    rep2 = json.loads((out2 / "report.json").read_text(encoding="utf-8"))
+    assert rep2["counts"]["files_sanitized"] == 1
+    assert rep2["counts"]["files_quarantined"] == 1
+    assert rep2["counts"]["records_quarantined"] == 1
+    assert rep2["counts"]["identifiers_detected"] == 2
+    assert rep2["entities"] == {"PATIENT_NAME": 1, "PHONE": 1}
+
+

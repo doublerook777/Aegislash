@@ -84,8 +84,8 @@ Assumptions:
 | link | Member-3 | contracts/link.md | real (`aegis/link/`) | 2026-11-26 |
 | privacy | Member-4 | contracts/privacy.md | real (`aegis/privacy/`, `config/policy.yaml`, `scripts/risk_report.py`, `README.md`, `brief/`); full-pipeline `CONTRACT OK`, `check_dev.py` + `risk_report.py` measured in brief | 2026-11-26 |
 
-io notes (2026-11-26):
-- Done: two-pass pipeline, decoding (BOM/UTF-16 incl. BOM-less/cp1252/corrupt UTF-8), CSV/TSV (delimiter sniff), JSON-behind-.csv, deep JSON, record splitting matching truth locators, base64 attachments, JSON type restore, key/header/file renames, leak gate, report/records. Verified with a truth-based fake detector (test only, not in repo): 0/3230 leaks, 4855/4855 medical kept, 0 structure mismatches, deterministic; 2,000 files in 1.7 s / 241 MB.
+io notes (2026-11-26 / 2026-11-27):
+- Done: two-pass pipeline, decoding (BOM/UTF-16 incl. BOM-less/cp1252/corrupt UTF-8, full-buffer NUL & control-byte rejection), CSV/TSV (multi-line consistent delimiter sniff), JSON-behind-.csv, JSONL-in-CSV/TSV, deep JSON (iterative depth limit 1000, compact >64), record splitting matching truth locators, base64 attachments & inline runs (`#b64:<n>`), JSON type restore, FHIR `fullUrl`/`id`/`reference` sync, key/header/file renames, leak gate (homoglyphs/zero-width/NFD, 2-8 token names, UUID/ISO-date guards), honest `records_quarantined` & rollback, `report.json`, `records.jsonl`, determinism, run-time/memory.
 - Next: swap in real detect/link/privacy as they land; re-run `check_dev.py`.
 - Contract notes (no shape change): (1) io decodes whole-string base64 JSON leaves (FHIR attachments) and gives detect the decoded text; it re-encodes on write. (2) `keys` passed to `privacy.plan` has no entries for `@file` records (link never sees them): use `keys.get`. (3) For single-document files, `@file` findings (file name) are passed to `privacy.replace` with the document's `record_id`, so the file name gets the patient's PSN. (4) A JSON top-level array counts as records only when its elements carry person fields (patient/uhid/name/...) and the top level has no subject of its own (matches truth locators).
 

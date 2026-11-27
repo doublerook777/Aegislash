@@ -11,6 +11,7 @@ import csv
 import re
 import io
 import json
+from collections import Counter
 from dataclasses import dataclass, field as dc_field
 from pathlib import PurePosixPath
 from typing import Any
@@ -285,7 +286,9 @@ def _looks_json(s: str) -> bool:
     try:
         json.loads(s)
         return True
-    except (ValueError, RecursionError):
+    except RecursionError:
+        return True
+    except ValueError:
         return False
 
 
@@ -293,7 +296,9 @@ def _first_line_is_object(text: str) -> bool:
     first = next((ln for ln in text.split("\n") if ln.strip()), "")
     try:
         return isinstance(json.loads(first), dict)
-    except (ValueError, RecursionError):
+    except RecursionError:
+        return True
+    except ValueError:
         return False
 
 
@@ -315,7 +320,36 @@ def _json_lines(text: str) -> list[dict] | None:
 
 
 def _sniff_delimiter(text: str) -> str:
-    first = text.split("\n", 1)[0]
+    lines = [ln for ln in text.splitlines() if ln.strip()][:25]
+    if not lines:
+        return ","
+    if len(lines) >= 2:
+        best_score = None
+        best_delim = ","
+        body_text = "\n".join(lines[1:])
+        for idx, d in enumerate((",", "\t", ";", "|")):
+            try:
+                hdr = next(csv.reader([lines[0]], delimiter=d))
+                body_widths = [len(r) for r in csv.reader(io.StringIO(body_text, newline=""), delimiter=d)]
+            except csv.Error:
+                continue
+            if not body_widths:
+                continue
+            mode_w, mode_n = Counter(body_widths).most_common(1)[0]
+            if mode_w <= 1 or mode_w != len(hdr):
+                continue
+            score = (
+                mode_n == len(body_widths),
+                mode_n / len(body_widths),
+                mode_w,
+                -idx,
+            )
+            if best_score is None or score > best_score:
+                best_score = score
+                best_delim = d
+        if best_score is not None:
+            return best_delim
+    first = lines[0]
     if "," in first:
         return ","
     counts = [(first.count(d), d) for d in ("\t", ";", "|")]
@@ -527,6 +561,76 @@ def _document_order(data: Any) -> list[str]:
     return out
 
 
+_FHIR_ID_UNSAFE = re.compile(r"[^A-Za-z0-9\-\.]+")
+
+
+def _fhir_safe_id(val: str) -> str:
+    cleaned = _FHIR_ID_UNSAFE.sub("-", val).strip("-")
+    return (cleaned or "id")[:64]
+
+
+def _snapshot_fhir_entries(data: Any) -> list[tuple[dict, str, str, str]]:
+    out: list[tuple[dict, str, str, str]] = []
+    if not isinstance(data, dict) or not isinstance(data.get("entry"), list):
+        return out
+    for e in data["entry"]:
+        if isinstance(e, dict) and isinstance(e.get("resource"), dict):
+            r = e["resource"]
+            fu = e.get("fullUrl") if isinstance(e.get("fullUrl"), str) else ""
+            rt = r.get("resourceType") if isinstance(r.get("resourceType"), str) else ""
+            rid = r.get("id") if isinstance(r.get("id"), str) else ""
+            out.append((e, fu, rt, rid))
+    return out
+
+
+def _sync_fhir_refs(pf: ParsedFile, before: list[tuple[dict, str, str, str]]) -> None:
+    """Keep Bundle entry fullUrl, resource.id and internal references valid and resolvable after replacements."""
+    used_ids: set[tuple[str, str]] = set()
+    for entry, _old_full, rtype, old_id in before:
+        res = entry.get("resource") if isinstance(entry, dict) else None
+        if isinstance(res, dict) and isinstance(res.get("id"), str) and res.get("id") == old_id:
+            used_ids.add((rtype, old_id))
+    ref_map: dict[str, str] = {}
+    for entry, old_full, rtype, old_id in before:
+        res = entry.get("resource") if isinstance(entry, dict) else None
+        if not isinstance(res, dict):
+            continue
+        cur_id = res.get("id")
+        cur_full = entry.get("fullUrl")
+        if isinstance(cur_id, str) and old_id and cur_id != old_id:
+            base_id = _fhir_safe_id(cur_id)
+            safe_id = base_id
+            n = 2
+            while (rtype, safe_id) in used_ids:
+                suffix = f"-{n}"
+                safe_id = base_id[: 64 - len(suffix)] + suffix
+                n += 1
+            used_ids.add((rtype, safe_id))
+            res["id"] = safe_id
+            cur_id = safe_id
+            if isinstance(old_full, str) and old_full.endswith(old_id):
+                new_full = old_full[: -len(old_id)] + safe_id
+                entry["fullUrl"] = new_full
+                cur_full = new_full
+        if old_full and isinstance(cur_full, str) and cur_full != old_full:
+            ref_map[old_full] = cur_full
+        if rtype and old_id and isinstance(cur_id, str) and cur_id != old_id:
+            ref_map[f"{rtype}/{old_id}"] = f"{rtype}/{cur_id}"
+    if not ref_map:
+        return
+    for container, key, orig in pf.leaf_refs.values():
+        if key == "reference" and isinstance(container, dict) and isinstance(orig, str):
+            if orig in ref_map:
+                container[key] = ref_map[orig]
+                continue
+            for sep in ("?", "#"):
+                if sep in orig:
+                    base, rest = orig.split(sep, 1)
+                    if base in ref_map:
+                        container[key] = ref_map[base] + sep + rest
+                        break
+
+
 # ---------------------------------------------------------------------------- write
 def write(pf: ParsedFile, new: dict[tuple[str, str], str]) -> str:
     """Rebuild the file. `new` maps (record_id, path) -> replacement text for changed fields only."""
@@ -542,6 +646,7 @@ def write(pf: ParsedFile, new: dict[tuple[str, str], str]) -> str:
             w.writerow([new.get((rid, f"col:{i}"), v) for i, v in enumerate(row)])
         return buf.getvalue()
     # json / fhir: mutate in place (we own the parsed copy), leaves first, then keys
+    fhir_before = _snapshot_fhir_entries(pf.data) if pf.fmt == "fhir" else []
     owner_of = {(r["record_id"], f["path"]) for r in pf.records for f in r["fields"]}
     leaf_new, key_new = {}, {}
     for (rid, path), text in new.items():
@@ -576,6 +681,8 @@ def write(pf: ParsedFile, new: dict[tuple[str, str], str]) -> str:
             items.append((nk, v))
         obj.clear()
         obj.update(items)
+    if fhir_before:
+        _sync_fhir_refs(pf, fhir_before)
     if pf.jsonl:
         return "".join(json.dumps(obj, ensure_ascii=False) + "\n" for obj in pf.data)
     deep = _json_depth(pf.data, COMPACT_ABOVE_DEPTH) > COMPACT_ABOVE_DEPTH

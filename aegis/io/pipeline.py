@@ -75,6 +75,7 @@ def run(inp: Path, out: Path) -> int:
     entries: list[dict] = []            # report "files", in input order
     parsed: list[tuple[int, ParsedFile]] = []
     results: dict[str, RecordResult] = {}
+    records_quarantined = 0
     for path in sorted((p for p in inp.rglob("*") if p.is_file()), key=lambda p: p.relative_to(inp).as_posix()):
         rel = path.relative_to(inp).as_posix()
         raw = path.read_bytes()
@@ -101,6 +102,7 @@ def run(inp: Path, out: Path) -> int:
                 raise RuntimeError("detect_shape")
         except Exception:  # noqa: BLE001 - any detect failure quarantines the file, never crashes the run
             entry["reason"] = "detect_error"
+            records_quarantined += sum(1 for rec in pf.records if rec["loc"] != "@file")
             continue
         for r in res:
             results[r["record_id"]] = r
@@ -137,9 +139,11 @@ def run(inp: Path, out: Path) -> int:
     used_outputs: set[str] = set()
     for idx, pf in parsed:
         entry = entries[idx]
+        before_hits = gate.hits
         try:
             new: dict[tuple[str, str], str] = {}
             rec_status: dict[str, str] = {}
+            file_entities: Counter = Counter()
             n_ids = 0
             for rec in pf.records:
                 rid = rec["record_id"]
@@ -156,7 +160,7 @@ def run(inp: Path, out: Path) -> int:
                         value, applied, statuses = _apply(value, fs, lambda f, r=plan_rid: privacy.replace(plan, r, f))
                         n_ids += applied
                         for f in fs:
-                            entity_counts[f["type"]] += 1
+                            file_entities[f["type"]] += 1
                         for s in statuses:
                             if _STATUS_RANK.get(s, 0) > _STATUS_RANK[worst]:
                                 worst = s
@@ -186,6 +190,7 @@ def run(inp: Path, out: Path) -> int:
             dest.write_text(content, encoding="utf-8", newline="")
             entry.update(output=f"sanitized/{out_rel}", status="sanitized")
             identifiers += n_ids
+            entity_counts.update(file_entities)
             for rec in pf.records:
                 if rec["loc"] == "@file":
                     continue
@@ -196,6 +201,8 @@ def run(inp: Path, out: Path) -> int:
                     line["status"] = rec_status[rec["record_id"]]
                 records_out.append(line)
         except Exception as exc:  # noqa: BLE001 - fail safe: quarantine, never half-write
+            gate.hits = before_hits
+            records_quarantined += sum(1 for rec in pf.records if rec["loc"] != "@file")
             entry.update(output=None, status="quarantined",
                          reason="leak_gate" if str(exc) == "leak_gate" else f"export_error_{type(exc).__name__}")
 
@@ -214,7 +221,7 @@ def run(inp: Path, out: Path) -> int:
             "records_linked": sum(r["patient"] is not None for r in records_out),
             "records_generalized": int(pstats.get("records_generalized", 0)),
             "records_suppressed": int(pstats.get("records_suppressed", 0)),
-            "records_quarantined": 0,
+            "records_quarantined": records_quarantined,
         },
         "entities": dict(sorted(entity_counts.items())),
         "timing": {"seconds": round(time.monotonic() - t0, 2)},
