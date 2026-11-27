@@ -488,8 +488,10 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
              if not (c.type in NAME_TYPES and any(c.start < e and s < c.end for s, e in blocked))]
     # an HL7 v2 message: the segment and field position decide (not filtered by word lists)
     if kind in ("text", "value") and hl7.is_message(text):
-        structured_found, stamps = hl7.find(text)
-        found = [c for c in found if not any(c.start < e and s < c.end for s, e in stamps)] + structured_found
+        structured_found, stamps, coded = hl7.find(text)
+        found = [c for c in found if not any(c.start < e and s < c.end for s, e in stamps)
+                 and (c.type in hl7.CODED_KEEP or not any(s <= c.start and c.end <= e for s, e in coded))]
+        found += structured_found
     return found
 
 

@@ -599,6 +599,15 @@ HL7_MESSAGES = [
      ["VERMA", "SUNITA", "PRAKASH", "KM-904170", "19881104", "22 Lake View", "Mohan Nagar", "462003", "(0755)4017733", "5 Temple Rd",
       "9425011100", "POL4455120"],
      ["Creatinine", "1.1", "mg/dL", "0.6-1.2", "2160-0", "202507021415", "PLAN9", "STAR CARE", "SUNRISEMED"]),
+    # coded fields are not free text: the message type "ORU^R01" next to "M7" (a control id) is not an age and sex,
+    # a unit code "F01" is not a name; a phone written into a coded field is still found
+    (["MSH|^~\\&|LIS|DISTLAB|EMR|DISTLAB|202504110930||ORU^R01|M7|P|2.5",
+      _seg("PID", {1: "1", 3: "330918^^^DL^MR", 5: "KANDPAL^REKHA", 7: "19650304", 8: "F"}),
+      _seg("OBR", {1: "1", 4: "LFT^Liver Function^L", 16: "F01^BHATT^ANIL"}),
+      _seg("OBX", {1: "1", 2: "NM", 3: "1742-6^ALT^LN", 5: "64", 6: "U/L", 7: "7-56", 8: "H", 11: "F", 16: "9412088123"})],
+     "\n",
+     ["KANDPAL", "REKHA", "330918", "19650304", "9412088123"],
+     ["ORU^R01", "M7", "Liver Function", "1742-6", "ALT", "64", "U/L", "7-56", "202504110930"]),
     # not a message: pipes in ordinary text, and a message with no MSH line, are read as free text only
     (["Rx|Tab Paracetamol 500 mg|1-0-1", "BP|112/78|mmHg"], "\n", [], ["Paracetamol", "112/78"]),
 ]

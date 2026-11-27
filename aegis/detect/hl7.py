@@ -146,11 +146,15 @@ _STAMP = re.compile(r"(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:[
                     r"(?:[+-]\d{4})?")
 
 
-def find(text: str) -> tuple[list[Cand], list[tuple[int, int]]]:
-    """(candidates for the personal data of an HL7 v2 message, spans of its time stamps). `text` is the message,
-    with any segment separator. A field the message gives no role to, that is a time stamp, is not an identifier."""
+def find(text: str) -> tuple[list[Cand], list[tuple[int, int]], list[tuple[int, int]]]:
+    """(candidates for the personal data of an HL7 v2 message, spans of its time stamps, spans of coded fields).
+    `text` is the message, with any segment separator. A field the message gives no role to, that is a time stamp,
+    is not an identifier. Coded fields (the MSH header, and any field with no role and no space in it: message type
+    "ORU^R01", codes, units, ranges) are no place for the free-text name / age / date rules: "R01|M1" is not an
+    age and sex. Only identifier shapes are still looked for there."""
     out: list[Cand] = []
     stamps: list[tuple[int, int]] = []
+    coded: list[tuple[int, int]] = []
     seps = ("^", "~", "\\", "&")
     seen_msh = False
     for line in _SEGMENT.finditer(text):
@@ -160,6 +164,7 @@ def find(text: str) -> tuple[list[Cand], list[tuple[int, int]]]:
         seg = text[start:end]
         if seg.startswith("MSH|"):
             seen_msh = True
+            coded.append((start, end))
             enc = seg[4:].split("|", 1)[0]
             if len(enc) >= 4 and len(set(enc[:4])) == 4 and "|" not in enc[:4]:
                 seps = (enc[0], enc[1], enc[2], enc[3])
@@ -179,6 +184,8 @@ def find(text: str) -> tuple[list[Cand], list[tuple[int, int]]]:
             kind = wanted.get(n)
             if (kind is None or not field.strip()) and _STAMP.fullmatch(field):
                 stamps.append((fs, fe))
+            elif kind is None and field and " " not in field:
+                coded.append((fs, fe))
             if kind is None or not field.strip():
                 continue
             if kind == "id":
@@ -206,4 +213,8 @@ def find(text: str) -> tuple[list[Cand], list[tuple[int, int]]]:
                 a, b = _trim(text, fs, fe)
                 if re.search(r"[^\W\d_]{3}", text[a:b]):
                     out.append(_cand("LOCALITY", a, b, text))
-    return out, stamps
+    return out, stamps, coded
+
+
+# identifier shapes that stay findable inside coded fields (a phone or Aadhaar written into a code field still counts)
+CODED_KEEP = frozenset(("PHONE", "AADHAAR", "AADHAAR_MASKED", "ABHA_NUMBER", "ABHA_ADDRESS", "PAN", "EMAIL"))

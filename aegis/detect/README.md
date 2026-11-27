@@ -267,6 +267,13 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 - Left alone: HL7 inside base64 or a CSV cell is only read if the cell itself starts with `MSH|`; escape sequences
   (`\F\`, `\S\`) inside names are not decoded; ORC / OBR / PV1 doctor names stay (staff).
 
+- **Review fix (before merging PR #25): coded fields are not free text.** The free-text age rule read `R01|M1` in MSH-9
+  (`ORU^R01`) as age "01" plus sex "M" and banded it (`ORU^R0-9`). This bug is older than `hl7.py`. Now `hl7.find` also returns
+  "coded" spans: the MSH segment, and every field that has no role and no space in it (message type, codes, units,
+  ranges, control ids). Free-text candidates inside them are dropped, except identifier shapes (phone, Aadhaar, ABHA,
+  PAN, e-mail: `hl7.CODED_KEEP`). OBX-5 / NTE text with spaces is still read by every rule. New selftest message (fails
+  before, passes after); committed sets and the HL7 files of the judge's fresh batches give identical output.
+
 ## Hinglish relation words, "Ghar <place> mein", "landmark <place>" and a name in brackets (finding F4)
 - **Cause.** The English kin cues (`son`, `wife`, `brother` ...) had no Roman-script Hindi twin before a name: `beta`, `pati`,
   `bhai`, ... only worked *after* a name ("<name> beta"). A place had no Hinglish sentence cue: `Ghar <X> mein hai` and
