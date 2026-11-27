@@ -196,6 +196,8 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
             roles[key] = role
     # unknown column: decide from its values (hidden data renames headers)
     values = {(r["record_id"], f["path"]): f["value"] for r in records for f in r["fields"]}
+    labels = {(r["record_id"], f["path"]): (f["context"] or "") if f["path"].startswith("col:")
+              else _json_label(f["path"])[0] for r in records for f in r["fields"]}
     # a doctor column without "Dr." in it: the same people are written "Dr. X" somewhere else in the file
     doctors = {" ".join(names.doctor_name(m)) for text in values.values() for m in names.doctor_mentions(text)}
     has_name = any(role in ("patient_name", "name", "first_name") for role in roles.values())
@@ -224,9 +226,12 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
                 guess, has_name = ("relative_name" if has_name else "patient_name"), True
             for k in keys:
                 roles[k] = guess
-    # after the column guesses: this role depends on the value, so it is decided one value at a time
+    # after the column guesses: these roles depend on the value, so they are decided one value at a time
     for key, role in roles.items():
-        if role in (None, "keep") and not key[1].startswith("col:"):
+        # {"subject": "Referral - <name>"}: the title of a mail, not the patient's name
+        if role == "patient_name" and names.mail_subject_label(tokens(labels[key])) and names.is_topic(values[key]):
+            roles[key] = None
+        elif role in (None, "keep") and not key[1].startswith("col:"):
             roles[key] = _person_leaf_role(key[1], values[key]) or role
     return roles
 
@@ -325,6 +330,8 @@ def _labelled(text: str, dmy: bool) -> list[Cand]:
             # a dash is a weak separator ("Ward 4 - ..."): require the label to be short and digit-free
             if dashed and (len(label.split()) > 5 or any(ch.isdigit() for ch in label)):
                 continue
+            if names.mail_subject_label(tokens(label)):
+                continue  # a mail subject is a topic: names.subject_lines reads it
             role = classify(label)
             if role in (None, "free", "keep", "doctor", "date", "relation", "tehsil"):
                 continue
@@ -478,6 +485,9 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
         if kind not in ("filename", "header", "key"):
             found += gazetteer.find_joined_names(text, names.STOP)
         found += _labelled(text, dmy)
+        found += names.subject_lines(text)
+        if kind == "value" and names.mail_subject_label(tokens(label)):
+            found += names.subject_line(text, 0, len(text), bare=True)
     if role is None and kind == "value":
         extra_check = extra_checks(label)
         if extra_check == "place" and not set(tokens(text)) & names.MEDICAL:

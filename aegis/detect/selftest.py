@@ -274,6 +274,25 @@ CASES = [
     ("Dengue ne aaj bahut kamzor kar diya, platelet 90000. Dr. Rekha Soren ke paas refer.", [], ["Dengue", "platelet 90000", "Rekha Soren"]),
     ("Bhai Sahab ne dawa li. Pita Ji ka BP 140/90 hai. Ghar Hospital mein hai.", [], ["Bhai", "Pita", "140/90", "Hospital"]),
     ("Patni Savita Devi (MD Pathology) ka report aaya, Hb 10.2 g/dl.", ["Savita Devi"], ["Pathology", "Hb 10.2 g/dl"]),
+    # mail subject lines: the title is a topic, not the patient's name; the name in it and a short record number go
+    ("From: desk4@clinic.example\nSubject: Referral - Chandni Mamgain (IPD 6204)\n\nSodium 131 mmol/L. "
+     "Referral accepted; Mamgain to attend Monday.", ["Chandni Mamgain", "6204"],
+     ["Referral", "Sodium 131", "accepted"]),
+    ("Subject: Discharge summary - Tilak Rawolia, 52/M", ["Tilak Rawolia"], ["Discharge summary"]),
+    ("Re: Fwd: Transfer of Smt. Basanti Koranga", ["Basanti Koranga"], ["Transfer"]),
+    ("Re: Referral Ruchira Mamgain (UHID No. 7719)", ["Ruchira Mamgain", "7719"], ["Referral"]),
+    ("Subject: रेफरल - भुवनेश्वरी कोरंगा (IPD 3381)", ["भुवनेश्वरी कोरंगा", "3381"], ["रेफरल"]),
+    # what "Subject:" as a patient label used to remove is still removed, without the document words around it
+    ("Subject: Tilak Rawolia", ["Tilak Rawolia"], []),
+    ("Subject: Referral for Chandni Mamgain", ["Chandni Mamgain"], ["Referral"]),
+    ("Subject: Discharge Summary Tilak Rawolia", ["Tilak Rawolia"], ["Discharge Summary"]),
+    # subject lines with no person in them keep all their words, and a year is not a record number
+    ("Subject: Referral Letter\nPlease see the referral note.", [], ["Referral Letter", "referral note"]),
+    ("Subject: Lab Report - Liver Function", [], ["Lab Report", "Liver Function"]),
+    ("Subject: Referral - Knee Replacement", [], ["Referral", "Knee Replacement"]),
+    ("Re: Wound Dehiscence", [], ["Wound Dehiscence"]),
+    ("Subject: Appointment Reminder\nSub: Fire Safety Drill", [], ["Appointment Reminder", "Fire Safety Drill"]),
+    ("Subject: Referral - CKD Stage 4, IP 2024 audit", [], ["CKD Stage 4", "2024"]),
 ]
 
 
@@ -528,6 +547,9 @@ DOCS = [
      [], ["Medication Review", "Discharge Summary", "Under Observation", "Type 2 Diabetes", "Gold Plan",
           "City Diagnostics", "Iron Sucrose", "Senior Citizen", "Chronic Gastritis", "Foot Exercises",
           "Rehydration", "Peripheral Smear", "Lives Alone", "High Risk"]),
+    # an e-mail saved as JSON: its "subject" is a title when it holds a document word
+    ({"subject": "Referral - Chandni Mamgain (IPD 6204)", "body": "Referral enclosed. Mamgain is on Tab. Torsemide 10 mg."},
+     ["Chandni Mamgain", "6204", "Mamgain"], ["Referral", "Torsemide 10 mg"]),
 ]
 
 
@@ -562,6 +584,7 @@ FILENAMES = [
     ("बरनाली_शर्मा_पर्चा.txt", "BP 110/70\n", ["बरनाली_शर्मा"]),
     ("ds-barnalithengal-31145549.txt", "Patient Name: Barnali Thengal\n", ["barnalithengal"]),
     ("ds_devika_ranganathan.txt", "Patient Name: Devika Ranganathan\n", ["devika_ranganathan"]),
+    ("referral.txt", "Subject: Referral - Chandni Mamgain (IPD 6204)\nReferral enclosed.\n", []),
 ]
 
 
@@ -573,7 +596,8 @@ def _run_filenames() -> int:
                    {"record_id": f"{name}#doc", "file": name, "loc": "doc", "fmt": "text",
                     "fields": [{"path": "text", "kind": "text", "context": None, "value": text}]}]
         found = [f["text"] for f in detect_file(records)[0]["findings"]]
-        if not all(any(x in f for f in found) for x in expected):
+        # nothing expected: the file name must be left as it is
+        if not all(any(x in f for f in found) for x in expected) or (not expected and found):
             failed += 1
             print(f"FAIL  file name {name}: found {found}")
     return failed
