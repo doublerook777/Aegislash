@@ -207,8 +207,8 @@ def structured(text: str, s: int, e: int, role: str, dmy: bool) -> list[Cand]:
 
     if role in ("age", "age_sex"):
         out = []
-        m = re.match(r"\D{0,6}?(\d{1,3})(?![\d./-])", value)
-        if m and 0 <= int(m.group(1)) <= 120:
+        m = re.match(r"\D{0,6}?(\d{1,3})(?![\d.-]|/\d)", value)
+        if m:
             out.append(Cand(s + m.start(1), s + m.end(1), "AGE", str(int(m.group(1))), "patient"))
         g = re.search(r"(?<![A-Za-z])(male|female|पुरुष|महिला|[MF])(?![A-Za-z])", value, re.I)
         if g:

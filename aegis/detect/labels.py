@@ -27,10 +27,10 @@ _DOCTOR = _words("doctor dr consultant physician surgeon nurse referred referrer
 _RELATIVE = _words("guardian relative relatives kin nok father fathers husband husbands mother mothers spouse attendant informant careof pita attender parivar sadasya gharwale gharwala gharwali "
                    "pati parent caregiver witness nominee पिता पति अभिभावक माता")
 _PHONE = _words("phone ph mobile mob tel telephone whatsapp cell callback contactno contactdigits msisdn फ़ोन फोन मोबाइल दूरभाष संपर्क")
-_MRN = _words("uhid mrn umr crno uid_h भर्ती_संख्या पंजीकरण आईपीडी")
+_MRN = _words("uhid mrn crno uid_h भर्ती_संख्या पंजीकरण आईपीडी")  # "umr" is age (Hindi/Urdu), not an MRN
 _ID_WORDS = _words("id no num number ref code सं संख्या")
 _DOB = _words("dob yob birth birthdate birthyear janm janam जन्म")
-_AGE = _words("age umar umr aayu yrs आयु उम्र")
+_AGE = _words("age umar umr umra umrah aayu yrs आयु उम्र उमर")
 _GENDER = _words("gender sex ling लिंग")
 _PIN = _words("pin pincode zip zipcode postal postalcode dak dakghar पिन डाक")
 _DISTRICT = _words("district distt dist jila zila zilla जिला ज़िला")
@@ -158,7 +158,7 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
     if not s & _NOT_MRN and not s & _NAME:
         if s & (_MRN | {"rch", "parchi"}) or "uhid" in joined or "पंजीकरण" in label or "आईपीडी" in label:
             return "mrn"
-        if s & {"reg", "regn", "registration", "ipd", "ip", "admission", "adm", "cr", "mr", "hospital"} and s & _ID_WORDS:
+        if s & {"reg", "regn", "registration", "ipd", "ip", "admission", "adm", "cr", "mr", "umr", "hospital"} and s & _ID_WORDS:
             return "mrn"
         if s & _SUBJECT and s & _ID_WORDS:
             return "mrn"

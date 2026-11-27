@@ -304,6 +304,8 @@ CASES = [
      ["Harishankar Pant", "Bhatwari"], ["Losartan 50 mg", "142/88"]),
     ("A 58 y/o woman from New Tehri, Hb 11.2 g/dL.", ["New Tehri"], ["Hb 11.2"]),
     ("64-year-old male referred from Civil Hospital; on insulin from January.", [], ["Civil Hospital", "insulin", "January"]),
+    # Hindi/Urdu age labels ("Umr", "Umra", "Umrah", "उमर") including ages > 120
+    ("Umr: 91\nUmra: 128\nउमर: 136", ["91", "128", "136"], []),
 ]
 
 
@@ -378,6 +380,12 @@ TABLES = [
     # an unreadable header over phone numbers written with odd spacing; other long numbers are not phones
     (["zz_reach", "zz_bill"], [["9412 7 30518", "4500.00"], ["70112-904-18", "1200.50"], ["8800 41 2276", "980.00"]],
      {"zz_reach": "PHONE", "zz_bill": None}),
+    # "umr"/"umra"/"umrah"/"उमर" (age, incl. >120) vs "umr_no" (MRN)
+    (["umr", "umra", "umrah", "उमर", "umr_ling", "umr_no"],
+     [["91", "128", "54", "67", "47/F", "104920"],
+      ["63", "42", "136", "39", "28/M", "104921"],
+      ["35", "71", "29", "141", "35/F", "104922"]],
+     {"umr": "AGE", "umra": "AGE", "umrah": "AGE", "उमर": "AGE", "umr_ling": "AGE", "umr_no": "MRN"}),
 ]
 
 
@@ -457,6 +465,10 @@ CELLS = [
     ("Guardian Contact", "Barsha Hazarika 94127-30518", ["Barsha Hazarika", "94127-30518"], []),
     ("Guardian Contact", "94127 30518", ["94127 30518"], []),
     ("Attendant Mobile", "not available", [], ["not available"]),
+    # "umr"/"umra"/"उमर" age cells including >120
+    ("umr", "91", ["91"], []),
+    ("umra", "128", ["128"], []),
+    ("उमर", "१३६", ["१३६"], []),
 ]
 
 
