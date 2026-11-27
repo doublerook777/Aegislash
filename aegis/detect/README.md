@@ -209,6 +209,15 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 - **Dotted Aadhaar.** `ids.AADHAAR` allowed only `-`, space or no separator. `1234.5678.9012` (4-4-4 with dots) is now matched,
   unless it reads as `year.monthday.hourminute` (`2024.0115.1030`). Dotted shapes with a fourth group (`1.2345.6789.0123`), versions
   and lab values (`4.2.1`, `7.5000`) are still not matched (checked in the selftest).
+- **Review fix (before merging PR #25): evidence of people is required.** "Two capitalised words not in a word list" also fits
+  organisms, drugs and vaccines (`Escherichia Coli`, `Piperacillin Tazobactam`, `Measles Rubella` under headers like `Isolate`,
+  `Sensitive To`, `Vaccine Given`). The first version redacted such columns whole. Now a column that only looks like names
+  (`PERSON_SHAPED`) counts as names when at least one cell, and a fifth of them, holds a listed surname (Latin or Devanagari).
+  It also counts when at least half its rows, two or more, end in the same word as another column of people in the same
+  row (`engine._shares_surnames`: patient and relative share a surname). Otherwise it is left alone.
+  Selftest table "Isolate / Sensitive To / Vaccine Given / Next Due" (13 problems before, 0 after). Committed sets and the
+  judge's fresh batches give identical output. Left: a lone column of people whose surnames are all unlisted and who share
+  no surname with another column is read cell by cell, as before F2.
 - **Limits.** A file with fewer than 3 filled cells in the column, or with names mixed with other text in the column, is still read
   cell by cell. A name column whose header is an unknown *category-like* word (`Occupation`) is left alone on purpose. An unknown
   header holding 2-3 word TitleCase trade or status values that are not in the word lists (`Govt Employee`) can still be read as names

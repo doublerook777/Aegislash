@@ -166,10 +166,20 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
     # a doctor column without "Dr." in it: the same people are written "Dr. X" somewhere else in the file
     doctors = {" ".join(names.doctor_name(m)) for text in values.values() for m in names.doctor_mentions(text)}
     has_name = any(role in ("patient_name", "name", "first_name") for role in roles.values())
-    for keys in columns.values():
+    guesses = {}
+    for path, keys in columns.items():
         if roles[keys[0]] is None:
-            guess = _guess_role([values[k] for k in keys if values[k].strip()], col_label.get(keys[0][1], ""),
-                                keys[0][1] in col_label)
+            guesses[path] = _guess_role([values[k] for k in keys if values[k].strip()], col_label.get(keys[0][1], ""),
+                                        keys[0][1] in col_label)
+    # a column that only looks like names counts when its rows share surnames with another column of people
+    people_cols = [keys for path, keys in columns.items()
+                   if roles[keys[0]] in _NAME_ROLES or guesses.get(path) in ("patient_name", PERSON_SHAPED)]
+    for path, keys in columns.items():
+        if guesses.get(path) == PERSON_SHAPED:
+            guesses[path] = "patient_name" if _shares_surnames(keys, people_cols, values) else None
+    for path, keys in columns.items():
+        if roles[keys[0]] is None:
+            guess = guesses[path]
             if guess == "patient_name":
                 filled = [values[k] for k in keys if values[k].strip()]
                 # most of the column, never a single match: one patient who shares a doctor's name must not
@@ -227,8 +237,33 @@ def _guess_role(vals: list[str], label: str = "", column: bool = False) -> str |
         persons = [v for v in folded if gazetteer.looks_like_person_cell(v, names.STOP | names.ORG)
                    and v.casefold() not in address._UP_DISTRICTS]
         if len(persons) >= 0.8 * len(vals) and len(set(folded)) >= max(3, 0.3 * len(vals)):
-            return "patient_name"
+            # "looks like two capitalised words" alone also fits organisms, drugs and vaccines ("Escherichia Coli",
+            # "Piperacillin Tazobactam", "Measles Rubella"). Some evidence of people is needed: a listed surname in
+            # at least one cell (and a fifth of them), or, decided in field_roles, surnames shared row by row with
+            # another column of people ("Bhagwati Rajak" / "Sohan Rajak").
+            surnames = gazetteer.SURNAMES | gazetteer.DEVA_SURNAMES
+            listed = sum(1 for v in persons if set(v.casefold().split()) & surnames)
+            return "patient_name" if listed >= max(1, 0.2 * len(vals)) else PERSON_SHAPED
     return None
+
+
+PERSON_SHAPED = "person_shaped"     # an unknown column that looks like names but carries no listed surname
+_NAME_ROLES = ("patient_name", "relative_name", "name", "first_name", "last_name")
+
+
+def _shares_surnames(keys: list[tuple[str, str]], others: list[list[tuple[str, str]]],
+                     values: dict[tuple[str, str], str]) -> bool:
+    """At least half the filled rows of this column (and two or more) end in the same word as a column of people
+    in the same row."""
+    def last(v: str) -> str:
+        words = fold(v).replace(",", " ").split()
+        return words[-1].casefold() if words and len(words[-1]) >= 3 else ""
+    mine = {rid: last(values[(rid, p)]) for rid, p in keys if values[(rid, p)].strip()}
+    shared = 0
+    for rid, word in mine.items():
+        if word and any(last(values.get((rid, ok[0][1]), "")) == word for ok in others if ok[0][1] != keys[0][1]):
+            shared += 1
+    return shared >= max(2, 0.5 * len(mine))
 
 
 # ---------------------------------------------------------------- 2. candidates

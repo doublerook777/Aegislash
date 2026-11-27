@@ -328,6 +328,14 @@ TABLES = [
       ["रेखा ठाकरे", "मोहन ठाकरे", "मधुमेह रोग", "एमलोडिपिन गोली"],
       ["अमन वाघमारे", "पूजा वाघमारे", "निमोनिया संक्रमण", "सिरप सेटिरिजिन"]],
      {"आवेदक": "PATIENT_NAME", "सहचर": "RELATIVE_NAME", "प्रारंभिक आकलन": None, "औषधि": None}),
+    # two-word organisms, drugs and vaccines under unknown headers look like names but are not: no listed surname
+    # and no surname shared row by row with another column of people, so every cell keeps its text
+    (["Isolate", "Sensitive To", "Vaccine Given", "Next Due"],
+     [["Escherichia Coli", "Piperacillin Tazobactam", "Pentavalent Booster", "Measles Rubella"],
+      ["Klebsiella Pneumoniae", "Meropenem Imipenem", "Rotavirus Oral", "Japanese Encephalitis"],
+      ["Staphylococcus Aureus", "Vancomycin Linezolid", "Inactivated Polio", "Typhoid Conjugate"],
+      ["Pseudomonas Aeruginosa", "Colistin Polymyxin", "Measles Rubella", "Vitamin Supplement"]],
+     {"Isolate": None, "Sensitive To": None, "Vaccine Given": None, "Next Due": None}),
     # a column of repeated two-word categories is not a column of people
     (["Care Route", "Pickup"], [["Walk In", "Open Camp"], ["Open Camp", "Walk In"], ["Walk In", "Walk In"],
                                 ["Walk In", "Open Camp"], ["Open Camp", "Open Camp"]],
