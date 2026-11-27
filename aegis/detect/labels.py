@@ -100,6 +100,20 @@ def _owner(parents: tuple[str, ...]) -> str | None:
     return None
 
 
+# keys that only wrap a person: "subject", "patientDetails", "guardian_info"
+_WRAPPER_WORDS = _words("detail details info information ref reference data the")
+
+
+def person_holder(key: str) -> str | None:
+    """"patient_name" / "relative_name" when a key names a person and nothing else ("subject", "guardianInfo", but
+    not "patient_tests" or "subjectCategory")."""
+    words = {w if w in _SUBJECT | _RELATIVE else re.sub(r"s$", "", w) for w in tokens(key)}
+    people = words & (_SUBJECT | _RELATIVE)
+    if not people or words - people - _WRAPPER_WORDS:
+        return None
+    return "relative_name" if people & _RELATIVE else "patient_name"
+
+
 def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
     """Role of a value, from its label and (for JSON) the keys above it.
 

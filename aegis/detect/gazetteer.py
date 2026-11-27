@@ -342,3 +342,23 @@ def looks_like_person_cell(value: str, stop: frozenset[str]) -> bool:
     disallow = ((stop - {"asha"}) | _PLACE_OR_ORG | _DEVA_PLACE_OR_ORG | _NOT_NAME | _DEVA_NOT_NAME
                 | _COLUMN_NOT_PERSON | _DEVA_COLUMN_NOT_PERSON)
     return not any(w in disallow or _DIAGNOSIS_ENDING.search(w) for w in words)
+
+
+# one word of a written name: capitalised, all capitals, an initial ("R."), "D'Mello", or Devanagari
+_NAME_TOKEN = re.compile(r"[A-Z]'?[A-Z]?[a-z]+(?:[-'][A-Z]?[a-z]+)*|[A-Z]{2,}|[A-Z]\.?|[ऀ-ॣॱ-ॿ]{2,}")
+
+
+def has_surname(value: str) -> bool:
+    return bool(set(re.split(r"[ ,.]+", value.casefold())) & (SURNAMES | _DEVA_SURNAMES))
+
+
+def reads_as_full_name(value: str, stop: frozenset[str]) -> bool:
+    """A full name by its shape (2-5 words, initials allowed, "Surname, Given" too), with no word of a report,
+    place, trade, diagnosis, medicine, hospital or staff title.  For a value whose label already points at a person."""
+    words = [w for w in re.split(r"[ ,]+|(?<=\.)(?=[A-Zऀ-ॿ])", value.strip()) if w]
+    if not 2 <= len(words) <= 5 or not all(_NAME_TOKEN.fullmatch(w) for w in words):
+        return False
+    long = [w.rstrip(".").casefold() for w in words if len(w.rstrip(".")) > 1]     # initials are not looked up
+    disallow = ((stop - {"asha"}) | _PLACE_OR_ORG | _DEVA_PLACE_OR_ORG | _NOT_NAME | _DEVA_NOT_NAME
+                | _COLUMN_NOT_PERSON | _DEVA_COLUMN_NOT_PERSON | NOT_A_PERSON_WORDS)
+    return bool(long) and not any(w in disallow or _DIAGNOSIS_ENDING.search(w) for w in long)
