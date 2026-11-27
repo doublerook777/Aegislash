@@ -1,0 +1,230 @@
+<!doctype html>
+<!-- Source of docs/brief.pdf. Print to PDF with Chromium (A4, no header/footer). Must stay within 2 pages. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Aegislash Project Brief</title>
+<style>
+  @page { size: A4; margin: 15mm 19mm 14mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 10.2pt/1.36 "Liberation Serif", "Times New Roman", "Droid Sans Devanagari", serif; color: #111;
+         text-align: justify; hyphens: auto; }
+  header { text-align: center; }
+  h1 { font-size: 17pt; line-height: 1.25; margin: 0 0 7pt; font-weight: 700; hyphens: manual; }
+  header p { margin: 0; }
+  header .repo { font-size: 10pt; }
+  .abstract { margin: 11pt 9mm 0; }
+  h2 { font-size: 12pt; margin: 10pt 0 4pt; break-after: avoid; text-align: left; }
+  h2 span, h3 span { display: inline-block; min-width: 18pt; }
+  h3 { font-size: 10.4pt; margin: 7pt 0 1pt; break-after: avoid; }
+  p { margin: 0 0 4pt; }
+  ul { margin: 2pt 0 4pt; padding-left: 15pt; }
+  li { margin-bottom: 2pt; }
+  code { font: 10pt "Liberation Mono", monospace; }
+  figure { margin: 8pt 0 0; break-inside: avoid; }
+  figcaption, caption { font-size: 10pt; text-align: left; }
+  figcaption { margin-top: 5pt; }
+  svg { display: block; width: 100%; height: auto; }
+  .eq { text-align: center; margin: 3pt 0 4pt; }
+  table { width: 100%; border-collapse: collapse; font-size: 10pt; line-height: 1.3; text-align: left; hyphens: manual;
+          margin: 5pt 0 6pt; break-inside: avoid; }
+  caption { caption-side: top; padding-bottom: 4pt; }
+  thead th { border-top: 1.1pt solid #111; border-bottom: .6pt solid #111; }
+  th, td { padding: 2.6pt 5pt; vertical-align: top; text-align: left; }
+  tbody tr:last-child td { border-bottom: 1.1pt solid #111; }
+  .page2 { break-before: page; }
+  .page2 > h2:first-child { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Aegislash: A Two-Pass Privacy Firewall for<br>Multilingual Indian Healthcare Records</h1>
+  <p>Saket Kumar (leader), Ayush Aditya, Krishnendu Chakraborty, Krishna Nema</p>
+  <p class="repo">Team curl_fun &nbsp;·&nbsp; Track 3, Secret Wards &nbsp;·&nbsp; github.com/doublerook777/Aegislash</p>
+</header>
+
+<div class="abstract">
+  <p><b>Abstract.</b> <i>Aegislash is a privacy firewall that judges identity and re-identification risk across the whole
+  dataset before it writes a single file.</i> It de-identifies English, Devanagari Hindi and Hinglish hospital records,
+  offline on a CPU, with no language model. On the practice data, which guided the rules, 0 of 3,230 personal values
+  remain visible, 99.6% of medical values are kept and linking F<sub>0.5</sub> is 1.00. Detection on unseen text is
+  weaker (Section 4).</p>
+</div>
+
+<h2><span>1</span>Introduction and unique features</h2>
+<p>Scrubbers that treat each string on its own fail on multi-hospital records in three ways: one name
+appears in two scripts and several spellings; identifiers hide in file names, headers, JSON keys and encoded
+attachments; and doctor names, doses such as <code>1-0-1</code> and complaints after <code>C/O</code> look like personal
+data. Our unique features are (i)&nbsp;context rules that protect clinical text, (ii)&nbsp;cross-script patient
+linkage that prefers a missed link to a wrong merge, and (iii)&nbsp;coarsening that is stronger only for patients in
+small or rare groups.</p>
+
+<h2><span>2</span>System architecture</h2>
+<figure>
+<svg viewBox="0 0 701 286" role="img" aria-label="Pipeline: ingest, detect and link in pass one; privacy plan, rewrite and leak gate in pass two"
+     font-family="Liberation Serif, serif" font-size="14.5" fill="#111" text-anchor="middle">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="#222"/>
+    </marker>
+  </defs>
+
+  <text x="1" y="14" text-anchor="start" font-style="italic">Pass 1: read and analyse every file; nothing is written</text>
+  <text x="1" y="281" text-anchor="start" font-style="italic">Pass 2: rewrite, verify, then write</text>
+
+  <!-- row 1 -->
+  <g stroke="#222" stroke-width="1.1">
+    <rect x="1"   y="28" width="132" height="76" rx="16" fill="#fff"/>
+    <rect x="189" y="28" width="132" height="76" rx="3" fill="#eef2f7"/>
+    <rect x="377" y="28" width="132" height="76" rx="3" fill="#eef2f7"/>
+    <rect x="567" y="28" width="132" height="76" rx="3" fill="#eef2f7"/>
+    <!-- row 2 -->
+    <rect x="567" y="184" width="132" height="76" rx="3" fill="#eef2f7"/>
+    <rect x="377" y="184" width="132" height="76" rx="3" fill="#eef2f7"/>
+    <rect x="189" y="184" width="132" height="76" rx="3" fill="#eef2f7"/>
+    <rect x="1"   y="184" width="132" height="76" rx="16" fill="#fff"/>
+    <!-- quarantine -->
+    <rect x="189" y="128" width="132" height="32" rx="3" fill="#fff" stroke-dasharray="4 3"/>
+  </g>
+
+  <g>
+    <text x="67" y="51" font-weight="700">Input files</text>
+    <text x="67" y="72">CSV, TSV, JSON,</text>
+    <text x="67" y="90">FHIR R4, text</text>
+
+    <text x="255" y="51" font-weight="700">1. Ingest</text>
+    <text x="255" y="72">decode, parse,</text>
+    <text x="255" y="90">split to records</text>
+
+    <text x="443" y="51" font-weight="700">2. Detect</text>
+    <text x="443" y="72">rules, checksums,</text>
+    <text x="443" y="90">medical guards</text>
+
+    <text x="633" y="51" font-weight="700">3. Link</text>
+    <text x="633" y="72">cross-script names,</text>
+    <text x="633" y="90">HMAC pseudonym</text>
+
+    <text x="633" y="207" font-weight="700">4. Privacy plan</text>
+    <text x="633" y="228">date shifts,</text>
+    <text x="633" y="246">risk tiers</text>
+
+    <text x="443" y="207" font-weight="700">5. Rewrite</text>
+    <text x="443" y="228">replace spans,</text>
+    <text x="443" y="246">repair FHIR</text>
+
+    <text x="255" y="207" font-weight="700">6. Leak gate</text>
+    <text x="255" y="228">rescan every</text>
+    <text x="255" y="246">output</text>
+
+    <text x="67" y="207" font-weight="700">Outputs</text>
+    <text x="67" y="228">sanitized/,</text>
+    <text x="67" y="246">report, records</text>
+
+    <text x="255" y="149">Quarantine</text>
+  </g>
+
+  <g stroke="#222" stroke-width="1.2" fill="none" marker-end="url(#a)">
+    <path d="M133 66H188"/>
+    <path d="M321 66H376"/>
+    <path d="M509 66H566"/>
+    <path d="M667 104V183"/>
+    <path d="M443 104V143H601V183"/>
+    <path d="M567 222H510"/>
+    <path d="M377 222H322"/>
+    <path d="M189 222H134"/>
+    <path d="M255 104V127" stroke-dasharray="4 3"/>
+    <path d="M255 184V161" stroke-dasharray="4 3"/>
+  </g>
+
+  <g font-style="italic">
+    <text x="660" y="127" text-anchor="end">patient keys</text>
+    <text x="515" y="136">findings</text>
+    <text x="247" y="120" text-anchor="end">unreadable</text>
+    <text x="247" y="176" text-anchor="end">leak found</text>
+  </g>
+</svg>
+<figcaption><b>Figure 1.</b> The pipeline. Dashed paths lead to quarantine. Detection also supplies the identity
+evidence used for linking.</figcaption>
+</figure>
+
+<h2><span>3</span>Method</h2>
+
+<h3><span>3.1</span>Ingestion</h3>
+<p>Files are read in sorted order from UTF-8, UTF-16 or cp1252. Unsupported or broken files are quarantined, never
+copied. File names, headers, keys and export metadata are scanned too; base64 and escaped text are decoded.</p>
+
+<h3><span>3.2</span>Detection</h3>
+<p>Column and key context is combined with patterns and checksums (Aadhaar Verhoeff, ABHA, PAN, phone, MRN), cue
+words in the three scripts (<code>S/o</code>, <code>ji</code>, <span lang="hi">उमर</span>) and name lists. Guards keep
+clinical text: <code>Dr.</code> names, <code>C/O</code> complaints, doses, vitals and eponymous diseases.</p>
+
+<h3><span>3.3</span>Linkage and pseudonyms</h3>
+<p>Devanagari names are transliterated; a consonant-skeleton key blocks candidates, and matching allows spelling
+variants. Records link on a strong ID, or on a name plus a second clue (date of birth,
+relative, or village with age ±1) that is unique in the dataset; conflicting clusters are split. Each linked patient
+receives six base-32 characters from a keyed hash, with secret <i>s</i> and patient key <i>p</i>:</p>
+<p class="eq">pseudonym(<i>p</i>) = <code>PSN-</code> ‖ base32(HMAC-SHA256(<i>s</i>, <code>"psn|"</code> ‖ <i>p</i>))</p>
+
+<div class="page2">
+<h3 style="margin-top:0"><span>3.4</span>Privacy layer</h3>
+<p>All dates of one patient move by the same secret, non-zero offset of at most 180 days, taken from
+HMAC-SHA256(<i>s</i>, <code>"shift|"</code> ‖ <i>p</i>). Date formats and lengths of stay are preserved; an unlinked
+record gets its own offset. Patients are grouped by 5-year age band, gender and district, and assigned a tier
+(Table 1). A <i>small</i> group has fewer than 5 patients; a <i>rare</i> condition occurs in at most 3. Diagnoses are
+kept in every tier.</p>
+
+<table>
+  <caption><b>Table 1.</b> Generalisation by risk tier. A district with fewer than 5 patients is hidden in every tier.</caption>
+  <thead><tr><th>Tier</th><th style="width:36%">Applies to</th><th style="width:15%">Age</th><th>PIN, village</th><th>District</th></tr></thead>
+  <tbody>
+    <tr><td>Standard</td><td>all others</td><td>5-year, 85+</td><td>3-digit prefix; village → district</td><td>kept</td></tr>
+    <tr><td>Widened</td><td>small group, or age 85+</td><td>10-year, 85+</td><td>hidden</td><td>kept</td></tr>
+    <tr><td>Strict</td><td>rare condition, and small 5- or 10-year age group or age 85+</td><td>20-year, 80+</td><td>hidden</td><td>hidden</td></tr>
+  </tbody>
+</table>
+
+<h2><span>4</span>Evaluation</h2>
+<table>
+  <caption><b>Table 2.</b> Practice data: 200 files (194 sanitized, 6 quarantined), 818 records.</caption>
+  <thead><tr><th style="width:38%">Measure</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>Personal values still visible</td><td>0 of 3,230 (0% in Latin, Devanagari and Hinglish); 0 of 4 canaries</td></tr>
+    <tr><td>Medical values kept</td><td>99.6% (4,835 of 4,855)</td></tr>
+    <tr><td>Linking precision / recall / F<sub>0.5</sub></td><td>1.00 / 0.99 / 1.00; 775 records linked, no wrong merges</td></tr>
+    <tr><td>Unique on age band, gender, district</td><td>31 of 50 patients (62%)</td></tr>
+    <tr><td>Unique on age, district, week, diagnosis</td><td>50 of 50 (week of admission)</td></tr>
+    <tr><td>Simulated registry attack (A2/A4)</td><td>16.6 candidates on average; 4 unique; confidence ≥ 0.5 for 20%</td></tr>
+    <tr><td>Simulated targeted attack (A5), 18 targets</td><td>no rare-condition match kept a narrow quasi-identifier; for 12, a known visit date matches a shifted date of any patient</td></tr>
+    <tr><td>Time and peak memory, 2 CPUs</td><td>8 to 12 s over 3 runs; 48 MB</td></tr>
+    <tr><td>Reproducibility</td><td>same secret, same output; new secret, new pseudonyms and dates</td></tr>
+  </tbody>
+</table>
+<p><b>Unseen data.</b> On text from an AI told not to read our code, scored before we inspected failures, detection
+covered 82% of personal values in free-text lines and 85% in exports (26 November). Across batches by different
+writers, coverage ranged from about 55% to 89%; later fixes have no new unseen score. On a separate file-name set, a
+given-name list raised names caught from 51 to 55 of 80 and cut false flags from 51 to 8 of 250.</p>
+
+<h2><span>5</span>Privacy–utility trade-off</h2>
+<p>The run marked 622 of 818 records as generalised and 152 as suppressed. Patients in standard groups keep 5-year ages,
+district and a PIN prefix; those at higher risk lose location detail and age precision. Most of the 20 lost medical
+values are district names hidden on purpose. Coarsening is a single pass that does <b>not guarantee k&nbsp;≥&nbsp;5</b>:
+43 of 50 patients remain in groups smaller than 5. We accept this risk to keep diagnoses and stay lengths.</p>
+
+<h2><span>6</span>Security design</h2>
+<p>We assume the server will one day be breached. A separate command, <code>scripts/vault.py</code>, makes an encrypted
+copy of the raw files: AES-256-GCM, a new key per file, wrapped by a master key kept outside data and code. File names
+are encrypted; altered, swapped or missing files are rejected. The pipeline writes no intermediate files, logs only
+counts and error codes, and never writes its secret. Unsafe files are quarantined. <i>Not covered:</i> removing the
+original files, a managed key service, and memory swapped to disk.</p>
+
+<h2><span>7</span>Limitations</h2>
+<ul>
+  <li><b>Re-identification:</b> in a release of this size, uniqueness remains high (Table 2).</li>
+  <li><b>Detection:</b> names or places with no label, capital or other clue can be missed (file-name set: 25 of 80).</li>
+  <li><b>Timelines:</b> 43 unlinked records are shifted one by one, losing the intervals between them.</li>
+</ul>
+</div>
+
+</body>
+</html>
