@@ -304,6 +304,8 @@ CASES = [
      ["Harishankar Pant", "Bhatwari"], ["Losartan 50 mg", "142/88"]),
     ("A 58 y/o woman from New Tehri, Hb 11.2 g/dL.", ["New Tehri"], ["Hb 11.2"]),
     ("64-year-old male referred from Civil Hospital; on insulin from January.", [], ["Civil Hospital", "insulin", "January"]),
+    # all-caps and mixed-case "SURNAME, Given"
+    ("Patient: KULKARNI, SURESH\nName: PATIL, Meera", ["KULKARNI, SURESH", "PATIL, Meera"], []),
 ]
 
 
@@ -378,6 +380,8 @@ TABLES = [
     # an unreadable header over phone numbers written with odd spacing; other long numbers are not phones
     (["zz_reach", "zz_bill"], [["9412 7 30518", "4500.00"], ["70112-904-18", "1200.50"], ["8800 41 2276", "980.00"]],
      {"zz_reach": "PHONE", "zz_bill": None}),
+    # all-caps and mixed-case "SURNAME, Given" in an unreadable column
+    (["PX_UPPER"], [["KULKARNI, SURESH"], ["PATIL, Meera"], ["THENGAL, BARNALI"]], {"PX_UPPER": "PATIENT_NAME"}),
 ]
 
 
@@ -457,6 +461,11 @@ CELLS = [
     ("Guardian Contact", "Barsha Hazarika 94127-30518", ["Barsha Hazarika", "94127-30518"], []),
     ("Guardian Contact", "94127 30518", ["94127 30518"], []),
     ("Attendant Mobile", "not available", [], ["not available"]),
+    # all-caps and mixed-case "SURNAME, Given" (degrees after comma still excluded)
+    ("Patient", "KULKARNI, SURESH", ["KULKARNI, SURESH"], []),
+    ("Patient", "PATIL, Meera", ["PATIL, Meera"], []),
+    ("Patient", "D'MELLO, ANITA R.", ["D'MELLO, ANITA R"], []),
+    ("Name", "Kulkarni, MBBS", ["Kulkarni"], ["MBBS"]),
 ]
 
 

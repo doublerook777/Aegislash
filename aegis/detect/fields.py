@@ -87,9 +87,13 @@ def kin_and_name(text: str) -> list[Cand]:
     return name_value(text, m.start("n"), m.end("n"), "relative_name")
 
 
-# "Surname, Given [Middle]": the comma belongs to the name. Degrees are upper case and do not match.
-_SURNAME_FIRST = re.compile(r"[A-Z][a-z'-]+, ?[A-Z][a-z'-]+(?: [A-Z](?![A-Za-z])\.?| [A-Z][a-z'-]+)?")
-_NOT_GIVEN = frozenset("male female other nurse sister doctor staff patient self son daughter wife husband father mother".split())
+# "Surname, Given [Middle]": the comma belongs to the name (title case or all capitals; degrees do not match).
+_CAP_NAME_WORD = r"(?=[A-Za-z'-]{2,})[A-Z](?:[a-z]*|[A-Z]*)(?:[-'][A-Z]?[a-z]+|[-'][A-Z]+)*"
+_SURNAME_FIRST = re.compile(rf"{_CAP_NAME_WORD}, ?{_CAP_NAME_WORD}(?: [A-Z](?![A-Za-z])\.?| {_CAP_NAME_WORD})?")
+_NOT_GIVEN = frozenset(
+    "male female other nurse sister doctor staff patient self son daughter wife husband father mother "
+    "mr mrs ms smt shri sri mbbs md ms dm mch dnb bds mds bams bhms bums phd frcs mrcp msc bsc gnm anm".split()
+)
 
 
 def surname_first(value: str) -> bool:
