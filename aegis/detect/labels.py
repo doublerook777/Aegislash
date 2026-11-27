@@ -73,6 +73,8 @@ _CATEGORY = _words("occupation job profession employer religion caste community 
 
 def category_column(label: str) -> bool:
     return bool(set(tokens(label)) & (_CATEGORY | _KEEP | _NOT_PERSON | _DOCTOR | _AREA))
+_PATIENT_ATTRIBUTE = _words("source export origin mode reason outcome class scheme language religion occupation "
+                            "education nationality")
 _CONTACT = _words("contact contacts caller")
 _NOT_MRN = _words("visit bill invoice sample claim policy ticket trip report order txn receipt encounter")
 _FREE = _words("notes note remarks remark comment comments complaints complaint history narrative advice summary")
@@ -208,7 +210,8 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
         if s & _SUBJECT or owner == "patient_name":
             return "patient_name"
         return owner or "name"
-    if s & _SUBJECT and not s & _ID_WORDS and not s & _KEEP:
+    # "patient_export_source", "patient_origin": about the patient, but the value is a system, place or category
+    if s & _SUBJECT and not s & _ID_WORDS and not s & _KEEP and not s & _PATIENT_ATTRIBUTE:
         return "patient_name"
     # "Bed & Patient", "ward_patient": where the person lies and who they are, in one column
     if s & _SUBJECT and not s & _ID_WORDS and s & _KEEP and s & _KEEP <= _PLACE_IN_HOSPITAL:

@@ -478,6 +478,9 @@ CELLS = [
     ("Guardian Contact", "Barsha Hazarika 94127-30518", ["Barsha Hazarika", "94127-30518"], []),
     ("Guardian Contact", "94127 30518", ["94127 30518"], []),
     ("Attendant Mobile", "not available", [], ["not available"]),
+    # a key about the patient whose value is a system / source, not a person
+    ("patient_export_source", "HIS-Lucknow-Ward-3", [], ["HIS-Lucknow-Ward-3"]),
+    ("patient_origin", "Referred OPD", [], ["Referred OPD"]),
     # all-caps and mixed-case "SURNAME, Given" (degrees after comma still excluded)
     ("Patient", "KULKARNI, SURESH", ["KULKARNI, SURESH"], []),
     ("Patient", "PATIL, Meera", ["PATIL, Meera"], []),
