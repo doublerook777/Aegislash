@@ -293,6 +293,11 @@ CASES = [
     ("Re: Wound Dehiscence", [], ["Wound Dehiscence"]),
     ("Subject: Appointment Reminder\nSub: Fire Safety Drill", [], ["Appointment Reminder", "Fire Safety Drill"]),
     ("Subject: Referral - CKD Stage 4, IP 2024 audit", [], ["CKD Stage 4", "2024"]),
+    # bare village after "<age>-year-old ... from <Place>" without eating hospital referrals or months (invented data)
+    ("Harishankar Pant, a 64-year-old carpenter from Bhatwari, came with his daughter. BP 142/88. Tab. Losartan 50 mg 0-0-1.",
+     ["Harishankar Pant", "Bhatwari"], ["Losartan 50 mg", "142/88"]),
+    ("A 58 y/o woman from New Tehri, Hb 11.2 g/dL.", ["New Tehri"], ["Hb 11.2"]),
+    ("64-year-old male referred from Civil Hospital; on insulin from January.", [], ["Civil Hospital", "insulin", "January"]),
 ]
 
 
