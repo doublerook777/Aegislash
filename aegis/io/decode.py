@@ -1,5 +1,6 @@
 """Bytes -> text. Handles UTF-8, UTF-8 with BOM, UTF-16 (with or without BOM), cp1252 and
-mostly-valid UTF-8 with a few corrupt bytes. Returns None when the bytes are not text."""
+mostly-valid UTF-8 with a few corrupt bytes. Returns None when the bytes are not text (a NUL byte anywhere
+in a file that is not UTF-16, such as a binary trailer after the first 4 KB)."""
 from __future__ import annotations
 
 import re
@@ -25,8 +26,8 @@ def decode(raw: bytes) -> str | None:
             if "\x00" not in text:
                 return text
         return None
-    if b"\x00" in head:
-        return None  # binary
+    if b"\x00" in raw:
+        return None  # binary: a NUL anywhere (not only in the first 4 KB) means this is not a text file
     try:
         return raw.decode("utf-8")
     except UnicodeDecodeError:

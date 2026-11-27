@@ -21,6 +21,8 @@ NAME_TYPES = ("PATIENT_NAME", "RELATIVE_NAME")
 _DIGIT_RUN = re.compile(r"(?<![0-9०-९])[0-9०-९](?:[0-9०-९]|[ \-./](?=[0-9०-९])){4,}")
 # a word is letters/digits/Devanagari; "_" separates words ("Agustín_Fonseca" in a file name is two words)
 _TOKEN = re.compile(r"(?:[^\W_]|[ऀ-ॿ])+")
+# a name right after a doctor's title ("Dr. R. Suresh Pandey") is the doctor, who is kept; detect protects the same span
+_DOCTOR_TITLE = re.compile(r"(?:\b(?:dr|doctor|prof)\b\.?|डॉ\.?|डा\.|डॉक्टर)[ \t]*(?:[A-Za-z]\.[ \t]*){0,2}$", re.IGNORECASE)
 _DEVA_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
 REDACTED = "[REDACTED]"
 
@@ -109,7 +111,8 @@ class LeakGate:
         while i < len(toks):
             for n in (4, 3, 2):
                 if i + n <= len(toks) and tuple(t[2] for t in toks[i:i + n]) in self.names:
-                    spans.append((toks[i][0], toks[i + n - 1][1]))
+                    if not _DOCTOR_TITLE.search(text[max(0, toks[i][0] - 16):toks[i][0]]):
+                        spans.append((toks[i][0], toks[i + n - 1][1]))
                     i += n
                     break
             else:

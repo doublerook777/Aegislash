@@ -55,3 +55,28 @@ Check a change: `.venv/bin/python -m pytest -q aegis/io`, then the usual `main.p
 - Still open: UTF-16 text inside base64; base64 in a header, a JSON key or a file name beyond the stem rule above; base64
   inside base64 (one layer is decoded); names with an accent typed as separate marks (NFD) in the gate (detect handles
   those); `\xNN` byte escapes and `U+0932` notation.
+
+## Quarantine and leak-gate fixes from the audit (`report/vulnerability_audit_report.md`: V7, V8, V9, V11)
+- **V8, binary files.** `decode()` looks for a NUL byte in the whole file, not only in the first 4 KB. A file with a NUL that is
+  not UTF-16 (a binary trailer after byte 4,096) is quarantined as `undecodable_text` instead of exported with its bytes.
+- **V7, deep JSON.** Nesting deeper than `MAX_JSON_DEPTH` (1,000 levels, counted without recursion) is quarantined as
+  `json_too_deep`, for JSON and JSON Lines alike. The cap sits just above the 950 levels the practice sets expect to be read
+  and below the 1,500-level bombs (the kit accepts either outcome for those). The audit suggested 256-500, which would
+  quarantine a file the kit expects to be sanitized. JSON deeper than 64 levels is written without indentation: with
+  `indent=2`, 950 levels grew from a few KB to 1.8 MB. Shallower JSON is written exactly as before.
+- **V9, export metadata keys.** A top-level key is ignored when deciding what the file's subject is only when BOTH its
+  key and its value describe the export (`_describes_export`): the key ends in an export word (`..._source`, `..._count`,
+  `...Total`, `..._version`, `..._batch`) and the value is a count or a short code with no spaces (`HIS-Lucknow-Ward-3`).
+  Then the `visits` array is split into one record per patient again. `batch_patient_name`, `source_patient_name`,
+  `export_name`, or a name or long number under `patient_source`, still make the file one document: splitting such a file
+  left the patient's first name or surname in the visit notes. When unsure the file stays one document.
+- **V11, doctors in the leak gate.** A name that follows a doctor's title (`Dr.`, `Dr R.`, `Prof`, `डॉ.`) is not scrubbed by the
+  gate, nor does it make `contains_leak` quarantine the file: detect already protects that span, and the gate used to turn
+  `Dr. Suresh Pandey` into `Dr. [REDACTED]` whenever a patient had the same name. The same name elsewhere is still removed.
+- **Checker note:** `check_dev.py` counts `Suresh Pandey` inside `Dr. Suresh Pandey` as a leak when a patient has that name.
+  The official rule (`docs/kit/SCORING.md`, "allowed") does not. The numbers in the PR use the official rule.
+- Not done here: a `LeakGate` that folds homoglyphs and zero-width characters, and V10 (delimiter sniffing from line 0 only;
+  it did not reproduce in the PR #25 review). Decoding escapes and base64 inside the gate came with PR #25 (R2b, below).
+- Side effect, expected: a file that used to be exported and is now quarantined leaves its patient's cluster, and the patient
+  key is a hash of the cluster's record ids (V13), so that one patient gets a new PSN and date shift. On `dev/input` this is
+  the patient whose name and mobile sit at the bottom of `misc/deep_export.json`.
