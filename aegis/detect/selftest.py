@@ -591,6 +591,15 @@ FILENAMES = [
     ("ds-barnalithengal-31145549.txt", "Patient Name: Barnali Thengal\n", ["barnalithengal"]),
     ("ds_devika_ranganathan.txt", "Patient Name: Devika Ranganathan\n", ["devika_ranganathan"]),
     ("referral.txt", "Subject: Referral - Chandni Mamgain (IPD 6204)\nReferral enclosed.\n", []),
+    # dashed, CamelCase, and Devanagari patient names in file names vs ordinary hospital files (invented data)
+    ("ipd-devendra-kothiyal-19.txt", "Hb 12.1 g/dL, TLC 6800.\n", ["devendra-kothiyal"]),
+    ("UrmilaSemwalLabs4.txt", "TSH 3.2 mIU/L, normal.\n", ["UrmilaSemwal"]),
+    ("रिपोर्ट_गोकुल_बमरारा_5.txt", "रक्त शर्करा 108 mg/dl।\n", ["गोकुल_बमरारा"]),
+    ("infection-prevention-audit.txt", "Compliance 94%.\n", []),
+    ("oxygen-regulator-usage.csv", "Cylinders 12.\n", []),
+    ("opd-pathology-report-9.txt", "Samples 40.\n", []),
+    ("ward-14-occupancy.txt", "Beds occupied 28.\n", []),
+    ("dr-kothiyal-rounds.txt", "Seen in ward.\n", []),
 ]
 
 
