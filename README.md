@@ -26,6 +26,19 @@ RAKSHA_SECRET=<secret> .venv/bin/python main.py --input dev/input --output out
 .venv/bin/python scripts/check_contracts.py
 ```
 
+## Encrypting Raw Data at Rest
+
+A separate command makes an encrypted copy of a raw input tree. The pipeline (`main.py`) does not use it.
+
+```bash
+.venv/bin/pip install -r requirements-vault.txt
+.venv/bin/python scripts/vault.py keygen --key-file /secure/place/master.key
+.venv/bin/python scripts/vault.py seal --input raw/ --vault vault/ --key-file /secure/place/master.key
+.venv/bin/python scripts/vault.py open --vault vault/ --output restored/ --key-file /secure/place/master.key
+```
+
+AES-256-GCM envelope encryption: a new data key per file, wrapped by a master key that must be outside the data, the vault and this repository. Blob names are random, original paths sit in an encrypted manifest, and a wrong key or an altered, swapped or missing file stops the restore before anything is written. It does **not** change or delete the original files, replace a key manager, protect memory swapped to disk, or hide the number and sizes of files.
+
 ## Repository Layout
 
 | Path | What it holds |
@@ -35,6 +48,7 @@ RAKSHA_SECRET=<secret> .venv/bin/python main.py --input dev/input --output out
 | `config/policy.yaml` | privacy policy: age bands, date-shift range, k, rare-condition threshold |
 | `contracts/` | module contracts, JSON schemas and examples (`scripts/check_contracts.py`) |
 | `scripts/risk_report.py` | k-anonymity and simulated attacker risk report |
+| `scripts/vault.py` | encrypted-at-rest copy of raw input (separate command, with tests) |
 | `tests/` | adversarial and breaker datasets with their measured reports |
 | `dev/`, `docs/kit/`, `check_*.py`, `validate_output.py`, `scoring.toml` | organiser practice data, track docs and self-check tools |
 | `docs/brief.pdf` | 2-page Project Brief |
@@ -87,6 +101,7 @@ Export: sanitized/ + report.json + records.jsonl (verified by final leak gate)
 
 ## Security Design
 
+- **Raw data at rest:** `scripts/vault.py` makes an AES-256-GCM encrypted copy ([usage and limits](#encrypting-raw-data-at-rest)).
 - **In-memory processing:** Raw PII is never written to temporary directories (`TMPDIR`, `HOME`), logs, or error messages.
 - **Key separation & hygiene:** `RAKSHA_SECRET` is read from the environment only, domain-separated between pseudonyms (`psn|`) and date shifts (`shift|`), and never logged or written to output artifacts.
 - **Fail-closed behavior:** Unknown finding types map to `[REDACTED]`; unparseable dates map to `[DATE]`; broken/unsupported files are quarantined rather than copied raw.
@@ -100,10 +115,10 @@ Export: sanitized/ + report.json + records.jsonl (verified by final leak gate)
 | Planted canaries leaked | `0 / 4` | `check_dev.py` |
 | Medical values preserved | `99.6%` (`4835 / 4855`; most lost values are district names hidden on purpose for small districts) | `check_dev.py` |
 | Patient linking (precision / recall / F0.5) | `1.00 / 0.99 / 1.00` (`775 / 818` records linked, `0` wrong merges) | `check_dev.py` |
-| Equivalence classes & A2/A4 / A5 risk | `31/50` unique on `(age_band, gender, district)`; A2/A4 mean `16.6` candidates, est. `conf >= 0.5`: `20.0%`; A5 rare+narrow-QI hits: `0 / 18` | `scripts/risk_report.py` |
+| Equivalence classes & A2/A4 / A5 risk | `31/50` unique on `(age_band, gender, district)`; A2/A4 mean `16.6` candidates, est. `conf >= 0.5`: `20.0%`; A5 rare+narrow-QI hits: `0 / 18`; a known visit date matches a shifted date of any patient for `12 / 18` | `scripts/risk_report.py` |
 | Unseen file names (held-out set) | false flags `51/250` -> `8/250`, names caught `51/80` -> `55/80` after the given-name list | held-out file-name set |
-| Runtime & determinism | `6.53 s`, `45.1 MB` peak RSS (`200` files, `818` records); byte-identical repeat runs & secret-keyed unlinkability verified | `report.json` / `check_submission.py --run` |
-| Self-test, contracts & unit tests | `218/218` `aegis.detect.selftest` cases (0 table/cell/JSON/HL7 problems); `13/13` contract cases; `95` `pytest` tests passing | `selftest.py` / `check_contracts.py` / `pytest` |
+| Runtime & determinism | `8`-`12 s` on 2 CPUs, `48 MB` peak RSS (`200` files, `818` records); byte-identical repeat runs & secret-keyed unlinkability verified | `report.json` / `check_submission.py --run` |
+| Self-test, contracts & unit tests | `218/218` `aegis.detect.selftest` cases (0 table/cell/JSON/HL7 problems); `13/13` contract cases; `107` `pytest` tests passing | `selftest.py` / `check_contracts.py` / `pytest` |
 
 ## Known Limitations
 
