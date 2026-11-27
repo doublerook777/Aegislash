@@ -238,6 +238,24 @@ class PrivacyTests(unittest.TestCase):
         self.assertEqual(replace(p, "chamoli.csv#row:0", results[10]["findings"][1]), {"text": "[VILLAGE]", "status": "suppressed"})
         self.assertEqual(replace(p, "chamoli.csv#row:0", results[10]["findings"][2]), {"text": "[DISTRICT]", "status": "suppressed"})
 
+    def test_ages_over_120_and_130_top_coded(self) -> None:
+        fillers = [_rec(f"agefill.csv#row:{i}", age=45, gender="F", district="almora") for i in range(10)]
+        old_rec = _rec(
+            "opd.tsv#row:0",
+            [
+                {"path": "col:1", "start": 0, "end": 3, "type": "AGE", "text": "134", "norm": "134", "role": "patient"},
+                {"path": "col:2", "start": 0, "end": 5, "type": "AGE", "text": "134/F", "norm": "134", "role": "patient"},
+            ],
+            age=134,
+            gender="F",
+            district="almora",
+        )
+        keys = {r["record_id"]: f"k:{i}" for i, r in enumerate(fillers)}
+        keys["opd.tsv#row:0"] = "k:old"
+        p = plan(fillers + [old_rec], keys)
+        self.assertEqual(replace(p, "opd.tsv#row:0", old_rec["findings"][0]), {"text": "85+", "status": "generalized"})
+        self.assertEqual(replace(p, "opd.tsv#row:0", old_rec["findings"][1]), {"text": "85+/F", "status": "generalized"})
+
     def test_risk_report_on_synthetic_release(self) -> None:
         import json
         import tempfile

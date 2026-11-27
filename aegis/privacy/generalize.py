@@ -27,7 +27,7 @@ def generalize_age(
 ) -> tuple[str, str]:
     """Return ``(replacement_text, status)`` preserving style (e.g. ``48/M`` -> ``45-49/M``)."""
     age = parse_age_int(text, norm)
-    if age is None or age < 0 or age > 130:
+    if age is None or age < 0:
         return "[AGE]", "suppressed"
 
     if age >= elderly_threshold:
