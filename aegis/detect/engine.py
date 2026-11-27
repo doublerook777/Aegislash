@@ -15,9 +15,9 @@ import base64
 import binascii
 import re
 
-from aegis.detect import address, dates, evidence, fields, gazetteer, ids, names
-from aegis.detect.labels import classify, extra_checks, names_a_relative, tokens
-from aegis.detect.normalize import DEVA, fold, norm_name, unquote_view, visible
+from aegis.detect import address, dates, evidence, fields, gazetteer, hl7, ids, names
+from aegis.detect.labels import _owner, category_column, classify, extra_checks, names_a_relative, tokens
+from aegis.detect.normalize import DEVA, decode_view, digits, fold, norm_name, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
 from aegis.types import DIRECT_TYPES, QUASI_TYPES, STRONG_ID_TYPES, Record, RecordResult, empty_evidence
 
@@ -34,7 +34,8 @@ _NAME_LABEL_WORDS = frozenset(("name", "naam", "nm", "नाम"))
 # ---------------------------------------------------------------- 1. roles
 
 def _segments(path: str) -> list[str]:
-    return [p.replace("~1", "/").replace("~0", "~") for p in path.split("/")[1:]]
+    # "/note#b64:0" is the text inside a base64 run of "/note" (made by io): it reads like its parent field
+    return [p.replace("~1", "/").replace("~0", "~") for p in path.partition("#b64:")[0].split("/")[1:]]
 
 
 def _json_label(path: str) -> tuple[str, tuple[str, ...]]:
@@ -50,7 +51,47 @@ def _fhir_types(records: list[Record]) -> dict[str, str]:
             if f["path"].startswith("/") and f["path"].endswith("/resourceType")}
 
 
-def _fhir_role(path: str, role: str | None, types: dict[str, str]) -> str | None:
+# Identifier.value of a person: whatever its shape it names the patient. The system / type beside it may say which kind.
+_PERSON_RESOURCES = ("Patient", "RelatedPerson", "Person")
+_PERSON_REFS = ("subject", "patient", "beneficiary")     # Observation.subject.identifier is the patient's too
+_NOT_PERSON_IDENTIFIER = ("assigner", "managingOrganization", "generalPractitioner", "performer", "author", "requester")
+_IDENT_PARTS = ("identifier", "identifiers")
+_IDENT_VALUE_KEYS = ("value", "number", "id", "val")
+PID = "pid:"      # role prefix: "this value is a patient identifier of the kind after the colon, whatever its shape"
+
+
+def _identifier_kind(holder: str, by_path: dict[str, str]) -> str:
+    """Kind of identifier an Identifier object (the pointer `holder`) says it holds: an ID_ROLES role, "mrn" by default."""
+    for leaf in ("system", "label", "type/text", *(f"type/coding/{i}/{k}" for i in range(3) for k in ("code", "display", "system"))):
+        text = by_path.get(f"{holder}/{leaf}")
+        role = classify(re.split(r"[/#:]", text.rstrip("/"))[-1]) if text else None
+        if role in fields.ID_ROLES:
+            return role
+    return "mrn"
+
+
+def _identifier_role(path: str, below: list[str], kind: str | None, by_path: dict[str, str]) -> str | None:
+    if not below or below[-1] not in _IDENT_VALUE_KEYS or not any(p in _IDENT_PARTS for p in below):
+        return None
+    if set(below) & set(_NOT_PERSON_IDENTIFIER) or not (kind in _PERSON_RESOURCES or set(below) & set(_PERSON_REFS)):
+        return None
+    return PID + _identifier_kind(path.rsplit("/", 1)[0], by_path)
+
+
+def _plain_identifier_role(path: str, label: str, parents: tuple[str, ...], by_path: dict[str, str]) -> str | None:
+    """{"patient": {"identifier": [{"system": ..., "value": ...}]}}: the same rule for JSON that is not FHIR."""
+    keys = [*parents, label]
+    at = max((i for i, k in enumerate(keys) if k in _IDENT_PARTS), default=-1)
+    if at < 0 or set(keys) & set(_NOT_PERSON_IDENTIFIER):
+        return None
+    if not (at == len(keys) - 1 or (at == len(keys) - 2 and label in _IDENT_VALUE_KEYS)):
+        return None
+    if at == 0 or _owner((re.sub(r"s$", "", keys[at - 1]),)) not in ("patient_name", "relative_name"):   # the key just above
+        return None
+    return PID + (_identifier_kind(path.rsplit("/", 1)[0], by_path) if at == len(keys) - 2 else "mrn")
+
+
+def _fhir_role(path: str, role: str | None, types: dict[str, str], by_path: dict[str, str]) -> str | None:
     parts = path.split("/")
     for i in range(len(parts) - 1, 0, -1):
         kind = types.get("/".join(parts[:i]))
@@ -59,6 +100,8 @@ def _fhir_role(path: str, role: str | None, types: dict[str, str]) -> str | None
             break
     else:
         return role
+    if pid := _identifier_role(path, below, kind, by_path):
+        return pid
     if "subject" in below and below[-1] == "display":
         return "patient_name"
     if below[-1] == "display" and any(p in below for p in ("author", "performer", "requester", "recorder", "asserter")):
@@ -98,6 +141,7 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
     roles: dict[tuple[str, str], str | None] = {}
     by_path = {f["path"]: f["value"] for r in records for f in r["fields"] if f["path"].startswith("/")}
     columns: dict[str, list[tuple[str, str]]] = {}
+    col_label: dict[str, str] = {}      # table columns only: path -> header
     for r in records:
         for f in r["fields"]:
             key = (r["record_id"], f["path"])
@@ -106,11 +150,14 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
             if f["path"].startswith("col:"):
                 role = classify(f["context"] or "")
                 columns.setdefault(f["path"], []).append(key)
+                col_label[f["path"]] = f["context"] or ""
             else:
                 label, parents = _json_label(f["path"])
                 role = classify(label, parents)
                 if types:
-                    role = _fhir_role(f["path"], role, types)
+                    role = _fhir_role(f["path"], role, types, by_path)
+                if not (role or "").startswith(PID):
+                    role = _plain_identifier_role(f["path"], label, parents, by_path) or role
                 role = _pair_role(f["path"], by_path) or role
                 columns.setdefault(re.sub(r"/\d+(?=/|$)", "/*", f["path"]), []).append(key)
             roles[key] = role
@@ -119,9 +166,20 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
     # a doctor column without "Dr." in it: the same people are written "Dr. X" somewhere else in the file
     doctors = {" ".join(names.doctor_name(m)) for text in values.values() for m in names.doctor_mentions(text)}
     has_name = any(role in ("patient_name", "name", "first_name") for role in roles.values())
-    for keys in columns.values():
+    guesses = {}
+    for path, keys in columns.items():
         if roles[keys[0]] is None:
-            guess = _guess_role([values[k] for k in keys if values[k].strip()])
+            guesses[path] = _guess_role([values[k] for k in keys if values[k].strip()], col_label.get(keys[0][1], ""),
+                                        keys[0][1] in col_label)
+    # a column that only looks like names counts when its rows share surnames with another column of people
+    people_cols = [keys for path, keys in columns.items()
+                   if roles[keys[0]] in _NAME_ROLES or guesses.get(path) in ("patient_name", PERSON_SHAPED)]
+    for path, keys in columns.items():
+        if guesses.get(path) == PERSON_SHAPED:
+            guesses[path] = "patient_name" if _shares_surnames(keys, people_cols, values) else None
+    for path, keys in columns.items():
+        if roles[keys[0]] is None:
+            guess = guesses[path]
             if guess == "patient_name":
                 filled = [values[k] for k in keys if values[k].strip()]
                 # most of the column, never a single match: one patient who shares a doctor's name must not
@@ -148,7 +206,7 @@ def _is_mobile(value: str) -> bool:
     return len(d) == 10 and d[0] in "6789"
 
 
-def _guess_role(vals: list[str]) -> str | None:
+def _guess_role(vals: list[str], label: str = "", column: bool = False) -> str | None:
     if len(vals) < 3:
         return None
     if all(re.fullmatch(r"[1-9]\d{2}(?!000)\d{3}", v.strip()) for v in vals):
@@ -173,7 +231,39 @@ def _guess_role(vals: list[str]) -> str | None:
     with_surname = [v for v in people if set(v.casefold().replace(",", " ").split()) & gazetteer.SURNAMES]
     if len(people) >= 0.7 * len(vals) and len(with_surname) >= 0.4 * len(vals):
         return "patient_name"
+    # a table column whose cells nearly all read as 2-3 word person names, surnames listed or not: the whole
+    # column is a name column (the cells that happen to carry a listed surname must not be the only ones removed)
+    if column and not category_column(label):
+        persons = [v for v in folded if gazetteer.looks_like_person_cell(v, names.STOP | names.ORG)
+                   and v.casefold() not in address._UP_DISTRICTS]
+        if len(persons) >= 0.8 * len(vals) and len(set(folded)) >= max(3, 0.3 * len(vals)):
+            # "looks like two capitalised words" alone also fits organisms, drugs and vaccines ("Escherichia Coli",
+            # "Piperacillin Tazobactam", "Measles Rubella"). Some evidence of people is needed: a listed surname in
+            # at least one cell (and a fifth of them), or, decided in field_roles, surnames shared row by row with
+            # another column of people ("Bhagwati Rajak" / "Sohan Rajak").
+            surnames = gazetteer.SURNAMES | gazetteer.DEVA_SURNAMES
+            listed = sum(1 for v in persons if set(v.casefold().split()) & surnames)
+            return "patient_name" if listed >= max(1, 0.2 * len(vals)) else PERSON_SHAPED
     return None
+
+
+PERSON_SHAPED = "person_shaped"     # an unknown column that looks like names but carries no listed surname
+_NAME_ROLES = ("patient_name", "relative_name", "name", "first_name", "last_name")
+
+
+def _shares_surnames(keys: list[tuple[str, str]], others: list[list[tuple[str, str]]],
+                     values: dict[tuple[str, str], str]) -> bool:
+    """At least half the filled rows of this column (and two or more) end in the same word as a column of people
+    in the same row."""
+    def last(v: str) -> str:
+        words = fold(v).replace(",", " ").split()
+        return words[-1].casefold() if words and len(words[-1]) >= 3 else ""
+    mine = {rid: last(values[(rid, p)]) for rid, p in keys if values[(rid, p)].strip()}
+    shared = 0
+    for rid, word in mine.items():
+        if word and any(last(values.get((rid, ok[0][1]), "")) == word for ok in others if ok[0][1] != keys[0][1]):
+            shared += 1
+    return shared >= max(2, 0.5 * len(mine))
 
 
 # ---------------------------------------------------------------- 2. candidates
@@ -308,8 +398,13 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
     if kind == "value":
         label, parents = (f["context"] or "", ()) if f["path"].startswith("col:") else _json_label(f["path"])
 
+    # the value of a person's Identifier: a patient identifier whatever its shape (kind: see _identifier_kind)
+    forced = None
+    if role and role.startswith(PID):
+        forced, role = role[len(PID):], role[len(PID):]
+
     # a record number always has a digit: "patient_ref" holding words is read like any unknown value
-    if role == "mrn" and kind == "value" and not re.search(r"\d", text):
+    if role == "mrn" and kind == "value" and not forced and not re.search(r"\d", text):
         role = None
 
     # the header is only a hint: a "PIN" column may really hold the whole address ("Home Place & PIN"),
@@ -354,6 +449,18 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
             found += fields.structured(text, 0, len(text), "phone", dmy)
         elif extra_check == "student":
             found += fields.name_value(text, 0, len(text), "name")
+    if forced and text.strip() and not any(c.type in fields.ID_ROLES.values() and text[c.start:c.end] == text.strip()
+                                           for c in found):
+        # no known shape (digits only, a short code): all of the value is the identifier
+        a = len(text) - len(text.lstrip())
+        b = len(text.rstrip())
+        kind_of = fields.ID_ROLES[forced]
+        if kind_of != "MRN" and not any(c.type == kind_of for c in found):
+            kind_of = "MRN"     # "aadhaar" system but not a number: still one identifier of the patient
+        found = [c for c in found if c.type not in fields.ID_ROLES.values()
+                 or c.end <= a or c.start >= b]
+        found.append(Cand(a, b, kind_of, digits(text) or re.sub(r"[^A-Z0-9]", "", text.upper()), "patient",
+                          prio=PRIORITY[kind_of] + 2))
     found += names.find_path_names(text)
     found += names.find_url_pii(text)
     if kind == "filename":
@@ -377,8 +484,15 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
     found = [c for c in found if not (c.type == "DATE" and any(h.start <= c.start and c.end <= h.end for h in houses))]
 
     blocked = names.protected_spans(text)
-    return [c for c in found
-            if not (c.type in NAME_TYPES and any(c.start < e and s < c.end for s, e in blocked))]
+    found = [c for c in found
+             if not (c.type in NAME_TYPES and any(c.start < e and s < c.end for s, e in blocked))]
+    # an HL7 v2 message: the segment and field position decide (not filtered by word lists)
+    if kind in ("text", "value") and hl7.is_message(text):
+        structured_found, stamps, coded = hl7.find(text)
+        found = [c for c in found if not any(c.start < e and s < c.end for s, e in stamps)
+                 and (c.type in hl7.CODED_KEEP or not any(s <= c.start and c.end <= e for s, e in coded))]
+        found += structured_found
+    return found
 
 
 # ---------------------------------------------------------------- 3. propagation
@@ -483,19 +597,19 @@ def _propagate(records: list[Record], per_field: dict) -> None:
 # ---------------------------------------------------------------- 4. results
 
 def _view(value: str) -> tuple[str, list[tuple[int, int]] | None]:
-    """The text detect reads: hidden characters removed and URL escapes decoded. For each of its characters, the
-    (start, end) it covers in `value` (None: the text is unchanged)."""
+    """The text detect reads: hidden characters removed and URL escapes, "\\uXXXX" sequences and HTML entities
+    decoded. For each of its characters, the (start, end) it covers in `value` (None: the text is unchanged)."""
     text, kept = visible(value)
     spans = None if kept is None else [(k, k + 1) for k in kept]
-    text, inner = unquote_view(text)
+    text, inner = decode_view(text)
     if inner is not None:
         spans = inner if spans is None else [(spans[s][0], spans[e - 1][1]) for s, e in inner]
     return text, spans
 
 
 def detect_file(records: list[Record]) -> list[RecordResult]:
-    """Hidden characters are removed and URL escapes decoded before detection; findings point back into the
-    original values."""
+    """Hidden characters are removed and URL escapes, \\uXXXX sequences and HTML entities decoded before detection;
+    findings point back into the original values."""
     originals: dict[tuple[str, str], tuple[str, list[tuple[int, int]]]] = {}
     cleaned = []
     for r in records:
@@ -553,7 +667,7 @@ def _detect(records: list[Record]) -> list[RecordResult]:
                     who = who or "patient"
                 if c.type in NAME_TYPES:
                     last, comma, given = surface.partition(",")
-                    norm = norm_name(f"{given} {last}" if comma else surface) or None
+                    norm = c.full_name or norm_name(f"{given} {last}" if comma else surface) or None
                     who = "relative" if c.type == "RELATIVE_NAME" else "patient"
                     hinglish = c.hinglish or len(_HINGLISH.findall(f["value"])) >= 2
                     script = "deva" if DEVA.search(surface) else ("hinglish" if hinglish else "latin")

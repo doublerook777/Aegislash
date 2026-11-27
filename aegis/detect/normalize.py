@@ -6,6 +6,7 @@ offset in the original. Never add a rule to `fold` that changes the length of th
 """
 from __future__ import annotations
 
+import html
 import re
 import unicodedata
 
@@ -59,21 +60,32 @@ def visible(s: str) -> tuple[str, list[int] | None]:
 
 
 _PCT_RUN = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
+_UNI_ESC = re.compile(r"\\u(?:\{([0-9A-Fa-f]{1,6})\}|([0-9A-Fa-f]{4}))")
+_HTML_ENT = re.compile(r"&(?:#[0-9]{1,7}|#[xX][0-9A-Fa-f]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});")
 
 
-def unquote_view(s: str) -> tuple[str, list[tuple[int, int]] | None]:
-    """`s` with URL escapes read ("%20" -> " ", "%5C" -> "\\", "%C3%AD" -> "í"), and for every character of the
-    result the (start, end) it covers in `s` (None: nothing was decoded). An escape that is not valid UTF-8, or that
-    stands for a control character, is left as it is, so "5%DEX" and "%0A" are not touched."""
-    if "%" not in s or not _PCT_RUN.search(s):
-        return s, None
+def _splice(s: str, items: list[tuple[int, int, str]]) -> tuple[str, list[tuple[int, int]]]:
+    """`s` with every (start, end, text) of `items` (sorted, not overlapping) replaced by its text; for each
+    character of the result the (start, end) it covers in `s`."""
     out: list[str] = []
     spans: list[tuple[int, int]] = []
-    pos, changed = 0, False
+    pos = 0
+    for a, b, t in items:
+        if a > pos:
+            out.append(s[pos:a])
+            spans.extend(zip(range(pos, a), range(pos + 1, a + 1)))
+        out.append(t)
+        spans.extend([(a, b)] * len(t))
+        pos = b
+    if pos < len(s):
+        out.append(s[pos:])
+        spans.extend(zip(range(pos, len(s)), range(pos + 1, len(s) + 1)))
+    return "".join(out), spans
+
+
+def _pct_items(s: str) -> list[tuple[int, int, str]]:
+    items: list[tuple[int, int, str]] = []
     for m in _PCT_RUN.finditer(s):
-        for k in range(pos, m.start()):
-            out.append(s[k])
-            spans.append((k, k + 1))
         raw = bytes.fromhex(m.group(0).replace("%", ""))
         i = 0
         while i < len(raw):
@@ -87,20 +99,77 @@ def unquote_view(s: str) -> tuple[str, list[tuple[int, int]] | None]:
                     ch = None
             first = m.start() + 3 * i
             if ch is not None and (n > 1 or 0x20 <= b < 0x7F):
-                out.append(ch)
-                spans.append((first, first + 3 * n))
-                changed = True
+                items.append((first, first + 3 * n, ch))
                 i += n
             else:
-                for k in range(first, first + 3):
-                    out.append(s[k])
-                    spans.append((k, k + 1))
                 i += 1
-        pos = m.end()
-    for k in range(pos, len(s)):
-        out.append(s[k])
-        spans.append((k, k + 1))
-    return ("".join(out), spans) if changed else (s, None)
+    return items
+
+
+def _usable(cp: int) -> bool:
+    return 0x20 <= cp <= 0x10FFFF and not 0x7F <= cp <= 0x9F and not 0xD800 <= cp <= 0xDFFF and cp != 0xFFFD
+
+
+def _uni_items(s: str) -> list[tuple[int, int, str]]:
+    """"\\u0932" / "\\u{1F600}" written out as text (not JSON-parsed), with surrogate pairs joined. Control characters
+    stay as they are."""
+    items: list[tuple[int, int, str]] = []
+    ms = list(_UNI_ESC.finditer(s))
+    i = 0
+    while i < len(ms):
+        m = ms[i]
+        cp = int(m.group(1) or m.group(2), 16)
+        end = m.end()
+        if 0xD800 <= cp <= 0xDBFF and i + 1 < len(ms) and ms[i + 1].start() == end and ms[i + 1].group(2):
+            low = int(ms[i + 1].group(2), 16)
+            if 0xDC00 <= low <= 0xDFFF:
+                cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00)
+                end = ms[i + 1].end()
+                i += 1
+        if _usable(cp):
+            items.append((m.start(), end, chr(cp)))
+        i += 1
+    return items
+
+
+def _html_items(s: str) -> list[tuple[int, int, str]]:
+    items: list[tuple[int, int, str]] = []
+    for m in _HTML_ENT.finditer(s):
+        t = html.unescape(m.group(0))
+        if t != m.group(0) and all(_usable(ord(c)) for c in t):
+            items.append((m.start(), m.end(), t))
+    return items
+
+
+def unquote_view(s: str) -> tuple[str, list[tuple[int, int]] | None]:
+    """`s` with URL escapes read ("%20" -> " ", "%5C" -> "\\", "%C3%AD" -> "í"), and for every character of the
+    result the (start, end) it covers in `s` (None: nothing was decoded). An escape that is not valid UTF-8, or that
+    stands for a control character, is left as it is, so "5%DEX" and "%0A" are not touched."""
+    if "%" not in s or not _PCT_RUN.search(s):
+        return s, None
+    items = _pct_items(s)
+    return _splice(s, items) if items else (s, None)
+
+
+def decode_view(s: str) -> tuple[str, list[tuple[int, int]] | None]:
+    """The text as a reader sees it once escapes are read: URL escapes ("%20"), "\\u0932" sequences written out in the
+    text and HTML entities ("&amp;", "&#2354;"), up to three layers deep ("%5Cu0932"). Returns the text and, for each of
+    its characters, the (start, end) it covers in `s` (None: nothing was decoded)."""
+    spans: list[tuple[int, int]] | None = None
+    for _ in range(3):
+        changed = False
+        for hint, fn in (("%", _pct_items), ("\\u", _uni_items), ("&", _html_items)):
+            if hint not in s:
+                continue
+            items = fn(s)
+            if not items:
+                continue
+            s, inner = _splice(s, items)
+            spans = inner if spans is None else [(spans[a][0], spans[b - 1][1]) for a, b in inner]
+            changed = True
+        if not changed:
+            break
+    return s, spans
 
 
 def digits(s: str) -> str:

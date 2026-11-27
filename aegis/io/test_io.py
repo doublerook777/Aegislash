@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 
 import pytest
 
@@ -202,3 +203,137 @@ def test_name_learned_in_one_file_is_removed_from_another_in_any_form(tmp_path, 
     for text in _outputs(out).values():
         assert "Quispe" not in text and "Mariela" not in text
     assert all("Quispe" not in n for n in _outputs(out))
+
+
+# ---------------------------------------------------------------- hidden payloads inside cells and running text
+HASH = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAHyJ4MQAAAABJRU5ErkJggg=="
+_B64_CHARS = re.compile(r"[A-Za-z0-9+/=]{16,}")
+
+
+def _decoded_runs(text: str) -> list[str]:
+    return [dec for _a, _b, dec, _f in formats.find_runs(text)]
+
+
+def _decode_all(text: str) -> str:
+    """Every base64-looking piece of `text` that decodes to UTF-8, joined (to check nothing is left inside)."""
+    out = []
+    for piece in _B64_CHARS.findall(text):
+        try:
+            out.append(base64.b64decode(piece + "=" * (-len(piece) % 4)).decode("utf-8"))
+        except ValueError:
+            pass
+    return "\n".join(out)
+
+
+def test_find_runs_reads_text_and_leaves_noise():
+    payload = _b64("patient=Rukmini Deshmukh;phone=9811100031")
+    assert _decoded_runs(f"ref {payload} end") == ["patient=Rukmini Deshmukh;phone=9811100031"]
+    assert _decoded_runs(f"x?q={payload}&y=1") == ["patient=Rukmini Deshmukh;phone=9811100031"]
+    uri = "data:text/plain;base64," + _b64("Contact Gulab Chaudhry on 9811100032")
+    assert _decoded_runs(f"see {uri} now") == ["Contact Gulab Chaudhry on 9811100032"]
+    for noise in (HASH, PNG, "TXN8F3K2Q9ZL4M7W1B6C", "Hydroxychloroquine", "Tab Paracetamol 650 mg", "ABCDEFGHIJKLMNOP",
+                  "1234567890123456", "https://portal.example/files/discharge/summary/2024", "9811100031" * 3):
+        assert _decoded_runs(noise) == [], noise
+
+
+def test_runs_round_trip_unchanged_and_changed():
+    payload = _b64("patient=Rukmini Deshmukh;phone=9811100031")
+    csv_text = f"id,blob,rx\nV1,{payload},Tab Cefixime 200 mg BD\n"
+    pf = formats.parse("a/x.csv", csv_text)
+    assert formats.write(pf, {}) == csv_text
+    kid = [f for f in pf.records[1]["fields"] if "#b64:" in f["path"]]
+    assert len(kid) == 1 and kid[0]["value"].startswith("patient=Rukmini")
+    out = formats.write(pf, {(pf.records[1]["record_id"], kid[0]["path"]): "patient=[PATIENT];phone=[PHONE]"})
+    cell = out.splitlines()[1].split(",")[1]
+    assert base64.b64decode(cell).decode() == "patient=[PATIENT];phone=[PHONE]"
+    note = f"line one\nattached {payload} thanks\n"
+    pf = formats.parse("n/a.txt", note)
+    assert formats.write(pf, {}) == note
+
+
+def test_base64_cell_end_to_end(tmp_path, monkeypatch):
+    csv_text = ("visit_id,blob,note,treatment\n"
+                f"V9001,{_b64('name=Rukmini Deshmukh;mobile=9811100031')},sample id {HASH},Tab Cefixime 200 mg BD x 5 days\n"
+                f"V9002,{_b64('Tab Cefixime 200 mg BD for 5 days')},image {PNG},Syp Ambroxol 5 ml TDS\n")
+    out, _ = _sanitize(tmp_path, monkeypatch, {"exports/blobs.csv": csv_text})
+    text = _outputs(out)["exports/blobs.csv"]
+    rows = text.splitlines()
+    inside = base64.b64decode(rows[1].split(",")[1]).decode()
+    assert "Rukmini" not in text and "9811100031" not in text and "Rukmini" not in inside and "9811100031" not in inside
+    assert inside.startswith("name=")
+    # untouched: a clinical note inside base64, a hash, a binary image, the medical text
+    assert _b64("Tab Cefixime 200 mg BD for 5 days") in rows[2] and HASH in rows[1] and PNG in rows[2]
+    for kept in ("Tab Cefixime 200 mg BD x 5 days", "Syp Ambroxol 5 ml TDS"):
+        assert kept in text
+
+
+def test_data_uri_inside_a_sentence_and_wrapped_run(tmp_path, monkeypatch):
+    uri = "data:text/plain;base64," + _b64("Patient: Gulab Chaudhry, mobile 9811100032")
+    wrapped = _b64("Relative Meenakshi Pillai can be reached on 9811100033 after noon", width=20)
+    note = (f"Scan attached ({uri}) please review. Rx Tab Metformin 500 mg BD, BP 128/82.\n"
+            f"Forwarded block:\n{wrapped}\nEnd of block. SpO2 97%.\n")
+    out, _ = _sanitize(tmp_path, monkeypatch, {"notes/fwd.txt": note})
+    text = _outputs(out)["notes/fwd.txt"]
+    seen = text + "\n" + _decode_all(text)
+    for gone in ("Gulab", "Chaudhry", "9811100032", "Meenakshi", "Pillai", "9811100033"):
+        assert gone not in seen
+    assert "data:text/plain;base64," in text and "Patient:" in seen
+    for kept in ("Rx Tab Metformin 500 mg BD, BP 128/82.", "Forwarded block:", "SpO2 97%."):
+        assert kept in text
+
+
+def test_escapes_in_text_are_read(tmp_path, monkeypatch):
+    bs = chr(92)
+    esc = "".join(f"{bs}u{ord(c):04x}" for c in "Hemant Joshi")
+    csv_text = ("visit_id,remarks,treatment\n"
+                f"V9101,Attendant: {esc} came with patient,Tab Telmisartan 40 mg OD\n"
+                "V9102,Attendant: Ishita &#74;oshi &amp; son,Tab Atorvastatin 10 mg HS\n"
+                "V9103,Rx Tab Amlodipine 5 mg &lt; 6 weeks BP 142/90 &amp; HR 78,Review in 2 weeks\n")
+    out, _ = _sanitize(tmp_path, monkeypatch, {"exports/esc.csv": csv_text})
+    text = _outputs(out)["exports/esc.csv"]
+    assert "Hemant" not in text and "u0048" not in text and "Ishita" not in text and "&#74;" not in text
+    for kept in ("Tab Telmisartan 40 mg OD", "Tab Atorvastatin 10 mg HS", "Tab Amlodipine 5 mg &lt; 6 weeks BP 142/90 &amp; HR 78"):
+        assert kept in text
+
+
+def test_gate_reads_runs_and_escapes():
+    g = LeakGate()
+    g.add("PATIENT_NAME", "Hector Pereira", None)
+    g.add("PHONE", "9811100025", "9811100025")
+    g.finalize()
+    assert g.contains_leak("blob," + _b64("seen: Hector Pereira, tel 9811100099") + ",x")
+    assert g.contains_leak("blob," + _b64("call 98111 00025 today") + ",x")
+    assert g.contains_leak("a=Hector" + chr(92) + "u0020Pereira") and g.contains_leak("&#72;ector Pereira")
+    assert not g.contains_leak("blob," + _b64("Tab Cefixime 200 mg BD for 5 days") + ",x")
+    assert "Pereira" not in g.scrub("who: Hector&#32;Pereira ok")
+
+
+def test_gate_catches_name_learned_elsewhere_inside_a_run(tmp_path, monkeypatch):
+    out, _ = _sanitize(tmp_path, monkeypatch, {
+        "a/Mariela_Quispe_9811100028.txt": "Routine OPD checkup complete. Paracetamol 650 mg SOS.\n",
+        "b/log.csv": "id,blob\n1," + _b64("handover note: Pema Tsering and Mariela Quispe at 10 am") + "\n",
+    })
+    for text in _outputs(out).values():
+        assert "Quispe" not in text and "Mariela" not in text
+    inside = base64.b64decode(_outputs(out)["b/log.csv"].splitlines()[1].split(",")[1]).decode()
+    assert "Quispe" not in inside and "handover note" in inside
+
+
+def test_run_inside_a_json_string_and_fhir_attachment_unchanged(tmp_path, monkeypatch):
+    note = "Forwarded: " + _b64("guardian Pushpa Rawat, mobile 9811100034, advised rest") + " (end)"
+    doc = {"resourceType": "Bundle", "type": "collection", "entry": [
+        {"resource": {"resourceType": "DocumentReference", "status": "current",
+                      "content": [{"attachment": {"contentType": "text/plain", "data": _b64("Tab Cefixime 200 mg BD for 5 days, review in a week.")}}]}},
+        {"resource": {"resourceType": "Communication", "status": "completed", "payload": [{"contentString": note}]}},
+    ]}
+    out, _ = _sanitize(tmp_path, monkeypatch, {"fhir/b.json": json.dumps(doc)})
+    text = _outputs(out)["fhir/b.json"]
+    got = json.loads(text)
+    assert got["resourceType"] == "Bundle"
+    att = got["entry"][0]["resource"]["content"][0]["attachment"]["data"]
+    assert att == doc["entry"][0]["resource"]["content"][0]["attachment"]["data"]
+    payload = got["entry"][1]["resource"]["payload"][0]["contentString"]
+    assert payload.startswith("Forwarded: ") and payload.endswith(" (end)")
+    inside = _decode_all(payload)
+    assert "Pushpa" not in inside and "9811100034" not in inside and "advised rest" in inside

@@ -16,7 +16,7 @@ All shapes are plain JSON-serializable dicts (`TypedDict` in `aegis/types.py`). 
 ## Field
 | Field | Type | Notes |
 |---|---|---|
-| path | str | unique inside the record. CSV: `col:<i>` · JSON leaf: pointer relative to file (`/visits/3/notes`) · JSON key: `key:<pointer of the object>/<key>` · CSV header cell: `header:<i>` · file name: `filename` · text doc: `text` |
+| path | str | unique inside the record. CSV: `col:<i>` · JSON leaf: pointer relative to file (`/visits/3/notes`) · JSON key: `key:<pointer of the object>/<key>` · CSV header cell: `header:<i>` · file name: `filename` · text doc: `text` · text inside a base64 run of another field: `<that field's path>#b64:<n>` (same `kind` and `context`; made by `io`, which puts the run back, re-encoded, on write) |
 | kind | str | `value` · `key` · `header` · `filename` · `text` |
 | context | str or null | the column header or JSON key above this value (`"Patient Name"`, `"patient_ref"`), lower-cased by nobody (raw) |
 | value | str | the text to scan. Non-string JSON leaves (numbers) arrive as their JSON text (`"397205839628"`); `io` restores the type on write |

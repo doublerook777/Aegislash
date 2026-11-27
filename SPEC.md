@@ -100,6 +100,11 @@ link notes (2026-11-26):
 - Done: cross-script Hindi-aware Devanagari/IAST/Latin normalizer (`aegis/link/normalize.py`), two-phase blocker/clustering linker (`aegis/link/resolver.py`) with strong IDs, Name+DOB, Name+Relative, Name+Village+Age±1, uniqueness gating, anti-over-merge invariants, multi-patient bridge guard (`patient_index.json`), and cross-hospital digits-only MRN matching when names match; wired into `aegis/link/__init__.py`. Live `check_dev.py`: precision 1.00, recall 0.91 (Windows CRLF filename-hash mismatch on renamed txt/json), F0.5 0.98, 0 false merges.
 - Next: ready for final submission checks (`check_submission.py`).
 
+PR #25 notes (2026-11-27, judge run):
+- Contract note (additive, no shape change): `Field.path` may end in `#b64:<n>` for text that io decoded from a base64 run
+  inside a longer value (CSV cell, text line, JSON string); see contracts/types.md. io re-encodes it on write.
+- No change to `aegis/types.py` or the JSON contracts. `Cand.full_name` in `aegis/detect/spans.py` is internal to detect.
+
 ## Open questions
 Format: what I'm unsure about | why it matters | options | recommended default | owner to answer
 - Exact deadline clock time | fixes the freeze time | give time | deadline − 4h | team

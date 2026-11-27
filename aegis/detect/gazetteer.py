@@ -136,6 +136,10 @@ _DEVA_NOT_NAME = frozenset("""
 भर्ती वाले वाली वाला हेतु लिए लिये द्वारा निवासी ग्राम गाँव गांव मोहल्ला पता फोन फ़ोन मोबाइल नोट लेबल बिना टिप्पणी विवरण
 जांच जाँच रिपोर्ट दवा टैबलेट इंजेक्शन बुखार दर्ज बताया कहा दिया दी गई
 """.split())
+# public names for the Hindi word lists, used by names.py and address.py
+DEVA_SURNAMES = _DEVA_SURNAMES
+DEVA_NOT_NAME = _DEVA_NOT_NAME
+DEVA_PLACE_OR_ORG = _DEVA_PLACE_OR_ORG
 
 
 def _clean(word: str) -> str:
@@ -301,3 +305,40 @@ def find_unlisted_person(text: str, stop: frozenset[str]) -> list[Cand]:
         return []
     start = text.index(s)
     return [Cand(start, start + len(s), "PATIENT_NAME", None, "patient", prio=PRIORITY["PATIENT_NAME"] - 2)]
+
+
+# ---- a whole column of people: judged cell by cell, never from the header
+# generic words (not from any data file) that make a 2-3 word cell a place, a trade, a diagnosis or a medicine
+_COLUMN_NOT_PERSON = frozenset("""
+new old north south east west central upper lower greater navi state city rural urban town govt government private
+self employed unemployed daily wage labourer laborer farmer teacher student housewife retired business service job
+male female other unknown general special semi deluxe economy insured uninsured card cash scheme
+weekly monthly yearly twice thrice once morning evening night food meals
+viral bacterial severe mild moderate left right bilateral
+urinary tract respiratory gastro abdominal cardiac renal hepatic liver kidney lung heart brain bone skin eye ear
+tablet capsule injection syrup ointment
+fever deficiency colic fracture ulcer stone stones injury failure attack stroke arrest hernia cyst tumour tumor
+infection pain bleed bleeding sepsis shock cancer carcinoma lymphoma diabetes anaemia obstruction dehydration
+profile panel count function test tests screening scan imaging therapy surgery dressing review checkup
+specialist specialty clinic ward room bed hall block floor
+""".split())
+_DEVA_COLUMN_NOT_PERSON = frozenset("""
+प्रदेश राज्य शहर नई नया नयी पुराना पुरानी उत्तर दक्षिण पूर्व पश्चिम मध्य ऊपरी निचला ग्रामीण शहरी नगर सरकारी निजी
+मधुमेह रक्तचाप उच्च निम्न संक्रमण बीमारी टाइफाइड मलेरिया डेंगू निमोनिया दमा कैंसर हृदय गुर्दा किडनी लिवर पेट सिर सीने खांसी खाँसी दर्द
+तीव्र जीर्ण गंभीर हल्का बायां दायां दोनों गोली कैप्सूल सिरप मरहम बूँदें किसान मजदूर शिक्षक गृहिणी सेवानिवृत्त व्यापार नौकरी
+""".split())
+# endings of diagnosis words: "Viral Hepatitis", "Chronic Nephropathy"
+_DIAGNOSIS_ENDING = re.compile(r"(?:itis|osis|aemia|emia|pathy|penia|algia|ectomy|plasty|scopy|uria|plegia|cytosis|ology|oedema|edema)$")
+
+
+def looks_like_person_cell(value: str, stop: frozenset[str]) -> bool:
+    """Could this whole cell be one person's name: 2-3 TitleCase or Devanagari words, no digits or punctuation,
+    and no word of a place, trade, diagnosis, medicine, ward, hospital or staff title?  Used only to judge a
+    column; one cell is never flagged on this alone."""
+    s = value.strip()
+    if not _PERSON_KEY_RUN.fullmatch(s):
+        return False
+    words = [w.casefold() for w in s.split()]
+    disallow = ((stop - {"asha"}) | _PLACE_OR_ORG | _DEVA_PLACE_OR_ORG | _NOT_NAME | _DEVA_NOT_NAME
+                | _COLUMN_NOT_PERSON | _DEVA_COLUMN_NOT_PERSON)
+    return not any(w in disallow or _DIAGNOSIS_ENDING.search(w) for w in words)

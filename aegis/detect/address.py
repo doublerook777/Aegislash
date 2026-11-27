@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 
 from aegis.detect.gazetteer import SURNAMES
-from aegis.detect.names import STOP, find_names
+from aegis.detect.names import HI_NOT_NAME, STOP, find_names
 from aegis.detect.normalize import norm_name
 from aegis.detect.spans import PRIORITY, Cand
 
@@ -32,6 +32,12 @@ LANDMARK = re.compile(
     rf"\b(?i:near|nr\.?|opp\.?|opposite|behind|beside|next to)(?: *: *| +)(?:(?i:old|new) )?(?:{_PLACE_WORD} ){{0,3}}{_LANDMARK_NOUN}\b"
     rf"|(?:{_DEVA_W} ){{1,3}}(?:के पास|के पीछे|के सामने|के बगल(?: में)?)"
     rf"|(?:{_PLACE_WORD} ){{0,3}}{_LANDMARK_NOUN} (?i:ke|ki) (?i:paas|pass|peeche|piche|saamne|samne|bagal)\b")
+# Hinglish running text: "Ghar Rajendra Vihar mein hai" (locality), "landmark Old Water Tank" and
+# "Rajendra Chowk ke paas" (landmark). The place words must be capitalised.
+_HINGLISH_LOCALITY = re.compile(rf"\b(?i:ghar|makaan|makan) (?P<v>{_PLACE_WORD}(?: {_PLACE_WORD}){{0,2}}) (?i:mein|me|mai|main)\b")
+_LANDMARK_CUE = re.compile(rf"\b(?i:landmark)(?: *[:=-] *| +)(?P<v>{_PLACE_WORD}(?: {_PLACE_WORD}){{0,3}})")
+_PLACE_LANDMARK = re.compile(
+    rf"(?<![A-Za-z])(?P<v>(?:{_PLACE_WORD} ){{0,2}}(?:{_PLACE_WORD}) ?(?:Nagar|Colony|Vihar|Puri|Enclave|Chowk|Marg)) (?i:ke|ki) (?i:paas|pass|peeche|piche|saamne|samne|bagal)\b")
 VILLAGE_CUE = re.compile(
     rf"(?:\b(?i:village|vill\.?|gram(?! panchayat)|gaon|r/o)|(?<![ऀ-ॿ])(?:ग्राम|गाँव|गांव))[ :.-]+"
     rf"(?P<v>{_PLACE_WORD}(?: {_PLACE_WORD}){{0,2}}|{_DEVA_W}(?: (?:खुर्द|कलां|कलाँ))?)")
@@ -40,6 +46,12 @@ _LIVES_IN = re.compile(
     rf"\b(?i:resident of|residing (?:at|in)|resides (?:at|in)|hailing from|hails from|native of|lives (?:at|in))"
     rf" (?:(?i:village|vill\.?|gram) )?(?P<v>{_PLACE_WORD}(?: {_PLACE_WORD}){{0,2}})")
 _THEN_VILLAGE = re.compile(rf"(?<![A-Za-z])(?P<v>{_PLACE_WORD}) (?i:village|gaon)\b|(?<![ऀ-ॿ])(?P<d>{_DEVA_W}(?:-{_DEVA_W})?) (?:गांव|गाँव)(?![ऀ-ॿ])")
+# Hindi: "निवासी रसूलपुर" (resident), and the place a patient was brought from: "<place> से लेकर आए".
+# A word from HI_NOT_NAME (time, "home", "hospital", pronoun ...) is not a place.
+_NIWASI = re.compile(rf"(?<![ऀ-ॿ])निवासी(?![ऀ-ॣॱ-ॿ])[ :.-]+(?P<v>{_DEVA_W}(?: (?:खुर्द|कलां|कलाँ))?)(?![ऀ-ॣॱ-ॿ]|-)")
+_BROUGHT_FROM = re.compile(
+    rf"(?<![ऀ-ॿ-])(?P<v>{_DEVA_W}(?: (?:खुर्द|कलां|कलाँ))?) से (?:(?:ले ?कर|लाकर|ले ?आकर) )?"
+    r"(?:आए|आये|आया|आई|आयी|आईं|लाए|लाये|लाया|लाई|लायी|लाईं)(?![ऀ-ॣॱ-ॿ])")
 DISTRICT_CUE = re.compile(
     rf"(?:\b(?i:district|distt\.?|dist\.?|zila|jila)|(?:जिला|ज़िला|जनपद))[ :.-]+"
     rf"(?P<d>{_PLACE_WORD}(?: {_PLACE_WORD}){{0,2}}|{_DEVA_W})")
@@ -120,12 +132,21 @@ def find_places(text: str, care_of: bool = True) -> list[Cand]:
     for kind, pattern in (("HOUSE", HOUSE), ("LOCALITY", LOCALITY), ("LANDMARK", LANDMARK)):
         for m in pattern.finditer(text):
             out.append(Cand(m.start(), m.end(), kind, norm_name(m.group(0)) or None, "patient"))
+    for pattern, kind in ((_HINGLISH_LOCALITY, "LOCALITY"), (_LANDMARK_CUE, "LANDMARK"), (_PLACE_LANDMARK, "LANDMARK")):
+        for m in pattern.finditer(text):
+            span = _place_span(text, m.start("v"), m.end("v"))
+            if span:
+                out.append(Cand(*span, kind, norm_name(text[slice(*span)]) or None, "patient", hinglish=True))
     for m in VILLAGE_CUE.finditer(text):
         if set(m.group("v").casefold().split()) & _NOT_PLACE:
             continue  # "Village Health Nutrition Day"
         if m.group(0)[:3].casefold() == "r/o" and _rules_out(m.group("v"), text[m.end("v"):]):
             continue
         out.append(Cand(m.start("v"), m.end("v"), "VILLAGE", norm_name(m.group("v")), "patient"))
+    for pattern in (_NIWASI, _BROUGHT_FROM):
+        for m in pattern.finditer(text):
+            if m.group("v").split()[0] not in HI_NOT_NAME:
+                out.append(Cand(m.start("v"), m.end("v"), "VILLAGE", norm_name(m.group("v")), "patient"))
     for pattern in (_LIVES_IN, _THEN_VILLAGE):
         for m in pattern.finditer(text):
             group = "v" if m.group("v") else "d"
@@ -153,6 +174,28 @@ def find_places(text: str, care_of: bool = True) -> list[Cand]:
         # any more specific reading of the same words wins over the chain's guess
         out += [p._replace(prio=PRIORITY["LOCALITY"] - 10) if p.type == "LOCALITY" else p for p in chain]
     return out
+
+
+def _place_span(text: str, start: int, end: int) -> tuple[int, int] | None:
+    """Cut report words ("Mob", "Hospital") and a doctor's name off the place words of a Hinglish cue."""
+    words = [(m.start() + start, m.end() + start) for m in re.finditer(r"\S+", text[start:end])]
+    folded = lambda w: text[w[0]:w[1]].strip(".").casefold()
+    if _STAFF_BEFORE_SIMPLE_PLACE.search(text[max(0, start - 20):start]):
+        return None
+    # the first word is a place word, not a report word: "Ghar Hospital mein", "Landmark Hospital pe"
+    if folded(words[0]) in STOP - {"nagar", "road", "gali", "mohalla"} or folded(words[0]) in _NOT_PLACE:
+        return None
+    for i, w in enumerate(words):
+        if folded(w) in STOP - _PLACE_STOP or folded(w) in _NOT_PLACE:
+            del words[i:]
+            break
+    if not words:
+        return None
+    s, e = words[0][0], words[-1][1]
+    return (s, e) if _is_place(text[s:e]) else None
+
+
+_STAFF_BEFORE_SIMPLE_PLACE = re.compile(r"(?:\b(?i:dr|doctor|prof|nurse|sister)\b\.?|डॉ\.?)[ :\-]*$")
 
 
 def _is_place(value: str) -> bool:

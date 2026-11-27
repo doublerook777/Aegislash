@@ -35,8 +35,11 @@ def _looks_like_email(m: re.Match) -> bool:
 ABHA_ADDR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._]*@(?:abdm|sbx|ndhm|abha)" + _R, re.I)
 ABHA_NUM = re.compile(_L + r"\d{2}([- ])\d{4}\1\d{4}\1\d{4}(?!\d)")
 AADHAAR_MASKED = re.compile(r"(?<![A-Za-z0-9])(?:[Xx*•]{4}[- ]?){2}\d{4}(?!\d)")
-# grouped 4-4-4 (the two separators may differ: "1234-5678 9012") or not grouped at all
-AADHAAR = re.compile(r"(?<![A-Za-z0-9%])(?<![\d][- /.])[2-9]\d{3}(?:[- ]\d{4}[- ]\d{4}|\d{8})(?![- /.]?\d)" + _R)
+# grouped 4-4-4 (the two separators may differ: "1234-5678 9012"), grouped with dots ("1234.5678.9012") or not
+# grouped at all. A dotted shape that reads as year.monthday.hourminute ("2024.0115.1030") is a time stamp.
+AADHAAR = re.compile(r"(?<![A-Za-z0-9%])(?<![\d][- /.])"
+                     r"(?!(?:19|20)\d{2}\.(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\.(?:[01]\d|2[0-3])[0-5]\d(?!\d))"
+                     r"[2-9]\d{3}(?:[- ]\d{4}[- ]\d{4}|\d{8}|\.\d{4}\.\d{4})(?![- /.]?\d)" + _R)
 PAN = re.compile(_L + r"[A-Z]{5}\d{4}[A-Z]" + _R, re.I)
 INSURANCE = re.compile(
     _L + r"(?:[A-Z]{2,10}-POL(?:[-/]\d+){1,4}|PMJAY(?:[-/ ]?[A-Z]{2,3})?(?:[-/]\d{2,4})?[-/ ]?\d{6,}"
