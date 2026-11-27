@@ -56,7 +56,7 @@ Check a change: `.venv/bin/python -m pytest -q aegis/io`, then the usual `main.p
   inside base64 (one layer is decoded); names with an accent typed as separate marks (NFD) in the gate (detect handles
   those); `\xNN` byte escapes and `U+0932` notation.
 
-## Quarantine and leak-gate fixes from the audit (`report/vulnerability_audit_report.md`: V7, V8, V9, V11)
+## Quarantine and leak-gate fixes from the audit (internal vulnerability audit: V7, V8, V9, V11)
 - **V8, binary files.** `decode()` looks for a NUL byte in the whole file, not only in the first 4 KB. A file with a NUL that is
   not UTF-16 (a binary trailer after byte 4,096) is quarantined as `undecodable_text` instead of exported with its bytes.
 - **V7, deep JSON.** Nesting deeper than `MAX_JSON_DEPTH` (1,000 levels, counted without recursion) is quarantined as

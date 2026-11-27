@@ -2,7 +2,7 @@
 
 Offline, CPU-only, LLM-free de-identification and re-identification risk firewall for multi-hospital Indian healthcare records across **English, Devanagari Hindi, and Hinglish** (CSV, TSV, JSON, FHIR R4 Bundles, and free-text notes; UTF-8/BOM, UTF-16, and cp1252).
 
-> Plan & module ownership: [SPEC.md](SPEC.md) · Module contracts: [contracts/](contracts/) · Team conventions: [CONVENTIONS.md](CONVENTIONS.md)
+> Project Brief: [docs/brief.pdf](docs/brief.pdf) · Design & module ownership: [SPEC.md](SPEC.md) · Module contracts: [contracts/](contracts/)
 
 ## Setup & Usage
 
@@ -25,6 +25,19 @@ RAKSHA_SECRET=<secret> .venv/bin/python main.py --input dev/input --output out
 # Validate all in-process Python module contracts
 .venv/bin/python scripts/check_contracts.py
 ```
+
+## Repository Layout
+
+| Path | What it holds |
+|---|---|
+| `main.py`, `raksha.toml` | entry point and run/setup declaration |
+| `aegis/io`, `aegis/detect`, `aegis/link`, `aegis/privacy` | the four pipeline modules (each with its own README and tests) |
+| `config/policy.yaml` | privacy policy: age bands, date-shift range, k, rare-condition threshold |
+| `contracts/` | module contracts, JSON schemas and examples (`scripts/check_contracts.py`) |
+| `scripts/risk_report.py` | k-anonymity and simulated attacker risk report |
+| `tests/` | adversarial and breaker datasets with their measured reports |
+| `dev/`, `docs/kit/`, `check_*.py`, `validate_output.py`, `scoring.toml` | organiser practice data, track docs and self-check tools |
+| `docs/brief.pdf` | 2-page Project Brief |
 
 ## Architecture
 
@@ -65,7 +78,7 @@ Export: sanitized/ + report.json + records.jsonl (verified by final leak gate)
 - **Linkage & Pseudonyms (`link`):** Normalizes names across Latin, Devanagari, and Hinglish to link only on strong IDs or unique secondary clues, keeping homonyms apart. `aegis.link.pseudonym()` generates Crockford base32 `PSN-XXXXXX` tokens via `HMAC-SHA256(RAKSHA_SECRET, "psn|" + patient_key)`.
 - **Privacy Layer (`privacy`):**
   - **Per-patient secret date shifting ([aegis/privacy/dates.py](aegis/privacy/dates.py)):** Computes a non-zero offset in `[-180, +180]` days via `HMAC-SHA256(RAKSHA_SECRET, "shift|" + key)` so all events of one patient (or unlinked record) shift together, preserving lengths of stay and visit intervals while preventing global-shift recovery and cross-release linkability. Preserves original formats (`DD/MM/YYYY`, `MM/DD/YYYY`, ISO datetimes with timezones, month-name dates, and Devanagari digits), failing closed to `[DATE]` if unparseable.
-  - **Quasi-identifier generalization ([aegis/privacy/generalize.py](aegis/privacy/generalize.py)):** Converts ages into truthful 5-year bands (`48/M` -> `45-49/M`, `47 वर्ष` -> `45-49 वर्ष`) with `85+` top-coding for elderly patients; generalizes 6-digit PINs to `XXX***` and villages to district names.
+  - **Quasi-identifier generalization ([aegis/privacy/generalize.py](aegis/privacy/generalize.py)):** Converts ages into truthful 5-year bands (`48/M` -> `45-49/M`, `47 वर्ष` -> `45-49 वर्ष`) with `85+` top-coding for elderly patients (implausible ages over 130 are top-coded too); generalizes 6-digit PINs to `XXX***` and villages to district names, and hides districts shared by fewer than 5 patient profiles.
   - **k-Anonymity & rare-condition defense ([aegis/privacy/engine.py](aegis/privacy/engine.py)):** Counts equivalence class sizes on `(age_band, gender, district)` and condition frequencies across the full dataset ([config/policy.yaml](config/policy.yaml)). Small cells (`k < 5`) trigger 10-year age widening and PIN/village suppression; rare conditions (`<= 3` profiles) in small cells trigger 20-year age widening (or `80+`) and district suppression while keeping diagnoses and ICD codes intact for clinical utility.
 
 ## Declared Models
