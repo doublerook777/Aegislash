@@ -51,8 +51,8 @@ def shift_days(shift_key: str, secret_bytes: bytes, max_days: int = 180) -> int:
     """
     m = max(1, int(max_days))
     digest = hmac.new(secret_bytes, b"shift|" + shift_key.encode("utf-8"), hashlib.sha256).digest()
-    val = int.from_bytes(digest[:4], "big") % (2 * m) - m
-    return val if val != 0 else 1
+    idx = int.from_bytes(digest[:4], "big") % (2 * m)
+    return idx - m if idx < m else idx - m + 1
 
 
 def _parse_norm_iso(norm: str | None) -> dt.date | None:

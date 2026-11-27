@@ -293,6 +293,12 @@ CASES = [
     ("Re: Wound Dehiscence", [], ["Wound Dehiscence"]),
     ("Subject: Appointment Reminder\nSub: Fire Safety Drill", [], ["Appointment Reminder", "Fire Safety Drill"]),
     ("Subject: Referral - CKD Stage 4, IP 2024 audit", [], ["CKD Stage 4", "2024"]),
+    # initials plus an unlisted surname in list/line-start or before age/sex (invented data)
+    ("OT list 04/02/2025\n1. P. N. Kothiyal, 62M, CABG done, Hb 11.8\nSurgeon: Dr. Nandita Gokhale",
+     ["P. N. Kothiyal"], ["CABG", "Hb 11.8", "Nandita Gokhale"]),
+    ("2) B S Semwal, 44/F\nR. Bamrara\n1. E. Coli positive, 2. S. Creatinine 1.3\nDr. A. K. Gokhale on call",
+     ["B S Semwal", "R. Bamrara"], ["E. Coli", "S. Creatinine", "Gokhale"]),
+    ("Booked K. T. Kothiyal, 39F for echo.", ["K. T. Kothiyal"], ["echo"]),
     # bare village after "<age>-year-old ... from <Place>" without eating hospital referrals or months (invented data)
     ("Harishankar Pant, a 64-year-old carpenter from Bhatwari, came with his daughter. BP 142/88. Tab. Losartan 50 mg 0-0-1.",
      ["Harishankar Pant", "Bhatwari"], ["Losartan 50 mg", "142/88"]),
@@ -590,6 +596,15 @@ FILENAMES = [
     ("ds-barnalithengal-31145549.txt", "Patient Name: Barnali Thengal\n", ["barnalithengal"]),
     ("ds_devika_ranganathan.txt", "Patient Name: Devika Ranganathan\n", ["devika_ranganathan"]),
     ("referral.txt", "Subject: Referral - Chandni Mamgain (IPD 6204)\nReferral enclosed.\n", []),
+    # dashed, CamelCase, and Devanagari patient names in file names vs ordinary hospital files (invented data)
+    ("ipd-devendra-kothiyal-19.txt", "Hb 12.1 g/dL, TLC 6800.\n", ["devendra-kothiyal"]),
+    ("UrmilaSemwalLabs4.txt", "TSH 3.2 mIU/L, normal.\n", ["UrmilaSemwal"]),
+    ("रिपोर्ट_गोकुल_बमरारा_5.txt", "रक्त शर्करा 108 mg/dl।\n", ["गोकुल_बमरारा"]),
+    ("infection-prevention-audit.txt", "Compliance 94%.\n", []),
+    ("oxygen-regulator-usage.csv", "Cylinders 12.\n", []),
+    ("opd-pathology-report-9.txt", "Samples 40.\n", []),
+    ("ward-14-occupancy.txt", "Beds occupied 28.\n", []),
+    ("dr-kothiyal-rounds.txt", "Seen in ward.\n", []),
 ]
 
 
