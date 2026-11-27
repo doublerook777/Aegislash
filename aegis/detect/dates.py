@@ -24,6 +24,16 @@ _YEAR_WORDS = r"(?:(?:19|20)\d{2}|18\d{2}(?! ?(?:hrs?\b|hours|h\b))|'?\d{2})"
 TEXT_DMY = re.compile(r"(?<![\d])(\d{1,2})(?:st|nd|rd|th)?[ -](" + _MONTH_RE + r")\b\.?(?:[ ,-]+(" + _YEAR_WORDS + r")(?!\d))?", re.I)
 TEXT_MDY = re.compile(r"\b(" + _MONTH_RE + r")\.? (\d{1,2})(?:st|nd|rd|th)?(?!\d)(?:,? ((?:19|20)\d{2}|18\d{2}(?! ?(?:hrs?\b|hours|h\b))))?", re.I)
 
+# "<day> <Hindi month> <year>" (digits arrive already folded to ASCII); "फ़" may be one character or two
+_HINDI_MONTHS = {"जनवरी": 1, "फरवरी": 2, "मार्च": 3, "अप्रैल": 4, "मई": 5, "जून": 6, "जुलाई": 7, "अगस्त": 8,
+                 "सितंबर": 9, "सितम्बर": 9, "अक्टूबर": 10, "अक्तूबर": 10, "नवंबर": 11, "नवम्बर": 11,
+                 "दिसंबर": 12, "दिसम्बर": 12}
+TEXT_HINDI = re.compile(r"(?<!\d)(\d{1,2}) ?(" + "|".join([*_HINDI_MONTHS, "फ़रवरी", "फ़रवरी"]) +
+                        r"),? ?((?:19|20)\d{2})(?!\d)")
+# "21/XI/1958": a month in roman numerals, only between a day and a four-digit year
+_ROMAN = "I II III IV V VI VII VIII IX X XI XII".split()
+ROMAN_MONTH = re.compile(r"(?<![\w/.-])(\d{1,2})([/.-])(XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)\2((?:19|20)\d{2})(?![\w/])")
+
 _DOB_BEFORE = re.compile(
     r"(?:\bd\.?o\.?b\b|date of birth|birth ?date|birth ?year|\byob\b|\bborn(?: on)?\b"
     r"|janam ?din(?:ank)?|janm ?(?:din|tithi|tarikh)|janam ?tithi|जन्म[^\n:]{0,20})\W{0,6}$",
@@ -82,6 +92,15 @@ def parse_dates(text: str, dmy: bool) -> list[tuple[int, int, str]]:
     for m in TEXT_DMY.finditer(text):
         y = _year(m.group(3)) if m.group(3) else 2026
         iso = _iso(y, _MONTHS[m.group(2)[:3].lower()], int(m.group(1)))
+        if iso:
+            out.append((m.start(), m.end(), iso))
+    for m in TEXT_HINDI.finditer(text):
+        month = m.group(2).replace("फ़", "फ").replace("़", "")
+        iso = _iso(int(m.group(3)), _HINDI_MONTHS[month], int(m.group(1)))
+        if iso:
+            out.append((m.start(), m.end(), iso))
+    for m in ROMAN_MONTH.finditer(text):
+        iso = _iso(int(m.group(4)), _ROMAN.index(m.group(3)) + 1, int(m.group(1)))
         if iso:
             out.append((m.start(), m.end(), iso))
     for m in TEXT_MDY.finditer(text):

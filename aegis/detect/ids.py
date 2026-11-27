@@ -35,8 +35,11 @@ def _looks_like_email(m: re.Match) -> bool:
 ABHA_ADDR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._]*@(?:abdm|sbx|ndhm|abha)" + _R, re.I)
 ABHA_NUM = re.compile(_L + r"\d{2}([- ])\d{4}\1\d{4}\1\d{4}(?!\d)")
 AADHAAR_MASKED = re.compile(r"(?<![A-Za-z0-9])(?:[Xx*•]{4}[- ]?){2}\d{4}(?!\d)")
-# grouped 4-4-4 (the two separators may differ: "1234-5678 9012") or not grouped at all
-AADHAAR = re.compile(r"(?<![A-Za-z0-9%])(?<![\d][- /.])[2-9]\d{3}(?:[- ]\d{4}[- ]\d{4}|\d{8})(?![- /.]?\d)" + _R)
+# grouped 4-4-4 (the two separators may differ: "1234-5678 9012"), grouped with dots ("1234.5678.9012") or not
+# grouped at all. A dotted shape that reads as year.monthday.hourminute ("2024.0115.1030") is a time stamp.
+AADHAAR = re.compile(r"(?<![A-Za-z0-9%])(?<![\d][- /.])"
+                     r"(?!(?:19|20)\d{2}\.(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\.(?:[01]\d|2[0-3])[0-5]\d(?!\d))"
+                     r"[2-9]\d{3}(?:[- ]\d{4}[- ]\d{4}|\d{8}|\.\d{4}\.\d{4})(?![- /.]?\d)" + _R)
 PAN = re.compile(_L + r"[A-Z]{5}\d{4}[A-Z]" + _R, re.I)
 INSURANCE = re.compile(
     _L + r"(?:[A-Z]{2,10}-POL(?:[-/]\d+){1,4}|PMJAY(?:[-/ ]?[A-Z]{2,3})?(?:[-/]\d{2,4})?[-/ ]?\d{6,}"
@@ -80,14 +83,19 @@ MRN_SHAPES = [
 
 
 # A number announced by its label, whatever its format ("Rec# : HOSP/2023/07/00123", "Aadhaar No: 1111-2222-3333").
-_SEP = r"\.?\s*[:#=\-]*\s*"
+_SEP = r"\.?\s*[:#=\->|~]*\s*"
 _LABELLED = [
     ("MRN", re.compile(
         r"(?<![A-Za-z])(?i:uhid|mrn|c\.? ?r\.? ?no|reg(?:istration|n)?\.? ?(?:no|id|number)|rec(?:ord)?\.? ?(?:no#?|id|#)"
-        r"|hosp(?:ital)?\.? ?(?:no|id)|pt\.? ?id|patient (?:id|no)|ipd? ?no|admission (?:no|number)|file no)" + _SEP
+        r"|hosp(?:ital)?\.? ?(?:no|id)|pt\.? ?id|patient (?:id|no)|ipd? ?no|admission (?:no|number)|file no|mr(?= ?#))" + _SEP
         + r"(?P<v>#?(?=[A-Za-z/\-]*\d[A-Za-z/\-]*\d)[A-Za-z0-9](?:[A-Za-z0-9/\-]{1,28}[A-Za-z0-9]))")),
     ("MRN", re.compile(r"(?:आईपीडी|आईपी|यूएचआईडी|पंजीकरण)(?: ?(?:नंबर|नं\.?|संख्या|क्रमांक))?" + _SEP
                        + r"(?P<v>(?=[A-Z/\-]*\d(?:[A-Z/\-]*\d){2})[A-Z0-9](?:[A-Z0-9/\-]{1,28}[A-Z0-9]))")),
+    # "TPA card no. <id>", "insurer ref is <id>", "आयुष्मान कार्ड संख्या <id>": the value needs at least four digits
+    ("INSURANCE_ID", re.compile(r"(?:(?<![A-Za-z])(?i:tpa|ayushman|pmjay|insurer|insurance|health insurance)"
+                                r"(?i: (?:card|policy|member|claim))? ?(?i:no|number|id|ref)(?![A-Za-z])(?i: is)?"
+                                r"|(?:आयुष्मान|बीमा)(?: कार्ड)? ?(?:संख्या|नंबर|नं\.?|क्रमांक))" + _SEP
+                                + r"(?P<v>(?=(?:[A-Za-z/\-]*\d){4})[A-Za-z0-9](?:[A-Za-z0-9/\-]{4,34}[A-Za-z0-9]))")),
     ("AADHAAR", re.compile(r"(?:(?i:aadh?aa?r|adhar)|आधार)(?i: ?(?:card)? ?(?:no|number|id)?)" + _SEP
                            + r"(?P<v>\d{4}[ -]?\d{4}[ -]?\d{4})(?!\d)")),
     ("ABHA_NUMBER", re.compile(r"(?:(?i:abha|health ?id)|एबीएचए)(?i: ?(?:id|no|number)?)" + _SEP
@@ -140,7 +148,8 @@ def find_ids(text: str) -> list[Cand]:
     for kind, pattern in _LABELLED:
         for m in pattern.finditer(text):
             value = m.group("v")
-            norm = phone_norm(value) if kind == "PHONE" else digits(value)
+            norm = (phone_norm(value) if kind == "PHONE" else
+                    re.sub(r"[^A-Z0-9]", "", value.upper()) if kind == "INSURANCE_ID" else digits(value))
             out.append(Cand(m.start("v"), m.end("v"), kind, norm, "patient"))
     for m in PAN.finditer(text):
         out.append(Cand(m.start(), m.end(), "PAN", m.group(0).upper()))

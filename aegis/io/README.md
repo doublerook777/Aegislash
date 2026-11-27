@@ -10,7 +10,7 @@ rename PII file names, final leak gate, `report.json`, `records.jsonl`, determin
 Contracts it calls: [detect](../../contracts/detect.md), [link](../../contracts/link.md), [privacy](../../contracts/privacy.md). Shapes: [types](../../contracts/types.md).
 
 Files: `decode.py` (bytes → text), `formats.py` (parse into Records, write back in the same
-structure, base64 attachments), `leakgate.py` (final scrub + verify), `pipeline.py` (orchestration,
+structure, base64 attachments and runs), `leakgate.py` (final scrub + verify), `pipeline.py` (orchestration,
 report, records), `test_io.py` (unit and end-to-end tests with invented data). `main.py` is a thin entry point.
 
 Check a change: `.venv/bin/python -m pytest -q aegis/io`, then the usual `main.py` + `validate_output.py` + `check_dev.py` run.
@@ -36,9 +36,25 @@ Check a change: `.venv/bin/python -m pytest -q aegis/io`, then the usual `main.p
   scrubbed as `Given Surname`. `%20`, `%5C`, `%2B` and the like count as separators when matching names and digit runs, so
   `Priyanka%20Sengupta` and `%2B91%209876543210` are caught in a file where detect missed them (detect itself reads URL
   escapes now; see its README).
-- Still open: base64 inside CSV cells or running text (only whole JSON string values are decoded); a data URI
-  embedded in a longer string; UTF-16 text inside base64; names with an accent typed as separate marks (NFD) in the
-  gate (detect handles those).
+- **Hidden payloads inside cells and running text (R2b).** Base64 *inside* a longer value (a CSV / TSV cell, a line of a
+  `.txt`, part of a JSON string, a `data:...;base64,` URI in a sentence, a MIME-wrapped block in a note) is found by
+  `formats.find_runs`. A run counts only when it decodes to readable UTF-8 that looks like writing (at least 8 characters,
+  letters, digits, spaces and usual punctuation; at least 16 encoded characters; padding may be missing; `data:` URIs need
+  8). Hashes, IDs, drug names, numbers and binary payloads (images) decode to noise and are never touched. `parse` then
+  gives detect the value with every run replaced by one private-use character (U+E000...) and the run's text as an extra
+  field of the same record (`path` = `<path>#b64:<n>`, same `kind` and `context`; additive, see `contracts/types.md`).
+  Detect, the link evidence, the privacy plan and the leak gate treat that text like any other field, so a name or phone
+  inside is found, replaced, and learned by the gate. `write` puts each run back: re-encoded in the same layout (prefix,
+  padding, line width) when its text changed, the original characters when it did not (files without such runs, and runs
+  without PII, are byte-identical). The whole-string JSON base64 handling above (FHIR `data`) is unchanged and runs first.
+- **Escapes in text.** `\uXXXX` written out as text (not JSON-parsed), HTML entities (`&amp;`, `&#74;`) and `%XX` are read
+  by detect and by the leak gate through `normalize.decode_view` (see the detect README); a hit is replaced as a whole.
+- **Leak gate.** `scrub` and `contains_leak` work on that decoded view, so `Hector%20Pereira`, `Hector\u0020Pereira` and
+  `&#72;ector Pereira` count as the name. The final check also decodes every base64 run in the output and quarantines the
+  file when a learned name, phone or ID is still inside one.
+- Still open: UTF-16 text inside base64; base64 in a header, a JSON key or a file name beyond the stem rule above; base64
+  inside base64 (one layer is decoded); names with an accent typed as separate marks (NFD) in the gate (detect handles
+  those); `\xNN` byte escapes and `U+0932` notation.
 
 ## Quarantine and leak-gate fixes from the audit (`report/vulnerability_audit_report.md`: V7, V8, V9, V11)
 - **V8, binary files.** `decode()` looks for a NUL byte in the whole file, not only in the first 4 KB. A file with a NUL that is
@@ -59,8 +75,8 @@ Check a change: `.venv/bin/python -m pytest -q aegis/io`, then the usual `main.p
   `Dr. Suresh Pandey` into `Dr. [REDACTED]` whenever a patient had the same name. The same name elsewhere is still removed.
 - **Checker note:** `check_dev.py` counts `Suresh Pandey` inside `Dr. Suresh Pandey` as a leak when a patient has that name.
   The official rule (`docs/kit/SCORING.md`, "allowed") does not. The numbers in the PR use the official rule.
-- Not done: the audit's wider ideas (a `LeakGate` that folds homoglyphs and zero-width characters, decoding base64 or URL text
-  inside `contains_leak`) and V10 (delimiter sniffing from line 0 only).
+- Not done here: a `LeakGate` that folds homoglyphs and zero-width characters, and V10 (delimiter sniffing from line 0 only;
+  it did not reproduce in the PR #25 review). Decoding escapes and base64 inside the gate came with PR #25 (R2b, below).
 - Side effect, expected: a file that used to be exported and is now quarantined leaves its patient's cluster, and the patient
   key is a hash of the cluster's record ids (V13), so that one patient gets a new PSN and date shift. On `dev/input` this is
   the patient whose name and mobile sit at the bottom of `misc/deep_export.json`.

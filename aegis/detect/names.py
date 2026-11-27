@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import urllib.parse
 
+from aegis.detect.gazetteer import DEVA_NOT_NAME, DEVA_PLACE_OR_ORG, DEVA_SURNAMES, SURNAMES
 from aegis.detect.labels import classify
 from aegis.detect.normalize import DEVA, digits, norm_name
 from aegis.detect.spans import PRIORITY, Cand
@@ -55,7 +56,26 @@ city help helpline emergency service services pharmacy counter care health life 
 desk toll free centre center support booking appointment control room police station bank number manager billing
 insurance company limited ltd pvt chemist store medicals general government govt trust foundation society apollo
 """.split())
-STOP = STOP | MEDICAL
+# Hindi words that are never (part of) a person's name: relation words, honorifics, particles, verb forms, time words,
+# everyday medical words. They end a name and they cannot start one. General Hindi vocabulary, not from any data file.
+HI_NOT_NAME = frozenset(DEVA_NOT_NAME | DEVA_PLACE_OR_ORG | set("""
+पति पत्नी धर्मपत्नी भाई बहन बेटा बेटे बेटी पुत्र पुत्री सुपुत्र सुपुत्री बहू बहु दामाद पिता माता माँ मां ससुर सास भतीजा भतीजी
+भांजा भांजी भाँजा भाँजी चाचा चाची मामा मामी ताऊ ताई दादा दादी नाना नानी देवर जेठ जेठानी जीजा साला साली बुआ मौसी ननद भाभी
+परिचारक पड़ोसी अभिभावक श्रीमान श्रीमती श्री सुश्री स्वर्गीय मिस्टर मिसेज़ मरहूम जी साहब साहिब साहेब भैया दीदी अम्मा बाबू
+को का की के ने से में पर तक ही भी तो कि जो और या तथा एवं नहीं ना सिर्फ केवल सब सभी बहुत कुछ कोई साथ संग पास बाद पहले अब अभी फिर तब जब
+यहाँ यहां वहाँ वहां कहाँ कहां जहाँ जहां इधर उधर बाहर अंदर घर इस उस इन उन ये वो यह वह
+है हैं था थी थे हो हुए हुआ हुई होगा होगी होंगे रहा रही रहे रहें रहती रहता रहेंगे करना करते करता करती कराया कराई कराना
+लेना लेते लेता लेती ली लिया लाए लाया लाई लायी लाये लाईं ले लेकर लाकर आए आये आया आई आयी आईं गए गया गई गयी गये गईं
+दिखाया दिखाई दिखाने बताया बताई बताते बोले कहा कहते देखा देखे दिया दी दिए दिये मिले मिली मिला मिलने चाहिए चाहते चाहता चाहती
+आना आने जाना जाने जाते जाता जाती सोते खाते खाता पीते आते आता आती बैठे बैठी बैठा रुके रुकी रुका रोज रोज़ रोज़ाना हर नियमित
+आज कल सुबह शाम रात दोपहर दिन महीने साल हफ्ते बार बजे पिछले अगले अगली पिछली
+मधुमेह डायबिटीज शुगर बीपी रक्तचाप उच्च बुखार ज्वर दर्द खांसी खाँसी सर्दी सांस साँस दमा दिल हृदय कैंसर थायराइड इंसुलिन
+दवा दवाई दवाइयां दवाइयाँ गोली टैबलेट इंजेक्शन जांच जाँच रिपोर्ट टेस्ट रक्त खून उपचार इलाज ऑपरेशन सर्जरी डायलिसिस भर्ती
+डिस्चार्ज छुट्टी ओपीडी आईसीयू वार्ड अस्पताल क्लिनिक कमज़ोरी कमजोरी चक्कर उल्टी दस्त सूजन चोट फ्रैक्चर बीमारी बीमार तबीयत
+हालत स्वास्थ्य मलेरिया डेंगू टाइफाइड टीबी क्षय पीलिया एनीमिया गर्भवती प्रसव डिलीवरी टीका टीकाकरण फॉलो फॉलोअप डॉ डा डॉक्टर
+नर्स मरीज मरीज़ रोगी
+""".split()))
+STOP = STOP | MEDICAL | HI_NOT_NAME
 # "asha" is both a common first name and the community health worker: names rules decide by context.
 _ASHA_WORKER = re.compile(r"\bASHA\b(?! +[A-Z]{2,})|\b(?i:asha)\b(?=\s+(?i:worker|volunteer|didi))"
                           r"|(?<![ऀ-ॿ])आशा(?= (?:दीदी|कार्यकर्ता|कार्यकर्त्री|वर्कर|बहू|सहयोगिनी))")
@@ -70,10 +90,32 @@ LATIN_NAME = rf"(?:(?:Mohd|Md)\.? )?{_CAP}(?: {_CAP}){{0,3}}"
 DEVA_NAME = rf"{_DEVA_WORD}(?: {_DEVA_WORD}){{0,2}}"
 NAME = rf"(?:{LATIN_NAME}|{DEVA_NAME})"
 
+# A doctor's name never runs on into a word that introduces somebody else: protecting "Dr <x> Patient <y>" as one
+# name would leave the patient in the output
+_NEXT_PERSON = (r"(?i:patient|pt|name|mr|mrs|ms|smt|shri|km|master|baby|attendant|wife|husband|son|daughter|informed|"
+                r"seen|ref)(?![A-Za-z])")
+_DOCTOR_LATIN = rf"(?:(?:Mohd|Md)\.? )?{_CAP}(?: (?!{_NEXT_PERSON}){_CAP}){{0,3}}"
+_COURTESY = r"\((?i:mrs?|ms|miss)\.?\)"
 _DOCTOR = re.compile(
-    rf"(?:\bDr\b\.?|\bDOCTOR\b|\bDoctor\b|\bProf\b\.?|डॉ\.?|डा\.|डॉक्टर)\s*(?:{LATIN_NAME}|{DEVA_NAME})"
+    # "DR.(MRS) X" in any case; a bare capital "DR" is not trusted, all-caps lines would hide the patient
+    rf"(?:\bDr\b\.?|\bDOCTOR\b|\bDoctor\b|\bProf\b\.?|डॉ\.?|डा\.|डॉक्टर|\b(?i:dr)\b\.?(?=\s*{_COURTESY}))"
+    rf"(?:\s*{_COURTESY})?\s*(?:{_DOCTOR_LATIN}|{DEVA_NAME})"
     rf"(?:\s*\([^)\n]*\))?")
 _EPONYM = re.compile(rf"\b{_CAP}(?:'s)?(?= (?:[Dd]isease|[Ss]yndrome|[Pp]alsy|[Ss]ign|[Pp]rocedure)\b)")
+
+
+# first words that cannot begin a relative's name ("History sibling: Normal", "son General Ward")
+_NEVER_FIRST = (STOP | ORG | frozenset("normal nil none not negative positive stable healthy alive expired deceased "
+                                       "unknown yes no".split())) - SURNAMES - {"asha"}
+# Hinglish (Roman-script Hindi) relation words: a capitalised name right after one belongs to that relative
+_HINGLISH_KIN = ("beta|bete|beti|pati|patni|dharmapatni|bhai|bhaiya|behen|behan|bahu|damaad|damad|devar|jeth|jethani|"
+                 "sasur|saas|chacha|chachi|mama|mami|bhatija|bhatiji|pota|poti|nati|nana|nani|dada|dadi|tau|tai|"
+                 "papa|mummy|pita|bua|mausi|jija|jeeja|sala|sali|nanad|devrani")
+_KIN_WORDS = frozenset(_HINGLISH_KIN.split("|"))
+# words that may follow a relation word without being a name: honorifics, and "beta blocker", "beta thalassemia"
+_NEVER_FIRST = _NEVER_FIRST | _KIN_WORDS | frozenset(
+    "sahab saheb sahib ji jee blocker blockers thalassemia thal hcg agonist agonists lactam lactamase glucan carotene "
+    "haemolytic hemolytic amyloid globulin cell cells".split())
 
 
 def name_words(value: str) -> list[str]:
@@ -86,7 +128,9 @@ def doctor_mentions(text: str) -> list[str]:
 
 def doctor_name(mention: str) -> list[str]:
     """The words after the title: "Dr. R. Mehta (MD)" -> ["r", "mehta"]."""
-    return name_words(re.sub(r"^(?:Dr\b\.?|DOCTOR|Doctor|Prof\b\.?|डॉ\.?|डा\.|डॉक्टर)|\(.*$", "", mention))
+    title = (r"^(?:(?i:dr)\b\.?|DOCTOR|Doctor|Prof\b\.?|डॉ\.?|डा\.|डॉक्टर)"
+             r"(?:\s*\((?i:mrs?|ms|miss|prof|capt|col|maj|major)\.?\))?")
+    return name_words(re.sub(r"\(.*$", "", re.sub(title, "", mention)))
 
 
 def protected_spans(text: str) -> list[tuple[int, int]]:
@@ -97,9 +141,12 @@ def protected_spans(text: str) -> list[tuple[int, int]]:
 def trim_name(text: str, start: int, end: int) -> tuple[int, int] | None:
     """Shrink a captured span to the real name: drop titles and stop words from both ends."""
     words = [(m.start() + start, m.end() + start) for m in re.finditer(r"[^\s]+", text[start:end])]
+    first_word = words[0] if words else None
     def bad(span):
         w = text[span[0]:span[1]].strip(".,'’:;()-")
-        title = re.fullmatch(_TITLE, text[span[0]:span[1]]) is not None and w not in ("Md", "Mohd")  # part of a name
+        # "Md", "Mohd" are part of a name; so is "Kumari" after a first name ("<name> Kumari")
+        part_of_name = w in ("Md", "Mohd") or (w == "Kumari" and span != first_word)
+        title = re.fullmatch(_TITLE, text[span[0]:span[1]]) is not None and not part_of_name
         return not w or w.casefold() in STOP - {"asha"} or title
     while words and bad(words[0]):
         words.pop(0)
@@ -144,33 +191,48 @@ for _rel in ("S/o", "D/o", "W/o"):
     _cue(rf"(?P<name>{NAME}) *,? *\(?(?<![A-Za-z])(?i:{_rel[0]}/o)\b", "patient")
 _cue(rf"(?<![A-Za-z/])[Cc]/[Oo]\b *(?:(?:{_TITLE}) )?(?P<name>{NAME})", "relative", "C/O")
 _cue(rf"\b(?i:son|daughter|wife|husband|father|mother) (?:of|name:?) (?:(?:{_TITLE}) )?(?P<name>{NAME})", "relative")
-_cue(rf"(?<![ऀ-ॿ])(?:पुत्र|पुत्री|पत्नी|सुपुत्र)[ :]+(?:श्री )?(?P<name>{DEVA_NAME})", "relative")
 _cue(rf"(?<![A-Za-z/])(?i:[fmg]/o)\b[.:]? *(?:(?:{_TITLE}|Baby) )?(?P<name>{LATIN_NAME})", "patient")
 # "Attendant: X", "called by X", "witnessed by X"
 _cue(rf"\b(?i:{_PERSON_WORD}|informed by|called by|witnessed by|accompanied by|brought by|raised by|reported by)"
      rf"(?: *\([^)\n]{{0,30}}\))?(?:\s*[:\-] *| +)(?P<name>{LATIN_NAME})", "relative")
+# the same cue words in an English line followed by a name written in Devanagari ("attendant <name>")
+_DEVA_FUNCTION = r"(?:के|का|की|को|से|ने|में|पर|है|हैं|था|थे|और|साथ|नहीं|भी|ही|तक|यह|वह)(?![ऀ-ॿ])"
+_cue(rf"\b(?i:{_PERSON_WORD}|informed by|called by|witnessed by|accompanied by|brought by|reported by)"
+     rf"(?:\s*[:\-] *| +)(?!{_DEVA_FUNCTION})(?P<name>{DEVA_NAME})", "relative")
 _cue(rf"(?P<name>{LATIN_NAME})'s +(?i:{_PERSON_WORD})", "patient")
 _cue(rf"(?P<name>{LATIN_NAME}) *\( *(?i:{_PERSON_WORD})", "relative")
+# More family words, and "<relation> = <name>". Kept apart from the cue above, so that the first-word check below can
+# only ever drop what these two add
+_MORE_KIN = r"(?:bro|dtr|sibling|bhabhi|devrani|jethani|bahu|nanad|dadaji|nanaji)"
+_CHECK_FIRST_WORD = set()
+for _pattern in (rf"\b(?i:{_MORE_KIN})(?:\s*[:\-=] *| +)(?P<name>{LATIN_NAME})",
+                 rf"\b(?i:{_PERSON_WORD}) *= *(?P<name>{LATIN_NAME})"):
+    _CHECK_FIRST_WORD.add(len(_CUES))
+    _cue(_pattern, "relative")
+# Hinglish relation word before a capitalised name: "unka beta Chetan Ekka", "Pati Omkar Ekka", "bhai Harish Tomar".
+# The first-word check drops "Beta Blocker", "Bhai Sahab"; a lowercase word or particle after the relation word
+# (ko, ka, ne ...) never matches, so "Beta ko bukhar" has no name.
+_CHECK_FIRST_WORD.add(len(_CUES))
+_cue(rf"\b(?i:{_HINGLISH_KIN})(?:[ ]*[:=\-][ ]*|[ ]+)(?P<name>{LATIN_NAME})", "relative", None, True)
 # Hinglish honorifics: "Shahid sahab", "Anita behenji", "Kamal Bhaiya"
+_DROP_LEADING_KIN = {len(_CUES), len(_CUES) + 1}   # but "Bhai Sahab", "Papa Ji" are relation words, not names
 _cue(rf"(?P<name>{LATIN_NAME}) +(?i:{_KIN_REL})\b", "relative", None, True)
 _cue(rf"(?P<name>{LATIN_NAME}) +(?i:{_KIN_PAT})\b", "patient", None, True)
-_cue(rf"(?P<name>{DEVA_NAME}) +(?:{_DEVA_HON})(?![ऀ-ॿ])", "patient")
+_cue(rf"(?P<name>{DEVA_NAME}) +(?:{_DEVA_HON})(?![ऀ-ॣॱ-ॿ])", "patient")
 # a sentence that starts with a bare name: "Dinesh ka BP ...", "Sunita ko 3 din se ...". The words after it must be
 # about a person's state, otherwise "Metformin ka dose" would count as a name.
 _ABOUT_PATIENT = (r"(?:(?:ka|ki|ke|ko) +(?i:bp|blood pressure|pulse|temp|temperature|bukhar|condition|tabiyat|haalat|haal|"
                   r"wazan|weight|saans|operation|discharge|ilaj|dard|sugar|pet|sir)\b"
                   r"|ko +(?:[a-z0-9]+ +){0,4}(?:bukhar|chakkar|khansi|dard|ulti|kamzori|dast|sujan|takleef|saans)\b"
                   r"|ko +\d+ +(?:din|hafte|mahine|saal)\b)")
+# (a relation word at the start is not the name: "Beta ko bukhar nahi hai", "Beta Chetan ko bukhar" -> "Chetan")
+_DROP_LEADING_KIN.add(len(_CUES))
 _cue(rf"(?:^|\n|[.!?] |- )(?P<name>{_CAP}(?: {_CAP}){{0,2}}) +(?={_ABOUT_PATIENT})", "patient", None, True)
 # family and helper words that may stand where a name does ("Uncle signed the consent"); not in STOP because other cues use them
 _NOT_THE_PATIENT = frozenset("uncle aunt aunty cousin neighbour neighbor grandfather grandmother grandson granddaughter "
                              "nephew niece bua mausi chacha mama dada dadi nana nani counsellor counselor technician "
                              "pharmacist dietician dietitian physiotherapist receptionist cashier driver".split())
 
-# Hindi titles: "श्रीमती <name>". A following particle (को, का, ने ...) is not part of the name.
-_HINDI_PARTICLE = r"(?:को|का|की|के|ने|से|है|में|पर|जी)(?![ऀ-ॿ])"
-_cue(rf"(?<![ऀ-ॿ])(?:श्रीमती|श्री|कुमारी|सुश्री) +(?P<name>{_DEVA_WORD}(?: (?!{_HINDI_PARTICLE}){_DEVA_WORD}){{0,2}})",
-     "patient")
 # titles and report headings
 _cue(rf"\b(?:Mr|Mrs|Ms|Smt|Shri|Km|Master)\b\.? +(?P<name>{LATIN_NAME})", "patient")
 _cue(rf"(?P<name>(?:Mohd|Md)\.? {LATIN_NAME})", "patient")
@@ -184,6 +246,72 @@ _cue(rf"(?P<name>{_CAP}(?: {_CAP}){{1,2}})[ ,:(-]*(?:(?i:mob|mobile|ph|phone|con
      "relative")
 _PHONE_ADJACENT_FROM = len(_CUES) - 1
 _cue(rf"(?P<name>{_CAP}(?: {_CAP}){{1,2}}) *, *(?i:mob|mobile|ph|phone|contact|tel)\b", "relative")
+
+
+# Hindi honorifics and relation words before a name: "श्रीमान <name>", "पति <name>", "बेटे <name>".
+# Devanagari has no capital letters, so the end of the name is found from what follows it: a comma or full stop,
+# a number or Latin text, or a Hindi particle, verb, relation or medical word (HI_NOT_NAME). "पति को बुखार" and
+# "बेटे का BP" have no name: the word after the cue is in the list. A name is never read over a word that is
+# not in the list and is not followed by such an end, so "पति रोज़ दवा" stays text.
+_HI_END = r"(?![ऀ-ॣॱ-ॿ])"
+_HI_HONORIFIC = re.compile(rf"(?<![ऀ-ॿ])(?:श्रीमान|श्रीमती|सुश्री|श्री|कुमारी|स्वर्गीय|स्व\.?|मिस्टर|मिसेज़|मरहूम){_HI_END}[ \t:.\-]*")
+_HI_RELATION = re.compile(
+    r"(?<![ऀ-ॿ])(?:पति|पत्नी|धर्मपत्नी|भाई|बहन|बेटा|बेटे|बेटी|पुत्र|पुत्री|सुपुत्र|सुपुत्री|बहू|बहु|दामाद|पिता|माता|माँ|मां|ससुर|सास|"
+    r"भतीजा|भतीजी|भांजा|भांजी|भाँजा|भाँजी|चाचा|चाची|मामा|मामी|ताऊ|ताई|दादा|दादी|नाना|नानी|देवर|जेठ|जेठानी|जीजा|साला|साली|"
+    rf"बुआ|मौसी|ननद|भाभी|परिचारक|पड़ोसी|अभिभावक){_HI_END}[ \t:=\-–]+")
+_HI_SKIP = frozenset("श्री श्रीमान श्रीमती सुश्री स्वर्गीय स्व स्व. मिस्टर मिसेज़".split())
+# a word followed by ":" is a label ("उम्र:"), never a name or the end of one
+_HI_WORD = re.compile(r"([ऀ-ॣॱ-ॿ]+)([,।;.)]*)")
+
+
+def _hindi_name_after(text: str, pos: int, strong: bool) -> tuple[int, int] | None:
+    """The name that starts at `pos`, read as 1 to 3 Hindi words; None when there is none (see the note above)."""
+    # never past the end of the line: the next line starts with its own label
+    window = re.split(r"[\r\n]", text[pos:pos + 160], maxsplit=1)[0]
+    tokens = [(m.start() + pos, m.end() + pos) for m in re.finditer(r"\S+", window)]
+    while tokens and text[tokens[0][0]:tokens[0][1]] in _HI_SKIP:
+        tokens.pop(0)
+    words = []   # (start, end, word, ended) for the plain Hindi words that may belong to the name
+    for s, e in tokens[:4]:
+        m = _HI_WORD.fullmatch(text[s:e])
+        if not m or m.group(1) in HI_NOT_NAME:
+            break
+        words.append((s, s + len(m.group(1)), m.group(1), bool(m.group(2))))
+        if m.group(2) or len(words) == 3:
+            break
+    if not words:
+        return None
+
+    def ends_after(k: int) -> bool:
+        if words[k - 1][3]:
+            return True
+        nxt = tokens[k:k + 1]
+        if not nxt:
+            return True
+        word = _HI_WORD.fullmatch(text[nxt[0][0]:nxt[0][1]])
+        # a hyphenated compound, Latin text or a number after the name also ends it
+        return not word or word.group(1) in HI_NOT_NAME
+
+    for k in range(1, len(words) + 1):
+        if ends_after(k):
+            return words[0][0], words[k - 1][1]
+    for k in range(1, len(words) + 1):
+        if words[k - 1][2] in DEVA_SURNAMES:
+            return words[0][0], words[k - 1][1]
+    return (words[0][0], words[0][1]) if strong else None
+
+
+def _hindi_cue_names(text: str) -> list[Cand]:
+    out = []
+    for pattern, role, strong in ((_HI_HONORIFIC, "patient", True), (_HI_RELATION, "relative", False)):
+        for m in pattern.finditer(text):
+            # "सीता कुमारी बैठी थीं": कुमारी after a Hindi word is part of a name, not a title
+            if m.group(0).startswith("कुमारी") and re.search(r"[ऀ-ॿ] $", text[max(0, m.start() - 2):m.start()]):
+                continue
+            span = _hindi_name_after(text, m.end(), strong)
+            if span:
+                out.append(Cand(span[0], span[1], "RELATIVE_NAME" if role == "relative" else "PATIENT_NAME", None, role))
+    return out
 
 
 # export paths and file names: "...\\Sunita_Patel_084999\\...", "Summary_Sunita_Patel_ABC-12345"
@@ -292,6 +420,8 @@ _PERSON_DOES = (
     r"|called +(?:up|back|to +(?:ask|enquire|inquire|inform|confirm|request))"
     r"|expired +(?:despite|during +(?:treatment|admission))"
 )
+_NE_DOES = (r"(?:raat|subah|shaam|dopahar|aaj|kal|dawa|dawai|dawaai|goli|tablet|khana|khaana|pani|paani|chai|doodh|"
+            r"phone|bataya|bola|kaha|dekha|dikhaya|mana|manaa|maana|liya|li|khaya|khayi|piya|nahi|nahin|mujhe|humein|hamein)")
 _ACTION_CUES: list[tuple[re.Pattern, str]] = [(re.compile(p), role) for p, role in (
     # English clinical subject-verb: "Satyendra discharged in stable condition", "Priyanka signed the surgical consent form"
     (rf"{_CLAUSE_START}(?P<name>{_ONE_OR_MORE}) +(?:was )?(?:{_PERSON_DOES})\b", "patient"),
@@ -299,6 +429,8 @@ _ACTION_CUES: list[tuple[re.Pattern, str]] = [(re.compile(p), role) for p, role 
     (rf"(?:\b(?i:given to|handed over to|handover to|follow[- ]?up with|spoke (?:to|with)|discussed with|verified by|co-admitted)\s*[:\-]?\s*)(?P<name>{_ONE_OR_MORE})", "patient"),
     # Hinglish action cues: "Satyendra ko chhutti mili", "Priyanka ne sign kiya"
     (rf"{_CLAUSE_START}(?P<name>{_ONE_OR_MORE}) +(?:ko +(?:chhutti|discharge|admit|ward|bed|ilaj)|ne +(?:sign|hastakshar|call|phone|verify|bulaya|bulaaya))\b", "patient"),
+    # Hinglish "<name> ne <what a person does>": "Rekha Ekka ne raat ko dawa nahi li", "ki Sunita ne bataya"
+    (rf"(?:{_CLAUSE_START}|\b(?:ki|jo|jab|tab|toh|to|ya|kyunki)\s+)(?P<name>{_ONE_OR_MORE}) +ne +(?:{_NE_DOES})\b", "patient"),
     # Devanagari Hindi action cues: "रमेश को छुट्टी दी गई", "प्रिया ने हस्ताक्षर किए"
     (rf"{_CLAUSE_START}(?P<name>{_DEVA_ONE_OR_MORE}) +(?:को +(?:छुट्टी|भर्ती|दवा|बेड|वार्ड|इलाज)|ने +(?:हस्ताक्षर|साइन|फ़ोन|फोन|कॉल|सत्यापित|बताया))(?![ऀ-ॿ])", "patient"),
 )]
@@ -321,6 +453,19 @@ def _valid_action_name(raw: str) -> bool:
     return not any(shouted) or all(shouted)
 
 
+def _after_kin_words(text: str, s: int, e: int) -> int | None:
+    """Start of the name once leading Hinglish relation words ("Pati", "Beta") are skipped; None if nothing is left."""
+    while True:
+        m = re.match(rf"(?i:{_HINGLISH_KIN})\b(?: +|$)", text[s:e])
+        if not m:
+            return s
+        s += m.end()
+        # "Bhai Sahab", "Pita Ji": an honorific after the relation word is not a name
+        nxt = re.match(r"[A-Za-z]+", text[s:e])
+        if s >= e or (nxt and nxt.group(0).casefold() in _NEVER_FIRST):
+            return None
+
+
 def _strict_names(text: str) -> list[Cand]:
     out = []
     for pattern, role in _STRICT_CUES:
@@ -335,7 +480,8 @@ def _strict_names(text: str) -> list[Cand]:
             s, e = m.span("name")
             if _STAFF_BEFORE_SIMPLE.search(text[max(0, s - 20):s]):
                 continue
-            if not _valid_action_name(m.group("name")):
+            s = _after_kin_words(text, s, e)
+            if s is None or not _valid_action_name(text[s:e]):
                 continue
             kind = "RELATIVE_NAME" if role == "relative" else "PATIENT_NAME"
             out.append(Cand(s, e, kind, None, role))
@@ -354,6 +500,21 @@ _STAFF_BEFORE_SIMPLE = re.compile(
 )
 
 
+# a name in brackets straight after a found name (and its honorific): "Nitin sahab (Nitin Ekka)", "Sunita (Sunita Devi)"
+_ALIAS = re.compile(rf"(?:[ ]+(?i:{_KIN_PAT}))?[ ]*\((?P<name>{_CAP}(?: {_CAP}){{1,2}})\)")
+
+
+def _alias_names(text: str, found: list[Cand]) -> list[Cand]:
+    out = []
+    for c in found:
+        if c.type not in ("PATIENT_NAME", "RELATIVE_NAME") or _STAFF_BEFORE_SIMPLE.search(text[max(0, c.start - 20):c.start]):
+            continue
+        m = _ALIAS.match(text, c.end)
+        if m and _valid_action_name(m.group("name")):
+            out.append(Cand(*m.span("name"), c.type, None, c.role, hinglish=c.hinglish))
+    return out
+
+
 def find_names(text: str) -> list[Cand]:
     out = []
     for index, (pattern, role, relation, hinglish) in enumerate(_CUES):
@@ -361,15 +522,23 @@ def find_names(text: str) -> list[Cand]:
             s, e = m.span("name")
             if index >= _PHONE_ADJACENT_FROM and set(text[s:e].casefold().split()) & (ORG | MEDICAL):
                 continue
+            first = re.match(r"[A-Za-z]+", text[s:e])
+            if index in _CHECK_FIRST_WORD and first and first.group(0).casefold() in _NEVER_FIRST:
+                continue
             if relation == "C/O" and not text[s].isupper() and not DEVA.match(text[s]):
                 continue
             # a title or stop word right after C/O means a complaint or a doctor, not a relative
             if relation == "C/O" and text[s:e].split()[0].strip(".").casefold() in STOP:
                 continue
+            if index in _DROP_LEADING_KIN:
+                s = _after_kin_words(text, s, e)
+                if s is None:
+                    continue
             span = trim_name(text, s, e)
             if not span:
                 continue
             s, e = span
             kind = "RELATIVE_NAME" if role == "relative" else "PATIENT_NAME"
             out.append(Cand(s, e, kind, None, role, relation=relation, hinglish=hinglish))
-    return out + _strict_names(text)
+    out += _hindi_cue_names(text) + _strict_names(text)
+    return out + _alias_names(text, out)

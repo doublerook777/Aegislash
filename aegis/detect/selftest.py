@@ -12,6 +12,8 @@ import sys
 
 from aegis.detect import detect_file
 
+_BS = chr(92)
+
 # (line, strings that MUST be found, strings that MUST survive)
 CASES = [
     # medical and staff text that only looks like a name
@@ -129,6 +131,7 @@ CASES = [
     # dotted and "+91/" phones, mixed Aadhaar separators
     ("Call 97.31.20.45.88 or +91/8123/004455; Na 138.5", ["97.31.20.45.88", "+91/8123/004455"], ["138.5"]),
     ("ID seen 5821-7734 9012 at desk, HbA1c 7.2", ["5821-7734 9012"], ["HbA1c 7.2"]),
+    ("Card 8831.0057.2294 on file; build 2024.0115.1030, HbA1c 7.2, Hb 11.4.2", ["8831.0057.2294"], ["2024.0115.1030", "HbA1c 7.2"]),
     # zero-width characters, look-alike letters, accents (typed whole or as separate marks)
     ("Patient: Bar\u200bnali Then\u200dgal, mob 97312\u200b04588", ["Bar\u200bnali Then\u200dgal", "97312\u200b04588"], []),
     ("Patient: B\u0430rn\u0430li Thengal (44/F)", ["B\u0430rn\u0430li Thengal"], []),
@@ -162,6 +165,17 @@ CASES = [
      ["Ra\u200bhul\u200d Chatur\u200bvedi", "73053\u200b31651", "Dеvikа Rаo"], []),
     ("URL ref: https://portal.example/view?patient=Priyanka%20Sengupta&tel=%2B91%207759130735",
      ["Priyanka%20Sengupta", "%2B91%207759130735"], []),
+    # escapes written out as text: "\uXXXX" sequences and HTML entities (the whole escaped name is the finding)
+    (f"Attendant: {_BS}u0053unita Mishra, tel {_BS}u0039811100041, Tab Telmisartan 40 mg OD.",
+     [f"{_BS}u0053unita Mishra", f"{_BS}u0039811100041"], ["Telmisartan 40 mg"]),
+    ("Attendant: &#83;unita Mishra &amp; son, BP 142/90 &amp; HR 78, Tab Amlodipine 5 mg &lt; 6 weeks.",
+     ["&#83;unita Mishra"], ["142/90", "Amlodipine 5 mg"]),
+    ("attendant " + "".join(f"{_BS}u{ord(c):04x}" if ord(c) > 127 else c for c in "लता बैरवा आयी"),
+     ["".join(f"{_BS}u{ord(c):04x}" for c in "लता")], []),
+    ("Drip 5%DEXTROSE at 40%20 ml/hr, folder C:" + _BS + "users" + _BS + "x, e.g. R&D; team.", [], ["5%DEXTROSE", "users", "R&D;"]),
+    # a cue word in an English line followed by a name written in Devanagari; Hindi function words are not names
+    ("attendant लता बैरवा came with her", ["लता बैरवा"], []),
+    ("wife के साथ आये, father को sugar है", [], ["के साथ"]),
     ("Satyendra discharged in stable condition on Tab Azithromycin 500 mg.",
      ["Satyendra"], ["Azithromycin 500 mg"]),
     ("Priyanka ne sign kiya aur Rohan ko chhutti mili; BP 120/80.",
@@ -177,6 +191,89 @@ CASES = [
     ("Lobsang verified the payment receipt at the counter.", ["Lobsang"], []),
     ("Culture verified the organism; Smear signed out by pathologist.", [], ["Culture", "Smear"]),
     ("Janam tithi 14/05/1988, जन्मतिथि 12-08-1992.", ["14/05/1988", "12-08-1992"], []),
+    # Kumari and Devi after a first name are part of the name, not a title
+    ("Patient: Km. Barsha Kumari came with cough.", ["Barsha Kumari"], ["cough"]),
+    # doctor titles in capitals or with a courtesy title in brackets
+    ("Chemo plan by DR.(MRS) TARULATA MAHANTA today.", [], ["TARULATA MAHANTA"]),
+    # relation words and separators
+    ("Consent taken. Son = Nandlal. Will pay tomorrow.", ["Nandlal"], ["Consent"]),
+    ("elder bro Ompal waiting outside, will sign.", ["Ompal"], ["waiting"]),
+    ("sibling Kiruba also screened, report normal.", ["Kiruba"], ["screened"]),
+    ("Call bahu Jasleen if he wanders at night.", ["Jasleen"], ["night"]),
+    ("dtr Rituparna will collect the reports.", ["Rituparna"], ["reports"]),
+    ("Family history: sibling Diabetes since 2019.", [], ["Diabetes"]),
+    # record and insurance numbers announced by a label
+    ("UHID-->QRS/OP/0045127 || BP 130/84", ["QRS/OP/0045127"], ["130/84"]),
+    ("Old file MR# 31-207-5568 traced.", ["31-207-5568"], ["traced"]),
+    ("TPA card no. ZXC7-00518837-04 pending, bill Rs 12,500", ["ZXC7-00518837-04"], ["12,500"]),
+    ("आयुष्मान कार्ड संख्या RJ-QX-66120934 दर्ज, खुराक 500mg", ["RJ-QX-66120934"], ["500mg"]),
+    ("TPA card not available, HbA1c 8.1% noted.", [], ["HbA1c 8.1%", "not available"]),
+    # birth dates written with a Hindi or roman-numeral month
+    ("जन्मतिथि ३ फ़रवरी १९७९, वज़न 62 kg", ["३ फ़रवरी १९७९"], ["62 kg"]),
+    ("DOB 21/XI/1958, on Telmisartan.", ["21/XI/1958"], ["Telmisartan"]),
+    ("Stage II/IV disease, grade III/2020 criteria.", [], ["II/IV", "III/2020"]),
+    # "Name- value" with a dash and no space before it
+    ("पंजीकरण काउंटर; नाम- सुमित्रा महंत", ["सुमित्रा महंत"], ["काउंटर"]),
+    ("Follow- up after two weeks.", [], ["up after two weeks"]),
+    # HL7 style names, and HL7 doctors and test names that look similar
+    ("PID Mahanta^Tarulata admitted to HDU.", ["Mahanta^Tarulata"], ["HDU"]),
+    ("Attending Dr^Rathi^Ompal on call.", [], ["Rathi", "Ompal"]),
+    ("OBX Glucose^Fasting 102 mg/dL", [], ["Glucose^Fasting"]),
+    # "near old <place>"
+    ("Lives near old Hanuman Temple, on Amlodipine.", ["near old Hanuman Temple"], ["Amlodipine"]),
+
+    # a tight dash only introduces a value after a label that says "name"
+    ("Patient- stable today, BP 120/80.", [], ["stable"]),
+    ("मरीज- को बुखार है, खुराक 500mg", [], ["बुखार"]),
+    # doctor protection must never spread over the patient who follows, whatever the capitals
+    ("REF DR RATHI PATIENT SUMITRA MAHANTA ADMITTED", ["SUMITRA MAHANTA"], []),
+    ("SEEN BY DR RATHI PT NAME NANDLAL HAZARIKA", ["NANDLAL HAZARIKA"], []),
+    ("Ref DR RATHI Mrs Barsha Hazarika came", ["Barsha Hazarika"], []),
+    ("ref dr Rathi Patient Sumitra Mahanta admitted", ["Sumitra Mahanta"], []),
+    ("UNDER DR RATHI MR OMPAL MAHANTA BP 120/80", ["OMPAL MAHANTA"], ["120/80"]),
+    ("Ref Dr Rathi Patient Sumitra Mahanta admitted", ["Sumitra Mahanta"], []),
+    ("DR.(MRS) MAHANTA PATIENT NANDLAL HAZARIKA", ["NANDLAL HAZARIKA"], []),
+    # a dash after a name label never takes over from a later colon
+    ("Patient Name- verified: Barsha Hazarika", ["Barsha Hazarika"], []),
+    # a leading word that is not a name must not take the name after it down with it
+    ("Witness Barsha Hazarika tel 9412730518", ["Barsha Hazarika", "9412730518"], []),
+    ("Admitted Ompal (father: Nandlal Mahanta) of H.No. 9, 781014", ["Ompal", "Nandlal Mahanta"], []),
+    # Hindi honorifics and relation words before a name; the name ends at a comma, particle, verb, number or medical word
+    ("श्रीमान गिरधारी लोहनी, उम्र 61, को मधुमेह है। इंसुलिन 12 यूनिट।", ["गिरधारी लोहनी"], ["मधुमेह", "इंसुलिन 12 यूनिट"]),
+    ("सुश्री कलावती फॉलो-अप के लिए आईं। रक्त शर्करा 190 mg/dl।", ["कलावती"], ["फॉलो", "190 mg/dl"]),
+    ("स्व. श्री हरकिशन टम्टा की पुत्री मीनाक्षी भर्ती हैं। बुखार 101 F।", ["हरकिशन टम्टा", "मीनाक्षी"], ["बुखार", "101 F"]),
+    ("साथ में भतीजा तेजपाल चंदोला आए और दवा की पर्ची दी। डॉ. रस्तोगी ने देखा।", ["तेजपाल चंदोला"], ["दवा", "रस्तोगी"]),
+    ("पत्नी सुमित्रा ने बताया कि सांस फूल रही है।", ["सुमित्रा"], ["सांस"]),
+    ("मरीज़ का दामाद योगेश, निवासी भानपुर, कल सुबह आया। फ़ॉलो-अप 2 हफ्ते बाद।", ["योगेश", "भानपुर"], ["2 हफ्ते"]),
+    ("कल रात धनौरा से लाए गए, रक्तचाप 150/95 है।", ["धनौरा"], ["रक्तचाप", "150/95"]),
+    ("बहन तारा, निवासी: कुम्हारपुर, साथ थीं।", ["तारा", "कुम्हारपुर"], []),
+    # a relation word that is followed by a medical word, a particle or a doctor is not a name
+    ("पति को बुखार है और बेटे का BP 150/90 है।", [], ["पति", "बेटे", "BP 150/90"]),
+    ("माता जी को मधुमेह है। भाई साहब को सांस की तकलीफ है।", [], ["माता", "भाई", "मधुमेह"]),
+    ("पत्नी डॉ. अवस्थी से मिलने आईं। बेटी को खांसी है।", [], ["पत्नी", "बेटी", "अवस्थी", "खांसी"]),
+    ("भर्ती रोगी: सावित्री चौरसिया\nपुत्र: नवल चौरसिया\nउम्र: 31 वर्ष   लिंग: महिला\nनिदान: मधुमेह",
+     ["सावित्री चौरसिया", "नवल चौरसिया"], ["उम्र", "लिंग", "निदान", "मधुमेह", "महिला"]),
+    ("पिता का नाम: जगदीश मौर्य\nउम्र: 63 वर्ष\nपति: हरिप्रसाद\nबीमारी: उच्च रक्तचाप\nश्रीमती उर्मिला\nइलाज: जारी",
+     ["जगदीश मौर्य", "हरिप्रसाद", "उर्मिला"], ["उम्र", "बीमारी", "रक्तचाप", "इलाज", "पिता का नाम"]),
+    ("पिता रोज़ सुबह इंसुलिन लेते हैं। घर से लेकर आए, अस्पताल से लाए गए।", [], ["पिता", "इंसुलिन", "घर", "अस्पताल"]),
+    # Hinglish relation words before a name, a locality after "Ghar", a landmark cue, a name in brackets (invented)
+    ("Bete Vinod Kharwar ne dawa nahi li. Tab. Telmisartan 40 mg 1-0-0.", ["Vinod Kharwar"], ["Telmisartan 40 mg", "1-0-0", "Bete"]),
+    ("Patni Savita Munda ko sugar hai, bhatija Deepak Toppo saath aaya, SpO2 95%.",
+     ["Savita Munda", "Deepak Toppo"], ["sugar", "SpO2 95%", "Patni", "bhatija"]),
+    ("Saas Kamla Oram aur damaad Pritam Lakra mile. Dr. Neelam Bakshi ne dekha.", ["Kamla Oram", "Pritam Lakra"], ["Neelam Bakshi", "Saas"]),
+    ("Ghar Shanti Colony mein hai, landmark Blue Gate School. BP 124/82 mmHg.",
+     ["Shanti Colony", "Blue Gate School"], ["BP 124/82 mmHg", "Ghar"]),
+    ("Makaan Ambedkar Vihar mein hai. Subhash Nagar ke paas. Syp. Cetirizine 5 mg HS.",
+     ["Ambedkar Vihar", "Subhash Nagar"], ["Cetirizine 5 mg", "ke paas"]),
+    ("Mareez Girish ji (Girish Lakda) ko Pantop 40 mg di gayi, Metformin 500 mg 1-0-1.",
+     ["Lakda"], ["Pantop 40 mg", "Metformin 500 mg", "1-0-1"]),
+    ("Sunita Minz ne raat ko dawa nahi li; Metformin 500 mg 1-0-1.", ["Sunita Minz"], ["Metformin 500 mg", "dawa nahi li"]),
+    # ... and what is NOT a name: relation word + particle or medical word, drugs, "Beta Blocker", doctors
+    ("Beta ko bukhar nahi hai. Pati ko TB hai. Bhai ka BP 150/90. Bete ne dawa li.", [], ["Beta", "Pati", "Bhai", "Bete", "150/90", "bukhar"]),
+    ("Beta Blocker (Metoprolol 25 mg) shuru kiya. Beta Thalassemia trait.", [], ["Beta Blocker", "Metoprolol 25 mg", "Beta Thalassemia"]),
+    ("Dengue ne aaj bahut kamzor kar diya, platelet 90000. Dr. Rekha Soren ke paas refer.", [], ["Dengue", "platelet 90000", "Rekha Soren"]),
+    ("Bhai Sahab ne dawa li. Pita Ji ka BP 140/90 hai. Ghar Hospital mein hai.", [], ["Bhai", "Pita", "140/90", "Hospital"]),
+    ("Patni Savita Devi (MD Pathology) ka report aaya, Hb 10.2 g/dl.", ["Savita Devi"], ["Pathology", "Hb 10.2 g/dl"]),
 ]
 
 
@@ -215,6 +312,42 @@ TABLES = [
      [["31145549", "31147001", "31149002", "Neha Kapoor", "Farhan Qureshi", "4000-11000", "226010", "880123"]],
      {"case_sheet_ref": "MRN", "patient_ref": "MRN", "mrn_ref": "MRN", "ref_by": None, "ref_doctor": None,
       "ref_range": None, "dak_code": "PIN", "sample_code": None}),
+    # a column of people under headers the label rules do not know: every row is flagged, whether or not its surname
+    # is on the list; diagnosis, medicine, ward and trade columns beside it keep their text
+    (["Enrollee", "Chaperone", "Working Impression", "Planned Test", "Treatment Given", "Occupation", "Ward Allotted"],
+     [["Tarun Wadhwani", "Hemant Wadhwani", "Iron Deficiency", "Lipid Profile", "Inj. Ceftriaxone 1 g IV BD", "Daily Wager", "Lotus Care"],
+      ["Meera Ghanekar", "Sunita Ghanekar", "Viral Hepatitis", "Liver Function Test", "Tab. Telmisartan 40 mg OD", "Home Maker", "Lakeview Ward"],
+      ["Siddharth Shirodkar", "Rekha Shirodkar", "Renal Colic", "Complete Blood Count", "Syp. Cetirizine 5 ml HS", "Govt Employee", "Lotus Care"],
+      ["Anjali Tendulkar", "Vivek Chaudhry", "Dengue Fever", "Chest Xray", "Tab. Metformin 500 mg BD", "Daily Wager", "Lakeview Ward"]],
+     {"Enrollee": "PATIENT_NAME", "Chaperone": "RELATIVE_NAME", "Working Impression": None, "Planned Test": None,
+      "Treatment Given": None, "Occupation": None, "Ward Allotted": None}),
+    # the same in Devanagari, with a Hindi diagnosis column and a drug column that must survive
+    (["आवेदक", "सहचर", "प्रारंभिक आकलन", "औषधि"],
+     [["कमला नागपाल", "रमेश नागपाल", "तीव्र बुखार", "पैरासिटामोल गोली"],
+      ["दीपक सहगल", "सुनीता सहगल", "उच्च रक्तचाप", "मेटफॉर्मिन टैबलेट"],
+      ["रेखा ठाकरे", "मोहन ठाकरे", "मधुमेह रोग", "एमलोडिपिन गोली"],
+      ["अमन वाघमारे", "पूजा वाघमारे", "निमोनिया संक्रमण", "सिरप सेटिरिजिन"]],
+     {"आवेदक": "PATIENT_NAME", "सहचर": "RELATIVE_NAME", "प्रारंभिक आकलन": None, "औषधि": None}),
+    # two-word organisms, drugs and vaccines under unknown headers look like names but are not: no listed surname
+    # and no surname shared row by row with another column of people, so every cell keeps its text
+    (["Isolate", "Sensitive To", "Vaccine Given", "Next Due"],
+     [["Escherichia Coli", "Piperacillin Tazobactam", "Pentavalent Booster", "Measles Rubella"],
+      ["Klebsiella Pneumoniae", "Meropenem Imipenem", "Rotavirus Oral", "Japanese Encephalitis"],
+      ["Staphylococcus Aureus", "Vancomycin Linezolid", "Inactivated Polio", "Typhoid Conjugate"],
+      ["Pseudomonas Aeruginosa", "Colistin Polymyxin", "Measles Rubella", "Vitamin Supplement"]],
+     {"Isolate": None, "Sensitive To": None, "Vaccine Given": None, "Next Due": None}),
+    # a column of repeated two-word categories is not a column of people
+    (["Care Route", "Pickup"], [["Walk In", "Open Camp"], ["Open Camp", "Walk In"], ["Walk In", "Walk In"],
+                                ["Walk In", "Open Camp"], ["Open Camp", "Open Camp"]],
+     {"Care Route": None, "Pickup": None}),
+    # twelve digits grouped 4-4-4 with dots are an Aadhaar number; a date-time stamp, a version and lab values are not
+    (["KYC Number", "Log Stamp", "Build", "Result"],
+     [["3540.4903.0424", "2024.0115.1030", "4.2.1", "1.0234"], ["6472.2828.3610", "2025.1130.0905", "4.2.2", "7.5000"],
+      ["8831.0057.2294", "2023.0302.2350", "4.3.0", "0.9981"]],
+     {"KYC Number": "AADHAAR", "Log Stamp": None, "Build": None, "Result": None}),
+    # an unreadable header over phone numbers written with odd spacing; other long numbers are not phones
+    (["zz_reach", "zz_bill"], [["9412 7 30518", "4500.00"], ["70112-904-18", "1200.50"], ["8800 41 2276", "980.00"]],
+     {"zz_reach": "PHONE", "zz_bill": None}),
 ]
 
 
@@ -252,7 +385,62 @@ CELLS = [
     ("Ward / Patient", "Ward 4 - Male Surgical", [], ["Male Surgical"]),
     ("Ward / Patient", "Ishrat Jahan Ansari", ["Ishrat Jahan Ansari"], []),
     ("patient_ward", "Maternity", [], ["Maternity"]),
+    # dotted short forms in headers
+    ("P.I.N.", "781014", ["781014"], []),
+    ("U.H.I.D.", "55-204-9911", ["55-204-9911"], []),
+    # landmark and neighbourhood headers
+    ("Landmark", "next to the old post office", ["old post office"], []),
+    ("ptNbhd", "Lalpur Basti", ["Lalpur Basti"], []),
+    ("Nearby", "dairy booth", ["dairy booth"], []),
+    # a notes column stays a notes column even when a nurse or doctor writes it
+    ("wardNurseNote", "son Nandlal informed, BP 120/80", ["Nandlal"], ["BP 120/80"]),
+    ("Doctor Remarks", "Continue Metformin 500 mg, wife Jasleen counselled", ["Jasleen"], ["Metformin 500 mg"]),
+    ("Doctor", "Tarulata Mahanta", [], ["Tarulata Mahanta"]),
+    ("Student", "Barsha Hazarika", ["Barsha Hazarika"], []),
+    # relative columns that put the relation first, or in brackets after the name
+    ("kin_mentioned", "amma - Kiruba", ["Kiruba"], []),
+    ("Relative", "papa Nandlal, didi Barsha", ["Nandlal", "Barsha"], []),
+    ("Relative", "devrani Sumitra", ["Sumitra"], []),
+    ("Brought By (with relation)", "Jasleen Gill (wife)", ["Jasleen Gill"], []),
+    ("Brought By (with relation)", "self (walk in)", [], ["self"]),
+    # an insurance number with an Aadhaar-looking tail is removed whole
+    ("Policy No", "ACMEGEN-4821-5530-9917", ["ACMEGEN-4821-5530-9917"], []),
+
+    # a name cell that runs into a sentence stops there, but never when another person follows
+    ("Patient", "Barsha came with cough", ["Barsha"], ["cough"]),
+    ("Patient", "Barsha with Nandlal", ["Barsha", "Nandlal"], []),
+    ("Patient", "Barsha came with husband nandlal", ["Barsha", "nandlal"], []),
+    # a header that is newly understood must not switch off the search for names
+    ("P.I.N.", "wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    ("PIN", "ask wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    ("Student", "Ompal Rathi came with wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    ("Landmark", "Ompal Rathi came with wife Barsha Hazarika", ["Ompal Rathi", "Barsha Hazarika"], []),
+    ("Landmark", "Paracetamol given since 2 days", [], ["Paracetamol"]),
+    ("fon_no", "9412 7 30518", ["9412 7 30518"], []),
+    ("fon_no", "ask wife Barsha Hazarika", ["Barsha Hazarika"], []),
+    # only a plain "student" column holds names; a hospital near by is not a landmark of a home
+    ("student_vision", "normal both eyes", [], ["normal"]),
+    ("Student Remarks", "attends regularly, weight low", [], ["attends"]),
+    ("Nearby Hospital", "District Hospital Sehore", [], ["District Hospital"]),
+    # "relative contact" columns hold a name, a number or both, even though "contact" reads as a phone label
+    ("परिजन_संपर्क", "भाई नंदलाल महंत", ["नंदलाल महंत"], []),
+    ("Guardian Contact", "Barsha Hazarika 94127-30518", ["Barsha Hazarika", "94127-30518"], []),
+    ("Guardian Contact", "94127 30518", ["94127 30518"], []),
+    ("Attendant Mobile", "not available", [], ["not available"]),
 ]
+
+
+def _run_mixed_column() -> int:
+    """Mostly phone numbers under an unreadable header: the one cell that names a person must still be searched."""
+    values = ["9412 7 30518", "70112-904-18", "8800 41 2276", "9435 2 11870", "ask wife Barsha Hazarika"]
+    records = [{"record_id": f"t.csv#row:{n}", "file": "t.csv", "loc": f"row:{n}", "fmt": "csv",
+                "fields": [{"path": "col:0", "kind": "value", "context": "zz_reach2", "value": v}]}
+               for n, v in enumerate(values, 1)]
+    found = [f["text"] for f in detect_file(records)[-1]["findings"]]
+    if not any("Barsha Hazarika" in f for f in found):
+        print(f"FAIL  mixed phone column: found {found}")
+        return 1
+    return 0
 
 
 def _run_cells() -> int:
@@ -290,6 +478,38 @@ DOCS = [
      ["Barnali Thengal", "Devika Ranganathan"], []),
     ({"organization": {"name": "Sunrise Care Centre", "department": {"name": "Cardiology"}},
       "patient": {"insurer": {"name": "Star Health"}}}, [], ["Sunrise Care Centre", "Cardiology", "Star Health"]),
+    # FHIR: the identifier of a Patient / RelatedPerson is removed whatever its shape; everything else in the bundle stays
+    ({"resourceType": "Bundle", "type": "collection", "entry": [
+        {"fullUrl": "urn:uuid:pt-71", "resource": {
+            "resourceType": "Patient", "id": "pt-71",
+            "identifier": [{"system": "https://example.org/patient-no", "value": "7340192"},
+                           {"type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v2-0203", "code": "MR"}]},
+                            "value": "4123"},
+                           {"system": "https://example.org/opaque", "value": "QZ-AB"}],
+            "gender": "female"}},
+        {"fullUrl": "urn:uuid:rp-72", "resource": {
+            "resourceType": "RelatedPerson", "id": "rp-72", "patient": {"reference": "Patient/pt-71"},
+            "identifier": [{"system": "https://example.org/rel-no", "value": "88123"}]}},
+        {"fullUrl": "urn:uuid:enc-73", "resource": {
+            "resourceType": "Encounter", "id": "enc-73", "status": "finished",
+            "identifier": [{"system": "https://example.org/visits", "value": "6650217"}],
+            "subject": {"reference": "Patient/pt-71"}}},
+        {"fullUrl": "urn:uuid:obs-74", "resource": {
+            "resourceType": "Observation", "id": "obs-74", "status": "final",
+            "code": {"coding": [{"system": "http://loinc.org", "code": "718-7", "display": "Haemoglobin"}]},
+            "subject": {"reference": "Patient/pt-71"}, "valueQuantity": {"value": 10.4, "unit": "g/dL"}}},
+        {"fullUrl": "urn:uuid:org-75", "resource": {
+            "resourceType": "Organization", "id": "org-75", "identifier": [{"value": "5509134"}]}}]},
+     ["7340192", "4123", "QZ-AB", "88123"],
+     ["6650217", "718-7", "10.4", "g/dL", "Patient/pt-71", "http://loinc.org", "5509134", "pt-71", "Haemoglobin"]),
+    # the patient's identifier inside another resource's subject reference
+    ({"resourceType": "Observation", "id": "o1", "subject": {"identifier": {"system": "https://example.org/uhid", "value": "3120045"}},
+      "code": {"coding": [{"system": "http://snomed.info/sct", "code": "271649006"}]}, "valueQuantity": {"value": 128}},
+     ["3120045"], ["271649006", "128", "http://snomed.info/sct"]),
+    # JSON that is not FHIR but has the same shape: a patient's identifier list, any shape
+    ({"patients": [{"identifier": [{"system": "hospital-no", "value": "60918"}], "visit": {"identifier": [{"value": "7712093"}]}}],
+      "organization": {"identifier": [{"value": "9034112"}]}},
+     ["60918"], ["7712093", "9034112"]),
 ]
 
 
@@ -341,6 +561,86 @@ def _run_filenames() -> int:
     return failed
 
 
+# HL7 v2 messages saved as text (invented data): each segment is {field number: text}; the separator between segments
+# is given per message (\n, \r or \r\n). (segments, separator, strings that MUST be found, strings that MUST survive)
+_MSH = "MSH|^~" + _BS + "&|ADT1|CITYCLINIC|LIS|CITYCLINIC|20250614093015||ORU^R01|C20991|P|2.5"
+
+
+def _seg(name: str, fields: dict[int, str]) -> str:
+    return name + "".join("|" + fields.get(i, "") for i in range(1, max(fields) + 1))
+
+
+HL7_MESSAGES = [
+    ([_MSH,
+      _seg("PID", {1: "1", 2: "88120045", 3: "702194^^^CC^MR~551203998877^^^GOV^NI", 5: "GUPTA^NEELAM^KAMLA", 6: "MISHRA^SAVITRI",
+                   7: "19720809", 8: "F", 11: "14 Gandhi Marg^Behind Post Office^Raebareli^UP^229001^IN",
+                   13: "0535-2271904^PRN^PH~9936120045^PRN^CP", 19: "334-55-9021"}),
+      _seg("NK1", {1: "1", 2: "TIWARI^ASHOK", 3: "BRO", 4: "7 Station Road^^Raebareli^UP^229001", 5: "9936555010"}),
+      _seg("PV1", {1: "1", 2: "I", 3: "MEDWARD^12^B", 7: "4455^SHARMA^KIRAN", 44: "20250613120000"}),
+      _seg("OBR", {1: "1", 2: "ORD551", 3: "FIL778", 4: "CBC^Complete Blood Count", 7: "20250614080000"}),
+      _seg("OBX", {1: "1", 2: "NM", 3: "718-7^Hemoglobin^LN", 5: "9.8", 6: "g/dL", 7: "12.0-15.5", 8: "L", 11: "F"}),
+      _seg("OBX", {1: "2", 2: "ST", 3: "630-4^Culture^LN", 5: "No growth after 48 hours", 11: "F"}),
+      _seg("NTE", {1: "1", 3: "Result discussed with Neelam Gupta."})],
+     "\n",
+     ["GUPTA", "NEELAM", "KAMLA", "MISHRA", "SAVITRI", "702194", "551203998877", "19720809", "334-55-9021", "14 Gandhi Marg",
+      "Behind Post Office", "Raebareli", "229001", "0535-2271904", "9936120045", "TIWARI", "ASHOK", "7 Station Road", "9936555010",
+      "Neelam Gupta"],
+     ["Hemoglobin", "9.8", "g/dL", "12.0-15.5", "718-7", "No growth after 48 hours", "MEDWARD", "Complete Blood Count",
+      "20250614093015", "20250614080000", "20250613120000", "CITYCLINIC", "ORD551", "FIL778"]),
+    # segments ending in a bare carriage return (the HL7 standard), and a guarantor and an insured person
+    ([_MSH.replace("20250614093015", "202507021415"),
+      _seg("EVN", {1: "A04", 2: "202507021415"}),
+      _seg("PID", {1: "1", 3: "KM-904170^^^SUN^MR", 5: "VERMA^SUNITA", 7: "19881104", 8: "F", 11: "22 Lake View^^Mohan Nagar^MP^462003",
+                   13: "(0755)4017733"}),
+      _seg("GT1", {1: "1", 3: "VERMA^PRAKASH", 5: "5 Temple Rd^^Mohan Nagar^MP^462003", 6: "9425011100"}),
+      _seg("IN1", {1: "1", 2: "PLAN9", 4: "STAR CARE", 16: "VERMA^SUNITA", 17: "SELF", 18: "19881104", 36: "POL4455120"}),
+      _seg("OBX", {1: "1", 2: "NM", 3: "2160-0^Creatinine^LN", 5: "1.1", 6: "mg/dL", 7: "0.6-1.2", 8: "N"})],
+     "\r",
+     ["VERMA", "SUNITA", "PRAKASH", "KM-904170", "19881104", "22 Lake View", "Mohan Nagar", "462003", "(0755)4017733", "5 Temple Rd",
+      "9425011100", "POL4455120"],
+     ["Creatinine", "1.1", "mg/dL", "0.6-1.2", "2160-0", "202507021415", "PLAN9", "STAR CARE", "SUNRISEMED"]),
+    # coded fields are not free text: the message type "ORU^R01" next to "M7" (a control id) is not an age and sex,
+    # a unit code "F01" is not a name; a phone written into a coded field is still found
+    (["MSH|^~\\&|LIS|DISTLAB|EMR|DISTLAB|202504110930||ORU^R01|M7|P|2.5",
+      _seg("PID", {1: "1", 3: "330918^^^DL^MR", 5: "KANDPAL^REKHA", 7: "19650304", 8: "F"}),
+      _seg("OBR", {1: "1", 4: "LFT^Liver Function^L", 16: "F01^BHATT^ANIL"}),
+      _seg("OBX", {1: "1", 2: "NM", 3: "1742-6^ALT^LN", 5: "64", 6: "U/L", 7: "7-56", 8: "H", 11: "F", 16: "9412088123"})],
+     "\n",
+     ["KANDPAL", "REKHA", "330918", "19650304", "9412088123"],
+     ["ORU^R01", "M7", "Liver Function", "1742-6", "ALT", "64", "U/L", "7-56", "202504110930"]),
+    # not a message: pipes in ordinary text, and a message with no MSH line, are read as free text only
+    (["Rx|Tab Paracetamol 500 mg|1-0-1", "BP|112/78|mmHg"], "\n", [], ["Paracetamol", "112/78"]),
+]
+
+
+def _run_hl7() -> int:
+    failed = 0
+    for segments, sep, must_find, must_keep in HL7_MESSAGES:
+        text = sep.join(segments) + sep
+        record = {"record_id": "m.txt#doc", "file": "m.txt", "loc": "doc", "fmt": "text",
+                  "fields": [{"path": "text", "kind": "text", "context": None, "value": text}]}
+        findings = detect_file([record])[0]["findings"]
+        kept = [f for f in findings if f["type"] not in ("CONDITION", "DISTRICT", "GENDER")]
+        found = [f["text"] for f in kept]
+        missed = [x for x in must_find if not any(x in f for f in found)]
+        eaten = [x for x in must_keep if any(x in f or f in x for f in found)]
+        # every finding replaced by a placeholder: same segments, same number of fields, same separators in each
+        out = text
+        for f in sorted(kept, key=lambda f: -f["start"]):
+            out = out[:f["start"]] + "[X]" + out[f["end"]:]
+        was, now = text.split(sep), out.split(sep)
+        shape = len(was) == len(now) and all(a.count("|") == b.count("|") and a.count("~") == b.count("~")
+                                             and (len(a.split("|")[0]) == 3) == (len(b.split("|")[0]) == 3)
+                                             and (a.split("|")[0] == b.split("|")[0]) for a, b in zip(was, now))
+        if segments[0].startswith("MSH"):
+            shape = shape and all(a.count("^") >= b.count("^") for a, b in zip(was, now)) and all(
+                a.count("^") == b.count("^") for a, b in zip(was, now) if not a.startswith("NTE"))
+        if missed or eaten or not shape:
+            failed += 1
+            print(f"FAIL  HL7 message {segments[2][:30]}...: missed={missed} wrongly_removed={eaten} shape_kept={shape}")
+    return failed
+
+
 def main() -> int:
     failed = 0
     for line, must_find, must_keep in CASES:
@@ -350,13 +650,16 @@ def main() -> int:
         if missed or eaten:
             failed += 1
             print(f"FAIL  {line}\n      missed={missed} wrongly_removed={eaten}")
-    table_failures = _run_tables()
+    table_failures = _run_tables() + _run_mixed_column()
     print(f"{len(TABLES)} column tables checked, {table_failures} problems")
     cell_failures = _run_cells()
     print(f"{len(CELLS)} single cells checked, {cell_failures} problems")
     table_failures += cell_failures
     doc_failures = _run_docs() + _run_filenames()
     print(f"{len(DOCS)} JSON documents and {len(FILENAMES)} file names checked, {doc_failures} problems")
+    hl7_failures = _run_hl7()
+    print(f"{len(HL7_MESSAGES)} HL7 v2 messages checked, {hl7_failures} problems")
+    doc_failures += hl7_failures
     print(f"{len(CASES) - failed}/{len(CASES)} cases passed")  # keep last: tools read the last line
     return 1 if failed or table_failures or doc_failures else 0
 

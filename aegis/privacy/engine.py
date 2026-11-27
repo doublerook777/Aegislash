@@ -118,9 +118,17 @@ def _compute_profile_tiers(
                 if dname:
                     prof["district"] = dname
 
-    # Only trigger k-anonymity / rare-cell suppression when dataset is large enough
-    # so small unit tests or micro-batches aren't over-suppressed.
-    enforce_k = len(profiles) >= max(10, min_k * 2)
+    # A small release (fewer than max(10, 2 * min_k) profiles) cannot hold two cells of min_k people, so the
+    # tiers below run as usual (they used to be switched off here, which left every patient in a small release
+    # unique on age band + gender + district). On top of that, a district shared by fewer than min_k profiles is
+    # suppressed in a small release, together with the village (which would otherwise be generalised to it).
+    # Larger releases keep district as before: suppressing it there costs generalisation utility on standard data.
+    small_release = len(profiles) < max(10, min_k * 2)
+    district_counts: Counter[str] = Counter(p["district"] for p in profiles.values() if p["district"])
+    for prof in profiles.values():
+        prof["hide_district"] = bool(
+            small_release and prof["district"] and district_counts[prof["district"]] < min_k
+        )
 
     cond_counts: Counter[str] = Counter()
     cell_counts: Counter[tuple[str, str, str]] = Counter()
@@ -146,9 +154,7 @@ def _compute_profile_tiers(
         has_rare_cond = any(cond_counts[c] <= rare_thresh for c in prof["conditions"])
         is_elderly = age is not None and age >= elderly
 
-        if not enforce_k:
-            tiers[pid] = "normal"
-        elif has_rare_cond and (k_norm < min_k or k_wide < min_k or is_elderly):
+        if has_rare_cond and (k_norm < min_k or k_wide < min_k or is_elderly):
             tiers[pid] = "suppress_qi"
         elif k_norm < min_k or is_elderly:
             tiers[pid] = "widen"
@@ -199,12 +205,13 @@ def _apply_replace(
         text_out, status = generalize_pin(finding["text"], suppress=(tier != "normal"))
         return {"text": text_out, "status": status}  # type: ignore[return-value]
 
+    hide_district = rec_info.get("hide_district", False)
     if t == "VILLAGE":
-        text_out, status = generalize_village(rec_info["district"], suppress=(tier != "normal"))
+        text_out, status = generalize_village(rec_info["district"], suppress=(tier != "normal" or hide_district))
         return {"text": text_out, "status": status}  # type: ignore[return-value]
 
     if t in _KEEP_BY_DEFAULT:
-        if t == "DISTRICT" and tier == "suppress_qi":
+        if t == "DISTRICT" and (tier == "suppress_qi" or hide_district):
             return {"text": "[DISTRICT]", "status": "suppressed"}
         return {"text": None, "status": "sanitized"}
 
@@ -248,6 +255,7 @@ def plan(results: list[RecordResult], keys: dict[str, str | None]) -> dict[str, 
             "tier": tiers.get(pid, "normal"),
             "shift_days": shift_cache[shift_key],
             "district": district,
+            "hide_district": bool(prof and prof.get("hide_district")),
         }
         records_map[rid] = rec_info
 

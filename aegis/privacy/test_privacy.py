@@ -6,6 +6,7 @@ import os
 import unittest
 
 from aegis.privacy import plan, replace, stats
+from aegis.privacy.dates import shift_date_text
 from aegis.types import empty_evidence
 
 
@@ -82,7 +83,11 @@ class PrivacyTests(unittest.TestCase):
     def test_ages_pins_villages_and_direct_identifiers(self) -> None:
         r1 = _rec("r1#row:0", district="rae bareli")
         r2 = _rec("r2#doc")
-        p = plan([r1, r2], {"r1#row:0": "k:1", "r2#doc": None})
+        # nine more patients in r1's cell, so the release is not "small" and r1 stays in the normal tier:
+        # this test is about the replacement formats, not about k-anonymity
+        fillers = [_rec(f"fill#row:{i}", district="rae bareli") for i in range(9)]
+        p = plan([r1, r2] + fillers,
+                 {"r1#row:0": "k:1", "r2#doc": None, **{f"fill#row:{i}": f"k:fill{i}" for i in range(9)}})
 
         self.assertEqual(replace(p, "r1#row:0", {"path": "c", "start": 0, "end": 2, "type": "AGE", "text": "48", "norm": "48", "role": "patient"}), {"text": "45-49", "status": "generalized"})
         self.assertEqual(replace(p, "r1#row:0", {"path": "c", "start": 0, "end": 4, "type": "AGE", "text": "48/M", "norm": "48", "role": "patient"}), {"text": "45-49/M", "status": "generalized"})
@@ -138,6 +143,50 @@ class PrivacyTests(unittest.TestCase):
         self.assertEqual(st["records_generalized"], 10)
         self.assertEqual(st["records_suppressed"], 1)
 
+    def test_small_release_is_generalised_and_hides_rare_districts(self) -> None:
+        # 6 patients (below max(10, 2 * min_group_size)): 4 in one district, 1 each in two others, one shared condition
+        districts = ["sitapur", "sitapur", "sitapur", "sitapur", "hardoi", "gonda"]
+        ages = [42, 44, 47, 61, 33, 70]
+        results, keys = [], {}
+        for i, (d, a) in enumerate(zip(districts, ages)):
+            rid = f"small.csv#row:{i}"
+            fs = [
+                {"path": "col:0", "start": 0, "end": 2, "type": "AGE", "text": str(a), "norm": str(a), "role": "patient"},
+                {"path": "col:1", "start": 0, "end": 6, "type": "PIN", "text": "261001", "norm": "261001", "role": "patient"},
+                {"path": "col:2", "start": 0, "end": 7, "type": "VILLAGE", "text": "Bhitauli", "norm": "bhitauli", "role": "patient"},
+                {"path": "col:3", "start": 0, "end": len(d), "type": "DISTRICT", "text": d.title(), "norm": d, "role": "patient"},
+                {"path": "col:4", "start": 0, "end": 9, "type": "CONDITION", "text": "Kala-azar", "norm": "kala-azar", "role": None},
+            ]
+            results.append(_rec(rid, fs, age=a, gender="F", district=d))
+            keys[rid] = f"k:small{i}"
+        p = plan(results, keys)
+
+        def rep(i: int, j: int) -> dict:
+            return replace(p, f"small.csv#row:{i}", results[i]["findings"][j])
+
+        for i in range(6):
+            # every cell is smaller than min_group_size: wider age band, no PIN prefix, no village
+            band = rep(i, 0)["text"]
+            lo, _, hi = band.partition("-")
+            self.assertTrue(band.endswith("+") or int(hi) - int(lo) + 1 >= 10, band)
+            self.assertEqual(rep(i, 1), {"text": "[PIN]", "status": "suppressed"})
+            self.assertEqual(rep(i, 2), {"text": "[VILLAGE]", "status": "suppressed"})
+            # the shared condition is not rare and survives
+            self.assertEqual(rep(i, 4), {"text": None, "status": "sanitized"})
+        self.assertEqual(rep(0, 0)["text"], "40-49")
+        # Sitapur has 4 profiles (< 5): hidden; Hardoi and Gonda (1 each): hidden
+        for i in range(6):
+            self.assertEqual(rep(i, 3), {"text": "[DISTRICT]", "status": "suppressed"})
+
+        # the same 6 patients plus 4 more in Sitapur: no longer small, district kept (unchanged behaviour)
+        for i in range(6, 10):
+            rid = f"small.csv#row:{i}"
+            results.append(_rec(rid, [dict(results[0]["findings"][3])], age=45, gender="F", district="sitapur"))
+            keys[rid] = f"k:small{i}"
+        p = plan(results, keys)
+        self.assertEqual(replace(p, "small.csv#row:0", results[0]["findings"][3]), {"text": None, "status": "sanitized"})
+        self.assertEqual(replace(p, "small.csv#row:4", results[4]["findings"][3]), {"text": None, "status": "sanitized"})
+
     def test_risk_report_on_synthetic_release(self) -> None:
         import json
         import tempfile
@@ -184,6 +233,31 @@ class PrivacyTests(unittest.TestCase):
             # "Fever" matches 4 "Viral fever" profiles -> not rare; only "Rare Addison" (1 profile) hits
             self.assertEqual(rep["simulated_known_facts_attack"]["rare_cond_with_narrow_qi_hits"], 1)
             self.assertEqual(rep["simulated_known_facts_attack"]["exact_date_overlap_hits"], 1)
+
+    def test_risk_report_missing_attacker_file_is_an_error(self) -> None:
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+        from scripts.risk_report import analyze_release
+
+        root = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td)
+            (out / "sanitized").mkdir()
+            (out / "records.jsonl").write_text("", encoding="utf-8")
+            missing = out / "no_such_registry.csv"
+            with self.assertRaises(FileNotFoundError):
+                analyze_release(out, registry_path=missing)
+            with self.assertRaises(FileNotFoundError):
+                analyze_release(out, known_facts_path=out / "no_such_facts.jsonl")
+            run = subprocess.run(
+                [sys.executable, str(root / "scripts" / "risk_report.py"), "--output", str(out), "--registry", str(missing)],
+                capture_output=True, text=True, cwd=root,
+            )
+            self.assertEqual(run.returncode, 2)
+            self.assertIn("--registry file not found", run.stderr)
+            self.assertNotIn("Simulated registry attack", run.stdout)
 
     def test_risk_report_handles_deep_json(self) -> None:
         import json
@@ -236,6 +310,15 @@ class PrivacyTests(unittest.TestCase):
         st = stats(p)
         self.assertEqual(st["records_generalized"], 8)
         self.assertEqual(st["records_suppressed"], 0)
+
+
+class CompactDateTests(unittest.TestCase):
+    def test_hl7_compact_dates_keep_their_shape(self) -> None:
+        self.assertEqual(shift_date_text("19881104", None, 10), "19881114")
+        self.assertEqual(shift_date_text("202507021415", None, -2), "202506301415")
+        self.assertEqual(shift_date_text("20250702141500", "2025-07-02", 1), "20250703141500")
+        self.assertIsNone(shift_date_text("19881304", None, 1))
+        self.assertIsNone(shift_date_text("12345678", None, 1))
 
 
 if __name__ == "__main__":

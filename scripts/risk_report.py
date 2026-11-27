@@ -380,7 +380,14 @@ def analyze_release(
     registry_path: Path | None = None,
     known_facts_path: Path | None = None,
 ) -> dict[str, Any]:
-    """Compute k-anonymity and optional registry / known-facts attack metrics."""
+    """Compute k-anonymity and optional registry / known-facts attack metrics.
+
+    A registry or known-facts path that is given but is not a file raises FileNotFoundError: a mistyped path
+    must not silently drop the attack sections from the report.
+    """
+    for label, path in (("registry", registry_path), ("known-facts", known_facts_path)):
+        if path is not None and not path.is_file():
+            raise FileNotFoundError(f"--{label} file not found: {path}")
     profiles, unlinked = _load_release_profiles(out_dir)
     psn_profiles = {k: v for k, v in profiles.items() if k.startswith("PSN-")}
     eval_profiles = psn_profiles if psn_profiles else profiles
@@ -403,9 +410,9 @@ def analyze_release(
         "k_anon_age_gender_district": _k_stats(cell_3),
         "k_anon_age_district_week_dx": _k_stats(cell_4),
     }
-    if registry_path and registry_path.is_file():
+    if registry_path is not None:
         report["simulated_registry_attack"] = _simulate_registry_attack(eval_profiles, registry_path)
-    if known_facts_path and known_facts_path.is_file():
+    if known_facts_path is not None:
         report["simulated_known_facts_attack"] = _simulate_known_facts_attack(eval_profiles, known_facts_path)
     return report
 
@@ -421,7 +428,11 @@ def main() -> int:
     out_dir = Path(args.output)
     reg_path = Path(args.registry) if args.registry else None
     kf_path = Path(args.known_facts) if args.known_facts else None
-    rep = analyze_release(out_dir, reg_path, kf_path)
+    try:
+        rep = analyze_release(out_dir, reg_path, kf_path)
+    except FileNotFoundError as exc:
+        print(f"risk_report: {exc}", file=sys.stderr)
+        return 2
 
     if args.json:
         print(json.dumps(rep, indent=2, sort_keys=True))

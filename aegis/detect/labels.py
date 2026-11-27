@@ -11,7 +11,11 @@ _CAMEL = re.compile(r"(?<=[a-z])(?=[A-Z])")
 _SPLIT = re.compile(r"[^a-z0-9ऀ-ॿ]+")
 
 
+_DOTTED = re.compile(r"(?<![A-Za-z])(?:[A-Za-z]\.){2,}(?:[A-Za-z](?![A-Za-z]))?")
+
+
 def tokens(label: str) -> list[str]:
+    label = _DOTTED.sub(lambda m: m.group(0).replace(".", ""), label or "")     # "P.I.N." -> "PIN"
     return [t for t in _SPLIT.split(_CAMEL.sub(" ", label or "").casefold()) if t]
 
 
@@ -43,11 +47,40 @@ _KEEP = _words("diagnosis dx drug drugs medicine medication test tests result re
                "coding schema profile निदान विभाग दवा")
 _NOT_PERSON = _words("hospital facility lab test tests drug medicine panel panels coding file organization org "
                      "department ward package scheme insurer company payer_org user username device software")
+_STUDENT = _words("student विद्यार्थी छात्र छात्रा")
+_AREA = _words("landmark landmarks lndmrk nearby nbhd neighbourhood neighborhood dwelling")
+
+
+def extra_checks(label: str) -> str | None:
+    """"place", "phone" or "student": a header that adds a check to an otherwise unknown column, without switching any off."""
+    s = set(tokens(label))
+    if s & _AREA and not s & (_KEEP | _NOT_PERSON | _SUBJECT | _RELATIVE | _DOCTOR):
+        return "place"
+    if "fon" in s and not s & _DOCTOR:     # Hinglish spelling of "phone"
+        return "phone"
+    if s and s <= _STUDENT:           # "Student", but not "student_vision"
+        return "student"
+    return None
 _PLACE_IN_HOSPITAL = _words("ward bed")
+# headers of columns that hold a category, trade or place, never a person: the values of an otherwise unknown
+# column are not read as a column of names under one of these
+_CATEGORY = _words("occupation job profession employer religion caste community language scheme category class source "
+                   "mode reason outcome institution school branch speciality specialty cadre designation role title "
+                   "nationality ethnicity education qualification relation relationship place location city town "
+                   "region origin destination remark remarks medication medicine drug drugs diagnosis disease symptom "
+                   "symptoms complaint treatment procedure advice investigation")
+
+
+def category_column(label: str) -> bool:
+    return bool(set(tokens(label)) & (_CATEGORY | _KEEP | _NOT_PERSON | _DOCTOR | _AREA))
 _CONTACT = _words("contact contacts caller")
 _NOT_MRN = _words("visit bill invoice sample claim policy ticket trip report order txn receipt encounter")
 _FREE = _words("notes note remarks remark comment comments complaints complaint history narrative advice summary")
 _DATE = _words("date dated datetime tarikh तारीख दिनांक collected reported registered admitted discharged at on")
+
+
+def names_a_relative(label: str) -> bool:
+    return bool(set(tokens(label)) & (_RELATIVE | {"परिजन"}))
 
 
 def _owner(parents: tuple[str, ...]) -> str | None:
@@ -83,11 +116,12 @@ def classify(label: str, parents: tuple[str, ...] = ()) -> str | None:
     joined = "".join(t)
     up = {w for p in parents for w in tokens(p)}
 
+    # a notes column stays a notes column whoever writes it ("nurse_note"): relatives are named in it
+    if s & _FREE and not s & _ADDRESS:
+        return "free"
     # "ref" alone is only "reference" (patient_ref, mrn_ref, ref_range); "ref_by" names the referring doctor
     if (s & _DOCTOR or {"ref", "by"} <= s) and not s_all & _PHONE:
         return "doctor"
-    if s & _FREE and not s & _ADDRESS:
-        return "free"
     if s & {"email", "mail", "ईमेल"} or joined.endswith("email"):
         return "email"
     if "abha" in joined or "healthid" in joined or "आभा" in s:

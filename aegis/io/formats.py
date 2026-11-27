@@ -46,6 +46,7 @@ class ParsedFile:
     doc_record_id: str | None = None                   # set when the file is a single document
     b64_ptrs: dict = dc_field(default_factory=dict)    # leaf pointer -> _B64Form (re-encoded the same way on write)
     jsonl: bool = False                                # one JSON object per line (written back the same way)
+    runs: dict = dc_field(default_factory=dict)        # (record_id, path) -> _Parent: base64 runs inside a longer value
 
 
 _B64_RX = re.compile(r"[A-Za-z0-9+/]{24,}={0,2}")
@@ -74,9 +75,18 @@ def _readable(raw: bytes) -> str | None:
     return text if text and printable >= 0.95 * len(text) else None
 
 
-def _b64_decode(v: str) -> tuple[str, _B64Form] | None:
+def _texty(text: str) -> bool:
+    """Text a person could have written: letters, digits, spaces and usual punctuation, not noise that happens to be
+    valid UTF-8."""
+    if len(text) < 8 or "�" in text or sum(c.isalpha() for c in text) < 4:
+        return False
+    return sum(c.isalnum() or c in " \n\r\t.,;:=-_/@()'\"[]{}&|+#%?!*" for c in text) >= 0.85 * len(text)
+
+
+def _b64_decode(v: str, loose: bool = False) -> tuple[str, _B64Form] | None:
     """Readable text and layout when the whole string is base64 of UTF-8: one line, wrapped over several lines
-    (MIME style) and/or behind a "data:...;base64," prefix. None for anything else."""
+    (MIME style) and/or behind a "data:...;base64," prefix. None for anything else. `loose` (a run found inside a
+    longer value): 16 characters are enough, the padding may be missing, and the text must look like writing."""
     stripped = v.strip()
     lead, tail = v[:len(v) - len(v.lstrip())], v[len(v.rstrip()):]
     m = _DATA_URI.match(stripped)
@@ -97,15 +107,17 @@ def _b64_decode(v: str) -> tuple[str, _B64Form] | None:
     else:
         width = 0
     padded = len(flat) % 4 == 0
-    if not prefix and (len(flat) < 24 or not padded):
+    if not prefix and not loose and (len(flat) < 24 or not padded):
         return None                 # without a prefix, only a properly padded, long value counts
+    if loose and not prefix and (len(flat.rstrip("=")) < 16 or not re.search(r"[A-Za-z]", flat)):
+        return None
     if len(flat) % 4 == 1 or (prefix and len(flat) < 8):
         return None
     try:
         text = _readable(base64.b64decode(flat + "=" * (-len(flat) % 4), validate=True))
     except (binascii.Error, ValueError):
         return None
-    if text is None:
+    if text is None or (loose and not _texty(text)):
         return None
     return text, _B64Form(lead, prefix, width, newline, padded, tail)
 
@@ -117,6 +129,36 @@ def _b64_encode(text: str, form: _B64Form) -> str:
     if form.width:
         out = form.newline.join(out[i:i + form.width] for i in range(0, len(out), form.width))
     return form.lead + form.prefix + out + form.tail
+
+
+_RUN_RX = re.compile(
+    r"data:[^,;\s]*(?:;[^,;\s]*)*;base64,[A-Za-z0-9+/]+={0,2}"
+    r"|(?<![A-Za-z0-9+/_-])(?:[A-Za-z0-9+/]{16,}\r?\n)+[A-Za-z0-9+/]+={0,2}(?![A-Za-z0-9+/_-])"
+    r"|(?<![A-Za-z0-9+/_-])[A-Za-z0-9+/]{16,}={0,2}(?![A-Za-z0-9+/_-])", re.I)
+
+
+_QUICK = re.compile(r"[A-Za-z0-9+/]{16}|;base64,")
+
+
+def find_runs(text: str) -> list[tuple[int, int, str, _B64Form]]:
+    """Base64 runs of readable UTF-8 text inside a longer value (a CSV cell, a line of a note, a data URI in a
+    sentence): (start, end, decoded text, layout). Ordinary tokens, hashes, IDs and drug names decode to noise and
+    are not runs."""
+    out: list[tuple[int, int, str, _B64Form]] = []
+    if len(text) < 16 or not _QUICK.search(text):
+        return out
+    for m in _RUN_RX.finditer(text):
+        hit = _b64_decode(m.group(0), loose=True)
+        if hit is not None:
+            out.append((m.start(), m.end(), hit[0], hit[1]))
+        elif "/" in m.group(0) and not m.group(0).lower().startswith("data:"):   # a URL path or a/b/c word: each part
+            pos = m.start()
+            for part in m.group(0).split("/"):
+                sub = _b64_decode(part, loose=True) if len(part) >= 16 else None
+                if sub is not None:
+                    out.append((pos, pos + len(part), sub[0], sub[1]))
+                pos += len(part) + 1
+    return out
 
 
 def _b64_filename(name: str) -> str | None:
@@ -139,6 +181,70 @@ def _b64_filename(name: str) -> str | None:
     return text + (dot + ext if ext else "")
 
 
+@dataclass
+class _Parent:
+    """A field that holds base64 runs. Detect sees `marked` (each run replaced by one private-use character) and the
+    text of every run as a field of its own (path "<path>#b64:<n>"); `write` puts the runs back, re-encoded the same
+    way when their text changed."""
+    original: str
+    marked: str
+    runs: list[tuple[str, str, _B64Form, str]]      # (mark, original run, layout, decoded text), in order
+    kids: list[str]
+
+
+_MARK0 = 0xE000
+
+
+def _expand_runs(pf: ParsedFile) -> None:
+    for rec in pf.records:
+        out: list[Field] = []
+        for fld in rec["fields"]:
+            out.append(fld)
+            v = fld["value"]
+            if fld["kind"] not in ("value", "text") or fld["path"] in pf.b64_ptrs or len(v) < 16:
+                continue
+            runs = find_runs(v)
+            if not runs or any(_MARK0 <= ord(c) < _MARK0 + 256 for c in v):
+                continue
+            pieces: list[str] = []
+            info: list[tuple[str, str, _B64Form, str]] = []
+            kids: list[Field] = []
+            pos = 0
+            for a, b, dec, form in runs[:255]:
+                if a < pos:
+                    continue
+                mark = chr(_MARK0 + len(info))
+                pieces += [v[pos:a], mark]
+                pos = b
+                info.append((mark, v[a:b], form, dec))
+                kids.append({"path": f"{fld['path']}#b64:{len(kids)}", "kind": fld["kind"],
+                             "context": fld["context"], "value": dec})
+            pieces.append(v[pos:])
+            marked = "".join(pieces)
+            pf.runs[(rec["record_id"], fld["path"])] = _Parent(v, marked, info, [k["path"] for k in kids])
+            fld["value"] = marked
+            out.extend(kids)
+        rec["fields"] = out
+
+
+def _restore_runs(pf: ParsedFile, new: dict[tuple[str, str], str]) -> dict[tuple[str, str], str]:
+    """`new` with every run put back in its field: the sanitized text re-encoded the way it was written when it
+    changed, the original run otherwise. A run whose mark was replaced or removed is gone."""
+    if not pf.runs:
+        return new
+    merged = dict(new)
+    for (rid, path), par in pf.runs.items():
+        value = merged.get((rid, path), par.marked)
+        for (mark, orig, form, dec), kid in zip(par.runs, par.kids):
+            fresh = merged.pop((rid, kid), None)
+            value = value.replace(mark, orig if fresh is None or fresh == dec else _b64_encode(fresh, form))
+        if value == par.original:
+            merged.pop((rid, path), None)
+        else:
+            merged[(rid, path)] = value
+    return merged
+
+
 def _rid(rel: str, loc: str) -> str:
     return f"{rel}#{loc}"
 
@@ -151,6 +257,12 @@ def _file_record(rel: str, fmt: str) -> Record:
 
 
 def parse(rel: str, text: str) -> ParsedFile:
+    pf = _parse(rel, text)
+    _expand_runs(pf)
+    return pf
+
+
+def _parse(rel: str, text: str) -> ParsedFile:
     ext = PurePosixPath(rel).suffix.lower()
     stripped = text.lstrip()
     if ext == ".json" or (ext in (".csv", ".tsv", ".txt") and stripped[:1] in "{[" and _looks_json(stripped)):
@@ -418,6 +530,7 @@ def _document_order(data: Any) -> list[str]:
 # ---------------------------------------------------------------------------- write
 def write(pf: ParsedFile, new: dict[tuple[str, str], str]) -> str:
     """Rebuild the file. `new` maps (record_id, path) -> replacement text for changed fields only."""
+    new = _restore_runs(pf, new)
     if pf.fmt == "text":
         return new.get((pf.doc_record_id, "text"), pf.text)
     if pf.fmt in ("csv", "tsv"):
