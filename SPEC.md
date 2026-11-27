@@ -98,6 +98,7 @@ detect notes (2026-11-26):
 
 link notes (2026-11-26):
 - Done: cross-script Hindi-aware Devanagari/IAST/Latin normalizer (`aegis/link/normalize.py`), two-phase blocker/clustering linker (`aegis/link/resolver.py`) with strong IDs, Name+DOB, Name+Relative, Name+Village+Age±1, uniqueness gating, anti-over-merge invariants, multi-patient bridge guard (`patient_index.json`), and cross-hospital digits-only MRN matching when names match; wired into `aegis/link/__init__.py`. Live `check_dev.py`: precision 1.00, recall 0.91 (Windows CRLF filename-hash mismatch on renamed txt/json), F0.5 0.98, 0 false merges.
+- 2026-11-27 (#36, #37): allow primary + alternate phone on one patient (`multi_patient` triggers on conflicting full names / gov IDs / >=3 unlabelled IDs); derive canonical patient keys from content clues rather than input file paths (`PSN-` stays 6 chars per contract).
 - Next: ready for final submission checks (`check_submission.py`).
 
 PR #25 notes (2026-11-27, judge run):
