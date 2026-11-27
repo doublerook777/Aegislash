@@ -510,6 +510,24 @@ DOCS = [
     ({"patients": [{"identifier": [{"system": "hospital-no", "value": "60918"}], "visit": {"identifier": [{"value": "7712093"}]}}],
       "organization": {"identifier": [{"value": "9034112"}]}},
      ["60918"], ["7712093", "9034112"]),
+    # plain JSON (no resourceType): the "display" / "text" / "full" of a key that names only a person is that person's
+    # name, and its parts are then removed from the notes
+    ({"subject": {"display": "Devika Pharswan"}, "notes": "Devika reviewed, Pharswan family informed. Pulse 76, Hb 10.9."},
+     ["Devika Pharswan", "Devika", "Pharswan"], ["Pulse 76", "Hb 10.9", "reviewed"]),
+    ({"beneficiary": [{"display": "Smt. T. K. Jhinkwan (46 F)"}], "guardian": {"text": "Omwati Bisht"},
+      "patientDetails": {"full": "Negi, Harshul"}}, ["T. K. Jhinkwan", "Omwati Bisht", "Negi, Harshul"], ["46 F"]),
+    ({"patient": {"text": "फूलमती रावत"}, "insured": {"text": "Shri Bhuwan Kholiya"},
+      "notes": "Bhuwan counselled. K/C/O DM2."}, ["फूलमती रावत", "Bhuwan Kholiya", "Bhuwan"], ["K/C/O DM2", "counselled"]),
+    # the same keys holding anything but a name, and keys that are not only a person, keep their text
+    ({"subject": {"text": "Medication Review"}, "message": {"subject": {"display": "Discharge Summary"}},
+      "patient": {"text": "Under Observation", "display": "Type 2 Diabetes"}, "member": {"display": "Gold Plan 2"},
+      "client": {"display": "City Diagnostics"}, "person": {"text": "Plan Iron Sucrose 100 mg"},
+      "subjectCategory": {"display": "Senior Citizen"}, "patientCondition": {"text": "Chronic Gastritis"},
+      "patient_education": {"display": "Foot Exercises"}, "product": {"display": "Oral Rehydration Salts"},
+      "code": {"text": "Peripheral Smear"}, "pt": {"text": "Lives Alone"}, "client_ref": {"text": "High Risk"}},
+     [], ["Medication Review", "Discharge Summary", "Under Observation", "Type 2 Diabetes", "Gold Plan",
+          "City Diagnostics", "Iron Sucrose", "Senior Citizen", "Chronic Gastritis", "Foot Exercises",
+          "Rehydration", "Peripheral Smear", "Lives Alone", "High Risk"]),
 ]
 
 

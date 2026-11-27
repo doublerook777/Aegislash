@@ -16,7 +16,7 @@ import binascii
 import re
 
 from aegis.detect import address, dates, evidence, fields, gazetteer, hl7, ids, names
-from aegis.detect.labels import _owner, category_column, classify, extra_checks, names_a_relative, tokens
+from aegis.detect.labels import _owner, category_column, classify, extra_checks, names_a_relative, person_holder, tokens
 from aegis.detect.normalize import DEVA, decode_view, digits, fold, norm_name, visible
 from aegis.detect.spans import PRIORITY, PROPAGATED, Cand, resolve
 from aegis.types import DIRECT_TYPES, QUASI_TYPES, STRONG_ID_TYPES, Record, RecordResult, empty_evidence
@@ -119,6 +119,39 @@ def _fhir_role(path: str, role: str | None, types: dict[str, str], by_path: dict
     return role
 
 
+# {"subject": {"display": X}}: leaves that hold a person's name when the key just above them names only a person
+_NAME_LEAVES = ("display", "text", "full")
+_BRACKET_TAIL = re.compile(r" *\([^()\n]*\)\s*$")
+
+
+def _person_leaf_role(path: str, value: str) -> str | None:
+    """The role of a name written as the "display" / "text" of a person, in JSON of any kind. The value must read as a
+    whole name: "subject": {"text": "Discharge Summary"} and "patient": {"text": "stable since morning"} stay text."""
+    label, parents = _json_label(path)
+    if label.casefold() not in _NAME_LEAVES or not parents:
+        return None
+    role = person_holder(parents[-1])
+    if not role or (label.casefold() == "text" and "subject" in tokens(parents[-1])):   # a subject line is a topic
+        return None
+    text = _BRACKET_TAIL.sub("", fold(value))
+    found = fields.name_value(text, 0, len(text), role)
+    # the name must be the whole value (titles aside): anything longer is read as ordinary text
+    if len(found) != 1 or text[found[0].end:].strip(" .,;|\"'"):
+        return None
+    title = fields._TITLES.match(text)
+    if text[title.end() if title else 0:found[0].start].strip(" \"'"):
+        return None
+    name = text[found[0].start:found[0].end]
+    if not gazetteer.reads_as_full_name(name, names.STOP | names.ORG):
+        return None
+    # "text" also holds narrative ("Under Observation"), so the shape is not enough there: it needs a title, an
+    # initial, "Surname, Given" or a listed surname
+    if label.casefold() == "text" and not (title or "," in name or re.search(r"(?<!\w)[A-Z]\.", name)
+                                           or gazetteer.has_surname(name)):
+        return None
+    return role
+
+
 _PAIR_VALUE = re.compile(r"^(?:value[A-Za-z]*|answer|val|data_value)$")
 _PAIR_LABEL = ("url", "field", "label", "key", "name", "attribute", "question")
 
@@ -191,6 +224,10 @@ def field_roles(records: list[Record]) -> dict[tuple[str, str], str | None]:
                 guess, has_name = ("relative_name" if has_name else "patient_name"), True
             for k in keys:
                 roles[k] = guess
+    # after the column guesses: this role depends on the value, so it is decided one value at a time
+    for key, role in roles.items():
+        if role in (None, "keep") and not key[1].startswith("col:"):
+            roles[key] = _person_leaf_role(key[1], values[key]) or role
     return roles
 
 

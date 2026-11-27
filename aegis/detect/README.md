@@ -300,3 +300,21 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   (`Anita ke paas` is a person, not a place). `Mama <Capitalised noun>` (`Mama Earth`) still reads the noun as a name; `landmark Gate No 4`
   keeps "No 4"; the `ne` cue knows about 30 verbs and nouns, so `<name> ne <other verb>` is not a cue; lowercase names are not found by
   the new cues.
+
+## Plain JSON `subject.display` (issue #29)
+- **Cause.** `display` is a "keep" label (it usually holds the name of a code), and only the FHIR rule gave
+  `subject.display` a role. In JSON with no `resourceType` the full name stayed, and with no name found, nothing was
+  propagated into the notes. `patient.text` and `patient.full` had the same gap.
+- **Change.** `engine._person_leaf_role`: a `display` / `text` / `full` value is a name when the key just above it names
+  a person and nothing else (`labels.person_holder`: `subject`, `patientDetails`, `guardian_info`; not `patient_tests`,
+  `subjectCategory`, `patient_education`) **and** the whole value, titles and a trailing bracket aside, reads as a full
+  name (`gazetteer.reads_as_full_name`: 2-5 name-shaped words, none of them a report, medical, place or hospital word).
+  `text` also holds narrative, so it needs one more sign (a title, an initial, "Surname, Given" or a listed surname),
+  and `subject.text` is never read (a subject line is a topic). Relative keys give `RELATIVE_NAME`. It also covers FHIR
+  `patient.display`, which the FHIR rule did not.
+- **Checks.** Three selftest documents with new names (two fail before; the third is non-names that must survive).
+  `dev/` and every committed set: output byte-identical to main.
+- **Left.** A one-word `display`; `text` with an unlisted surname and no title (found only by the other rules); a
+  two-word status in title case under `patient.display` / `.full` that has no listed word ("Under Observation") would
+  be read as a name; flat CSV headers like `subject.display` are not changed. Seen, not fixed: `fields._TITLES` ends
+  Devanagari titles with `\b`, which fails after a vowel sign ("श्रीमती" is cut after "श्री").
