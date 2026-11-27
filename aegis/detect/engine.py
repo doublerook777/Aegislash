@@ -857,6 +857,41 @@ def detect_file(records: list[Record]) -> list[RecordResult]:
     return results
 
 
+# a place name as a tehsil / block cell holds it: one to three capitalised or Devanagari words
+_PLACE_CELL = re.compile(r"(?:[A-Z][A-Za-z'-]*|[ऀ-ॣॱ-ॿ]+)(?: (?:[A-Z][A-Za-z'-]*|[ऀ-ॣॱ-ॿ]+)){0,2}")
+# "block" is also a nerve block, a heart block and a part of a building
+_NOT_A_BLOCK = frozenset("nerve heart bundle branch complete partial degree wing building tower ward opd ipd icu ot room "
+                         "bed floor office lab main new old".split())
+
+
+def _group(path: str) -> str:
+    """Fields that describe one place: the cells of a row, or the keys of one JSON object."""
+    return "col" if path.startswith("col:") else path.rsplit("/", 1)[0]
+
+
+def _tehsils(records: list[Record], roles: dict) -> dict[tuple[str, str], Cand]:
+    """The tehsil / taluk / block cells and keys that name an area. "Block" counts only beside a district or village."""
+    placed = {(rid, _group(path)) for (rid, path), role in roles.items() if role in ("district", "village")}
+    out = {}
+    for r in records:
+        for f in r["fields"]:
+            key = (r["record_id"], f["path"])
+            if f["kind"] != "value" or roles.get(key) != "tehsil":
+                continue
+            words = set(tokens(f["context"] or "" if f["path"].startswith("col:") else _json_label(f["path"])[0]))
+            if not words & {"tehsil", "taluk", "taluka", "tahsil", "तहसील"} and (r["record_id"], _group(f["path"])) not in placed:
+                continue
+            text = fold(f["value"])
+            value = text.strip()
+            parts = set(value.casefold().split())
+            if (len(value) < 3 or not _PLACE_CELL.fullmatch(value)
+                    or parts & (names.MEDICAL | _NOT_A_BLOCK | {"na", "nil", "none", "not", "unknown"})):
+                continue
+            start = text.index(value)
+            out[key] = Cand(start, start + len(value), "TEHSIL", norm_name(value) or None, None)
+    return out
+
+
 def _detect(records: list[Record]) -> list[RecordResult]:
     if not records:
         return []
@@ -873,6 +908,8 @@ def _detect(records: list[Record]) -> list[RecordResult]:
             key = (r["record_id"], f["path"])
             per_field[key] = (fold(f["value"]), candidates(f, roles.get(key), dmy, f["path"] in people))
     _propagate(records, per_field)
+    for key, cand in _tehsils(records, roles).items():   # after propagation: a tehsil is never copied elsewhere
+        per_field[key][1].append(cand)
 
     out: list[RecordResult] = []
     whole_text = "\n".join(texts)

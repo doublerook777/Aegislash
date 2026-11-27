@@ -373,3 +373,15 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 - **Checks.** One selftest FHIR document (fails before). `dev/` and the committed sets: output unchanged except
   `bundle_query_ref.json` in the first breaker set, whose corrupted reference is now intact.
 - **Left.** The io part (not passing `reference` / `fullUrl` / `id` to detect) is Member-1's.
+
+## Tehsil and block (issue #33)
+- **Cause.** `tehsil` / `block` had a role but no finding type, so they stayed raw even where privacy hid the district.
+- **Decision.** New info-only type `TEHSIL` (additive, noted in SPEC.md). `privacy` keeps it unless it hides that patient's
+  district, then writes `[TEHSIL]`. It is not reported as `VILLAGE` (privacy would replace every one) and is not evidence,
+  so linking is unchanged. This one change also edits `aegis/privacy/engine.py` (agreed with the issue: detect + privacy).
+- **Detect.** Only cells and JSON keys whose label means tehsil / taluk / block, holding 1-3 capitalised or Devanagari
+  words. "Block" also means a nerve or heart block or part of a building, so it counts only beside a district or village
+  field in the same row or object, and not with such words in the value.
+- **Checks.** selftest tables (4 problems before) and a privacy test (fails before). `dev/` scores unchanged; third
+  breaker set: leaks 2/80 -> 1/80.
+- **Left.** "Tehsil X" written inside an address line or free text; a record that has a tehsil but no district anywhere.

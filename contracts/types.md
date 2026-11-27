@@ -34,7 +34,7 @@ All shapes are plain JSON-serializable dicts (`TypedDict` in `aegis/types.py`). 
 TYPES
 - Direct identifiers (always replaced): `PATIENT_NAME`, `RELATIVE_NAME`, `PHONE`, `AADHAAR`, `AADHAAR_MASKED`, `ABHA_NUMBER`, `ABHA_ADDRESS`, `EMAIL`, `MRN` (UHID/IPD/registration numbers), `PAN`, `INSURANCE_ID`, `HOUSE`, `LOCALITY`, `LANDMARK`, `OTHER_ID` (an identifier-looking value of unknown kind, including canaries).
 - Quasi-identifiers (replacement decided by `privacy`): `DOB`, `DATE` (any clinical/event date or datetime), `AGE`, `VILLAGE`, `PIN`.
-- Info only (never replaced unless `privacy` decides): `CONDITION` (diagnosis text or ICD code; feeds rare-value handling), `DISTRICT`, `GENDER`.
+- Info only (never replaced unless `privacy` decides): `CONDITION` (diagnosis text or ICD code; feeds rare-value handling), `DISTRICT`, `GENDER`, `TEHSIL` (the value of a tehsil / taluk / block column or JSON key; `privacy` hides it only when it hides that patient's district).
 
 ## Evidence (made by `detect`, read by `link`)
 | Field | Type | Notes |
