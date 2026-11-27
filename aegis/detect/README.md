@@ -342,3 +342,24 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 - **Follow-up (speed).** `names.subject_line` split each piece into words by scanning the file from its start, so a file
   with many subject lines cost quadratic time (4,000 mails in one file: 62 s). It now searches the piece only (0.2 s).
   Output unchanged.
+
+## Checkpoint 2026-11-27: state and handoff
+- **Done and merged:** #29 (PR #40), #27 (PR #41, speed follow-up #42).
+- **Open detect issues:** #26, #28, #30, #31, #34 (label part only; top-coding is Member-4's). No code is written for them.
+- **Notes for #26** (probed on main with invented names). A file name is caught today only with `_` or a capitalised dash
+  pair **and** a listed surname. Lowercase dashes, CamelCase, dots, spaces, Devanagari with dashes and every unlisted
+  surname are missed. Splitting on separators alone was rejected before (it needs a listed surname). Proposed, not built or
+  measured: a run of 2-3 words is a name with both a listed given name and a listed surname; with only one of the two,
+  only if every other word in the stem is ordinary document or medical vocabulary. Do not add the names in the issue to
+  any list; write any given-name list without looking at test names. Measure on many ordinary file names first.
+- **Notes for #30.** `fields.surname_first` needs `Surname, Given` in title case, so `name_value` cuts an all-capitals
+  surname at the comma and the given name stays.
+- **Notes for #34.** `umr` is in both `labels._AGE` and `labels._MRN`.
+- **How to work** (`CONVENTIONS.md`): one issue per branch `detect/<topic>` from `origin/main`, tests with new invented
+  data in `selftest.py` that fail before the change. The selftest's last line counts free-text cases only: require exit 0
+  and "0 problems" in every section. Also run `scripts/check_contracts.py`, `-m pytest -q aegis`, and `main.py` +
+  `check_dev.py` on `dev/` and the `tests/` sets; committed outputs stay byte-identical except where the fix applies.
+  Open a non-draft PR; the PR watcher reviews and merges it.
+- **For link (Member-3), not a detect bug:** on locally generated cases outside the repo, linking F0.5 on three unseen
+  pools fell between main 515ac4f and 20c3530 (#39): 1.00 -> 0.938, 0.972 -> 0.893, 1.00 -> 0.972. Precision stayed
+  1.00; recall fell. The committed sets do not show it.
