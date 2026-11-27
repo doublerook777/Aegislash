@@ -395,21 +395,56 @@ def _b64_filename_cands(text: str, dmy: bool) -> list[Cand]:
 
 
 _STEM_TOK = re.compile(
-    r"(?=[A-Za-z0-9])[a-z]+\d+[a-z0-9]*|\d+[a-z][a-z0-9]*|[0-9a-f]{6,}(?![A-Za-z0-9])"
+    r"(?=[A-Za-z0-9])[A-Za-z]+\d+[A-Za-z][A-Za-z0-9]*|[a-z]+\d+[a-z0-9]*|\d+[a-z][a-z0-9]*|[0-9a-f]{6,}(?![A-Za-z0-9])"
     r"|[A-Z][a-z']+(?=[A-Z]|[^A-Za-z]|$)|[A-Z]+(?=[A-Z][a-z]|[^A-Za-z]|$)|[a-z']+"
     r"|[\u0900-\u0963\u0971-\u097f]+|\d+|[\u0966-\u096f]+"
 )
-_STEM_CODE = re.compile(r"^(?:\d|[\u0966-\u096f]|[a-z]+\d|[0-9a-f]{6,}$)")
+_STEM_CODE = re.compile(r"^(?:\d|[\u0966-\u096f]|[A-Za-z]+\d+[A-Za-z]|[a-z]+\d|[0-9a-f]{6,}$)")
 _STEM_PATIENT_DOC = frozenset(
     "ipd opd ds rx lab labs report reports discharge summary consent prescription note notes memo referral "
     "bill bills claim claims invoice receipt record records file case sheet card history followup follow "
-    "patient patients pt uhid mrn crn "
-    "रिपोर्ट पर्चा पर्ची डिस्चार्ज भर्ती छुट्टी दवा जांच जाँच फाइल फ़ाइल".split()
+    "patient patients pt uhid mrn crn admission newborn delivery palliative angio biopsy culture "
+    "xray ecg usg cbc ogtt pcr anc nrc dots sickle electrophoresis immunisation immunization dialysis "
+    "cataract fever sugar iron scan test result results hb form "
+    "रिपोर्ट पर्चा पर्ची डिस्चार्ज भर्ती छुट्टी दवा जांच जाँच फाइल फ़ाइल कार्ड फार्म फॉर्म "
+    "टीकाकरण प्रसव विवरण क्षय उपचार एएनसी सोनोग्राफी हीमोग्लोबिन रक्तचाप रक्त नसबंदी एक्सरे".split()
+)
+_STEM_ADMIN_DOC = frozenset(
+    """
+    audit census occupancy turnaround roster schedule protocol guideline guidelines sop manual handbook module
+    training workshop seminar orientation awareness handout circular minutes agenda meeting committee samiti
+    yojana scheme abhiyan mission campaign program programme strategy score scoresheet indicator indicators metric
+    metrics stats statistics aggregate totals trend backlog compliance accreditation assessment evaluation inspection
+    stock inventory indent reorder supply expiry wastage utilization utilisation availability consumption usage
+    downtime maintenance repair calibration qc eqas antibiogram validation excursion excursions mismatch sync errors
+    rejections failures defaulters pending template format blank mock drill fumigation manifest refill tracker
+    readings times trip diet formulary archive backup export dump log logbook register line linelist microplan
+    session booth site sites blockwise footfall grievance grievances expenditure rates dbt helpdesk directory index
+    chc phc dh sdh uhc district state national block subcentre subcenter baithak karaywahi parchi samaan mang
+    patra kayakalp anm asha peer educator supervisor nurses attendant workers staff duty safai karmi roster
+    analyzer analyser slit lamp chair dental freezer cylinder plant purity autoclave spore cold chain bag bags kit
+    kits reagent reagents stain worklist anti rabies sucrose infusion birth dose coverage spray irs
+    mda hand hygiene needle stick injury waste biomedical bmw ambulance linen laundry canteen mortuary diesel
+    generator dg oxygen psa blood bank component components crossmatch donation camp film ultrasound echo leprosy
+    malaria dengue chikungunya encephalitis typhus leptospirosis diarrhoeal anaemia anemia thalassemia hepatitis
+    hiv ictc syphilis rapid gram widal hba1c biochem hematology histopath pcpndt ct ifa ors zinc amoxicillin
+    paracetamol oxytocin magsulf metformin amlodipine venom artemether lumefantrine bedaquiline delamanid isoniazid
+    albendazole deworming vaccine penta polio hpv setu swasthya swachh arogya mandir final
+    rbsk rksk jsy jssk nvbdcp ntep npcdcs nlep npcb nmhp idsp ihip hmis rch uwin evin ilr amc
+    मासिक दैनिक साप्ताहिक वार्षिक प्रगति प्रतिवेदन आंकड़े आँकड़े गणना पंजी पंजिका प्रारूप योजना परियोजना अभियान
+    मिशन कार्यक्रम कार्ययोजना प्रशिक्षण कार्यशाला बैठक समिति कल्याण स्वच्छता प्रोत्साहन राशि भंडार कोष स्टॉक लॉगबुक
+    सूक्ष्म गतिविधि पखवाड़ा सप्ताह अवकाश आवेदन पत्र मांग आपूर्ति वितरण खपत उपयोग सत्यापन निरीक्षण टिप्पणी मूल्यांकन
+    उन्मूलन रोकथाम प्रबंधन नीति नियमावली मानक कार्यकर्ता एएनएम आंगनवाड़ी पर्यवेक्षक महिला शिशु मातृ बाल किशोर जननी
+    परिवार नियोजन माह दिवस उत्सव मेला आरोग्य आयुष्मान मंदिर कायाकल्प इन्द्रधनुष इंद्रधनुष दस्तक वंदना प्रधानमंत्री
+    मुख्यमंत्री भारत मुक्त शीत श्रृंखला तापमान सिलेंडर ऑक्सीजन एम्बुलेंस जनवरी फरवरी मार्च अप्रैल मई जून जुलाई अगस्त
+    सितंबर अक्टूबर नवंबर दिसंबर पुरुष पंजीयन
+    """.split()
 )
 _STEM_STAFF = frozenset("dr doctor prof nurse sister surgeon consultant physician resident डॉ डा डॉक्टर नर्स".split())
 _STEM_ORG_ADJ = frozenset(
     "hospital hospitals clinic clinics centre center memorial trust foundation school college university "
-    "pharmacy medicals अस्पताल हॉस्पिटल क्लिनिक संस्थान ट्रस्ट".split()
+    "pharmacy medicals scheme yojana samiti abhiyan mission mela baithak circular "
+    "अस्पताल हॉस्पिटल क्लिनिक संस्थान ट्रस्ट योजना समिति अभियान मिशन".split()
 )
 _STEM_NON_NAME_SUFFIX = re.compile(
     r"(?:tion|sion|ment|ance|ence|ness|logy|ography|ometry|oscopy|ectomy|itis|osis|emia|aemia|"
@@ -417,45 +452,29 @@ _STEM_NON_NAME_SUFFIX = re.compile(
 )
 _STEM_VOCAB = frozenset(
     """
-    infection control audit oxygen cylinder usage regulator prevention occupancy census rounds roster protocol
-    formulary ambulance dengue malaria typhoid hepatitis sepsis triage casualty theatre theater sterilization
-    autoclave biomedical waste disposal syringe catheter cannula ventilator defibrillator oximeter glucometer
-    stethoscope thermometer stretcher wheelchair incubator centrifuge microscope analyzer analyser reagent calibrator
-    cuvette slide pipette vial ampoule bottle pack pouch trolley cabinet locker bin bucket mop detergent disinfectant
-    sanitizer bleach alcohol spirit betadine iodine cotton swab gauze gloves apron mask boot cover blanket pillow
-    mattress curtain rack stand pole pump valve filter sensor alarm battery cable cord plug switch panel board
-    printer paper toner ink label sticker tag stamp seal pen marker folder binder clip stapler compliance safety
-    fire drill evacuation inspection calibration maintenance repair asset inventory stock supply linen laundry kitchen
-    diet dietary canteen fuel generator transformer sanitation mortuary morgue blood bank crossmatch transfusion
-    donor apheresis pathology radiology pharmacy dispensary endoscopy colonoscopy bronchoscopy audiometry spirometry
-    physiotherapy rehabilitation antenatal postnatal neonatal maternal pediatric paediatric geriatric palliative
-    surgical clinical nursing outpatient inpatient ambulatory emergency trauma critical intensive isolation
-    quarantine observation recovery anaesthesia anesthesia cytology histology serology biochemistry haematology
-    hematology coagulation lipid endocrine sentinel outbreak epidemic pandemic endemic prophylaxis regimen dosage
-    frequency route infusion injection vaccination immunization certificate license accreditation hazard needle
-    sharp sharps injury error reaction adverse incident outcome indicator metric ratio rate count total daily weekly
-    monthly quarterly annual yearly shift morning evening night holiday weekend leave attendance training workshop
-    seminar backup archive export import dump sync log logs data dataset manifest metadata schema template sample
-    specimen batch lot serial code id ref reference range ranges normal abnormal pending final draft revised
-    updated copy duplicate original blank empty check checklist slip voucher payment tariff package reimbursement
-    cash credit ledger account stats statistics analytics dashboard alert notification message forward fwd reply
-    query ticket tickets helpdesk support desk counter reception enquiry inquiry feedback complaint grievance
-    visitor pass gate security transport primary secondary tertiary rural urban central national public private
-    annexure appendix enclosure scan scanned photo image pdf doc xls csv json xml txt misc common standard routine
-    urgent stat unknown other others all none na nil english hindi hinglish latin devanagari deva roman tamil telugu
+    infection control prevention rounds prevention sample samples check checklist slip voucher payment tariff
+    package reimbursement cash credit ledger account analytics dashboard alert notification message forward fwd reply
+    query ticket tickets support desk counter reception enquiry inquiry feedback complaint feedback grievance
+    visitor pass gate security transport primary secondary tertiary rural urban central public private annexure
+    appendix enclosure scan scanned photo image pdf doc xls csv json xml txt misc common standard routine urgent
+    stat unknown other others all none na nil english hindi hinglish latin devanagari deva roman tamil telugu
     bengali marathi urdu ambiguous corrupt cryptic extreme rare homonym obfuscated transitive chain trap dense
     triple unfamiliar unlabeled unlabelled escalation unseen synthetic variant variants lowercase stream wrapped
-    late binary after mixed ragged depth bomb nested single five token tokens multi v1 v2 v3
-    bundle unicode escape escaped semicolon colon pipe delim delimiter comma utf ascii hex base64 jsonl ndjson
-    tsv fhir encoding charset locale payload chunk chunks header headers footer body meta key keys value values
-    path paths dir root tree node nodes array object string text bytes char chars zero width
-    creatinine bilirubin cholesterol albumin globulin electrolytes potassium calcium magnesium urea amylase
-    lipase troponin ferritin folate vitamin hba1c cbc esr lft kft rft tft abg vbg inr aptt crp widal mantoux hiv
-    hbsag hcv vdrl elisa pcr culture sensitivity biopsy smear fnac ecg ekg eeg emg echo tmt usg ultrasound doppler
-    xray mri ct pet dexa whatsapp hl7 cda city deep bulk mislabeled truncated lifeline pathkind
+    late binary after mixed ragged depth bomb nested single five token tokens multi v1 v2 v3 bundle unicode
+    escape escaped semicolon colon pipe delim delimiter comma utf ascii hex base64 jsonl ndjson tsv fhir encoding
+    charset locale payload chunk chunks header headers footer body meta key keys value values path paths dir root
+    tree node nodes array object string text bytes char chars zero width bilinear creatinine bilirubin cholesterol
+    albumin globulin electrolytes potassium calcium magnesium urea amylase lipase troponin ferritin folate vitamin
+    esr lft kft rft tft abg vbg inr aptt crp mantoux hbsag hcv vdrl elisa sensitivity smear fnac ekg eeg emg tmt
+    doppler mri pet dexa whatsapp hl7 cda city deep bulk mislabeled truncated lifeline pathkind response express
+    service ophthalmology chart poshan sahay
     """.split()
-) | names.STOP | names.ORG | gazetteer.NOT_A_PERSON_WORDS | gazetteer._COLUMN_NOT_PERSON | _STEM_PATIENT_DOC | _STEM_STAFF
-_DEVA_STEM_VOCAB = names.HI_NOT_NAME | gazetteer.DEVA_NOT_NAME | gazetteer.DEVA_PLACE_OR_ORG | gazetteer._DEVA_COLUMN_NOT_PERSON | _STEM_PATIENT_DOC | _STEM_STAFF
+) | names.STOP | names.ORG | gazetteer.NOT_A_PERSON_WORDS | gazetteer._COLUMN_NOT_PERSON | _STEM_PATIENT_DOC | _STEM_ADMIN_DOC | _STEM_STAFF
+_DEVA_STEM_VOCAB = (
+    names.HI_NOT_NAME | gazetteer.DEVA_NOT_NAME | gazetteer.DEVA_PLACE_OR_ORG
+    | gazetteer._DEVA_COLUMN_NOT_PERSON | _STEM_PATIENT_DOC | _STEM_ADMIN_DOC | _STEM_STAFF
+    | frozenset(("पोषण",))
+)
 
 
 def _is_stem_vocab(tok: str, kind: str) -> bool:
@@ -473,8 +492,16 @@ def _is_stem_vocab(tok: str, kind: str) -> bool:
     )
 
 
+def _is_stem_admin(tok: str, kind: str) -> bool:
+    if kind == "num":
+        return False
+    if kind == "deva":
+        return tok in _STEM_ADMIN_DOC
+    return tok.casefold() in _STEM_ADMIN_DOC
+
+
 def _filename_name_cands(text: str) -> list[Cand]:
-    """Detect 2-3 word patient names inside dashed, CamelCase, or Devanagari filename stems."""
+    """Detect 2-3 word patient names inside dashed, CamelCase, spaced, or Devanagari filename stems."""
     slash = max(text.rfind("/"), text.rfind("\\"))
     base_start = slash + 1
     dot = text.rfind(".", base_start)
@@ -491,7 +518,8 @@ def _filename_name_cands(text: str) -> list[Cand]:
         return []
 
     out: list[Cand] = []
-    surnames = gazetteer.SURNAMES | gazetteer.DEVA_SURNAMES
+    surnames = gazetteer.SURNAMES | gazetteer._SURNAME_NO_APOSTROPHE | gazetteer.DEVA_SURNAMES
+    given = gazetteer.GIVEN_NAMES | gazetteer.DEVA_GIVEN_NAMES
     n = len(toks)
     used = [False] * n
     for length in (3, 2):
@@ -504,18 +532,25 @@ def _filename_name_cands(text: str) -> list[Cand]:
                 continue
             if i > 0 and toks[i - 1][2].casefold() in _STEM_STAFF:
                 continue
-            outside = toks[:i] + toks[i + length:]
-            if not all(_is_stem_vocab(t[2], t[3]) for t in outside):
-                continue
             if any(t[2].casefold() in _STEM_ORG_ADJ for t in (toks[i - 1:i] + toks[i + length:i + length + 1])):
                 continue
             has_surn = any(t[2].casefold() in surnames for t in span)
-            if not has_surn and script == "latin" and any(len(t[2]) < 3 for t in span):
-                continue
-            has_doc_ctx = any(t[3] == "num" or t[2].casefold() in _STEM_PATIENT_DOC for t in outside)
-            is_camel = any(span[k][1] == span[k + 1][0] for k in range(length - 1))
-            is_title = script == "latin" and all(t[2][:1].isupper() and t[2][1:].islower() for t in span)
-            if not (has_surn or script == "deva" or has_doc_ctx or is_camel or is_title):
+            has_given = any(t[2].casefold() in given for t in span)
+            outside = toks[:i] + toks[i + length:]
+            all_outside_vocab = all(_is_stem_vocab(t[2], t[3]) for t in outside)
+            has_admin = any(_is_stem_admin(t[2], t[3]) for t in outside)
+            has_patient_doc = any(
+                (t[3] == "num" and t[2].isdigit()) or t[2].casefold() in _STEM_PATIENT_DOC
+                for t in outside
+            )
+            if has_given and has_surn:
+                pass  # strong: both listed given name and listed surname
+            elif (has_given or has_surn) and all_outside_vocab and not has_admin:
+                pass  # one listed part + clean doc/clinical context
+            elif (not has_admin and all_outside_vocab and has_patient_doc
+                  and (script != "latin" or all(len(t[2]) >= 3 for t in span))):
+                pass  # unseen full name inside an individual patient clinical file
+            else:
                 continue
             out.append(Cand(span[0][0], span[-1][1], "PATIENT_NAME", None, "patient"))
             for k in range(i, i + length):
@@ -643,6 +678,13 @@ def candidates(f: dict, role: str | None, dmy: bool, person_label: bool = False)
         b64_cands = _b64_filename_cands(text, dmy)
         found += b64_cands
         if not b64_cands:
+            found = [
+                c for c in found
+                if c.type not in NAME_TYPES or any(
+                    not _is_stem_vocab(m.group(0), "deva" if DEVA.match(m.group(0)[0]) else "latin")
+                    for m in re.finditer(r"[A-Za-z']+|[\u0900-\u0963\u0971-\u097f]+", text[c.start:c.end])
+                )
+            ]
             found += _filename_name_cands(text)
     if kind in ("header", "key", "filename"):
         found += _next_to_mrn(text, found)

@@ -626,6 +626,12 @@ FILENAMES = [
     ("opd-pathology-report-9.txt", "Samples 40.\n", []),
     ("ward-14-occupancy.txt", "Beds occupied 28.\n", []),
     ("dr-kothiyal-rounds.txt", "Seen in ward.\n", []),
+    # given-name + surname matches and ordinary admin/QC/protocol filenames (invented data)
+    ("anita-sharma-followup-customtag.txt", "BP 120/80\n", ["anita-sharma"]),
+    ("DavidDsouzaDialysisNote.txt", "Cr 3.1\n", ["DavidDsouza"]),
+    ("HbA1c QC Monitoring Chart.csv", "QC pass\n", []),
+    ("safai-karmi-duty-roster.csv", "Shift A\n", []),
+    ("आयुष्मान_कार्ड_प्रगति_तालिका.csv", "Total 42\n", []),
 ]
 
 
