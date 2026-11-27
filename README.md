@@ -83,17 +83,17 @@ Export: sanitized/ + report.json + records.jsonl (verified by final leak gate)
 
 | Metric | Measured Value | Source |
 |---|---|---|
-| Personal data leaked (overall / Hindi / Hinglish) | `1.1%` (`35/3230`; `latin 1.2%`, `deva 0.0%`, `hinglish 0.0%`; `content 0.0%`, `filename 72.9%`) | `check_dev.py` |
+| Personal data leaked (overall / Hindi / Hinglish) | `0.0%` (`0/3230`; `latin 0.0%`, `deva 0.0%`, `hinglish 0.0%`; content, filename, base64, metadata, key and header channels all `0.0%`) | `check_dev.py` |
 | Planted canaries leaked | `0 / 4` | `check_dev.py` |
-| Medical values preserved | `100.0%` (`4496 / 4497`) | `check_dev.py` |
-| Patient linking (precision / recall / F0.5) | `0.99 / 0.90 / 0.97` (`765 / 819` records linked, `1` wrong merge) | `check_dev.py` |
-| Equivalence classes & A2/A4 / A5 risk | `35/49` unique on `(age_band, gender, district)`; A2/A4 est. `conf >= 0.5`: `32.7%`; A5 rare+narrow-QI hits: `0 / 18` | `scripts/risk_report.py` |
-| Unseen-label self-test (perturbed headers/keys/labels) | `3.2%` leaked (`102/3230`), `0/4` canaries, `100.0%` medical kept (`4312/4313`); `69/69` `aegis.detect.selftest` | `check_dev.py` / `selftest.py` |
-| Runtime & determinism | `6.05 s` (`200` files, `819` records); byte-identical repeat runs & secret-keyed unlinkability verified | `report.json` / 3-run check |
-| Contracts & unit tests | `13/13` contract cases passing; `14/14` `pytest` (`link` + `privacy`) passing | `check_contracts.py` / `pytest` |
+| Medical values preserved | `99.6%` (`4835 / 4855`; most lost values are district names hidden on purpose for small districts) | `check_dev.py` |
+| Patient linking (precision / recall / F0.5) | `1.00 / 0.99 / 1.00` (`775 / 818` records linked, `0` wrong merges) | `check_dev.py` |
+| Equivalence classes & A2/A4 / A5 risk | `31/50` unique on `(age_band, gender, district)`; A2/A4 mean `16.6` candidates, est. `conf >= 0.5`: `20.0%`; A5 rare+narrow-QI hits: `0 / 18` | `scripts/risk_report.py` |
+| Unseen file names (held-out set) | false flags `51/250` -> `8/250`, names caught `51/80` -> `55/80` after the given-name list | held-out file-name set |
+| Runtime & determinism | `6.53 s`, `45.1 MB` peak RSS (`200` files, `818` records); byte-identical repeat runs & secret-keyed unlinkability verified | `report.json` / `check_submission.py --run` |
+| Self-test, contracts & unit tests | `218/218` `aegis.detect.selftest` cases (0 table/cell/JSON/HL7 problems); `13/13` contract cases; `95` `pytest` tests passing | `selftest.py` / `check_contracts.py` / `pytest` |
 
 ## Known Limitations
 
-- All four modules (`io`, `detect`, `link`, `privacy`) are integrated on `main` (`1.1%` overall leak in `check_dev.py` driven by `35` filename leaks and `0.0%` content leaks; `100.0%` medical values kept; `0.97` linking F0.5). Some compact age strings (`54/F`, `97/M`, `Age: 0/F`) and filename tokens remain unflagged by `detect`, which elevates simulated A2/A4 registry uniqueness (`32.7%` est. `conf >= 0.5`).
+- All four modules (`io`, `detect`, `link`, `privacy`) are integrated on `main` (`0/3230` leaks and `0/4` canaries in `check_dev.py`; `99.6%` medical values kept; `1.00` linking F0.5). Residual quasi-identifier risk remains on the small practice release: `31/50` profiles are unique on `(age_band, gender, district)` (simulated A2/A4 est. `conf >= 0.5`: `20.0%`). Detection is rule-based, so names outside our gazetteers and given-name list can still be missed on new data.
 - K-anonymity risk mitigation relies on `detect` emitting `CONDITION`, `DISTRICT`, `GENDER`, and `AGE` findings/evidence consistently across formats, including unseen layouts.
 - Unlinked records that lack strong IDs or matching secondary clues receive per-record date shifts rather than cross-file patient shifts, preserving intra-record LOS but not cross-document intervals.
