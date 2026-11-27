@@ -10,11 +10,11 @@ Two-stage workflow:
 """
 from __future__ import annotations
 
-import os
 from collections import Counter, defaultdict
 from typing import Any
 
 from aegis.link import pseudonym
+from aegis.link.psn import secret
 from aegis.privacy.dates import shift_date_text, shift_days
 from aegis.privacy.generalize import (
     generalize_age,
@@ -118,16 +118,13 @@ def _compute_profile_tiers(
                 if dname:
                     prof["district"] = dname
 
-    # A small release (fewer than max(10, 2 * min_k) profiles) cannot hold two cells of min_k people, so the
-    # tiers below run as usual (they used to be switched off here, which left every patient in a small release
-    # unique on age band + gender + district). On top of that, a district shared by fewer than min_k profiles is
-    # suppressed in a small release, together with the village (which would otherwise be generalised to it).
-    # Larger releases keep district as before: suppressing it there costs generalisation utility on standard data.
-    small_release = len(profiles) < max(10, min_k * 2)
+    # A district shared by fewer than min_k profiles leaves its residents easy to single out
+    # in A2/A4 registry linkage regardless of overall release size, so hide it (and suppress
+    # village findings that would otherwise generalize to that district).
     district_counts: Counter[str] = Counter(p["district"] for p in profiles.values() if p["district"])
     for prof in profiles.values():
         prof["hide_district"] = bool(
-            small_release and prof["district"] and district_counts[prof["district"]] < min_k
+            prof["district"] and district_counts[prof["district"]] < min_k
         )
 
     cond_counts: Counter[str] = Counter()
@@ -221,7 +218,7 @@ def _apply_replace(
 def plan(results: list[RecordResult], keys: dict[str, str | None]) -> dict[str, Any]:
     """Build the dataset-wide privacy plan (date shifts, k-anonymity tiers, counts)."""
     policy = load_policy()
-    secret_bytes = os.environ.get("RAKSHA_SECRET", "").encode("utf-8")
+    secret_bytes = secret()
     max_shift = int(policy.get("date_shift_max_days", 180))
 
     ordered = sorted(results, key=lambda r: r["record_id"])
