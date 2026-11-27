@@ -525,6 +525,7 @@ inquiry intimation information opinion consultation consult approval authorisati
 schedule certificate form status urgent action required pending fwd forwarded reply regarding
 """.split())
 _AROUND_NAME = _TOPIC_WORDS | frozenset("patient pt the our your new".split())
+_SUBJECT_WORD = re.compile(r"[^ \t\"'!?]+")
 # where reading a "label: value" name stopped
 _OLD_LABEL_CUT = re.compile(r"[,(\[|;:/]| - |\s{2,}|\d")
 _SUBJECT_LABELS = (("subject",), ("subj",), ("sub",), ("mail", "subject"), ("email", "subject"), ("e", "mail", "subject"))
@@ -564,7 +565,7 @@ def subject_line(text: str, start: int, end: int, bare: bool) -> list[Cand]:
         s, e = pos, br.start() if br else end
         pos = br.end() if br else end
         # document words around the name are not part of it: "Discharge Summary <name>"
-        words = [m.span() for m in re.finditer(r"[^ \t\"'!?]+", text[:e]) if m.start() >= s]
+        words = [m.span() for m in _SUBJECT_WORD.finditer(text, s, e)]     # this piece only, not the whole file
         while words and text[words[0][0]:words[0][1]].strip(".").casefold() in _AROUND_NAME:
             words.pop(0)
         while words and text[words[-1][0]:words[-1][1]].strip(".").casefold() in _AROUND_NAME:
