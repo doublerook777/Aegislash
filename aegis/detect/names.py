@@ -5,7 +5,8 @@ from __future__ import annotations
 import re
 import urllib.parse
 
-from aegis.detect.gazetteer import DEVA_NOT_NAME, DEVA_PLACE_OR_ORG, DEVA_SURNAMES, SURNAMES
+from aegis.detect.gazetteer import (DEVA_NOT_NAME, DEVA_PLACE_OR_ORG, DEVA_SURNAMES, SURNAMES, has_surname,
+                                    reads_as_full_name)
 from aegis.detect.labels import classify
 from aegis.detect.normalize import DEVA, digits, norm_name
 from aegis.detect.spans import PRIORITY, Cand
@@ -512,6 +513,89 @@ def _alias_names(text: str, found: list[Cand]) -> list[Cand]:
         m = _ALIAS.match(text, c.end)
         if m and _valid_action_name(m.group("name")):
             out.append(Cand(*m.span("name"), c.type, None, c.role, hinglish=c.hinglish))
+    return out
+
+
+# ---- mail subject lines. "Subject" there is a topic, not a study subject or patient: "Subject: Referral - <name>"
+# general words of a mail or document title: a piece of a subject line holding one is never a name
+_TOPIC_WORDS = frozenset("""
+referral refer referred report reports summary discharge letter transfer admission follow followup appointment reminder
+request lab result results review query claim bill invoice prescription record records update notification enquiry
+inquiry intimation information opinion consultation consult approval authorisation authorization feedback meeting
+schedule certificate form status urgent action required pending fwd forwarded reply regarding
+""".split())
+_AROUND_NAME = _TOPIC_WORDS | frozenset("patient pt the our your new".split())
+# where reading a "label: value" name stopped
+_OLD_LABEL_CUT = re.compile(r"[,(\[|;:/]| - |\s{2,}|\d")
+_SUBJECT_LABELS = (("subject",), ("subj",), ("sub",), ("mail", "subject"), ("email", "subject"), ("e", "mail", "subject"))
+_SUBJECT_LINE = re.compile(
+    r"(?m)^[ \t>]*(?P<label>(?i:(?:e-?mail |mail )?subject|subj|sub|re|fwd?))[ \t]*(?::|=| [-–—] )[ \t]*"
+    r"(?:(?i:re|fwd?)[ \t]*:[ \t]*)*(?P<value>[^\n]+)")
+_SUBJECT_BREAK = re.compile(r"[ \t]+[-–—]+[ \t]+|[:|,;()\[\]]|[ \t]+(?i:for|of|re|regarding)[ \t]+")
+_RECORD_NO = r"(?:IPD|IP|UHID|MRN|MRD|CRN|CR)\b[ .:#-]*(?:(?:No|NO|no)\b[ .:#-]*)?"
+# right after a name, only punctuation between: a record number, or an age with a sex or "years"
+_ABOUT_ONE_PERSON = re.compile(
+    rf"[ \t,;:|(\[–—-]*(?:(?i:{_RECORD_NO}|(?:OPD|Reg)\b[ .:#-]*(?:No\b[ .:#-]*)?)\d{{3,}}"
+    r"|\d{1,3}[ ]*(?:/[ ]*[MFmf](?![A-Za-z])|(?i:y/?o|yrs?|years?)\b)|[MF][ ]*/[ ]*\d{1,3}(?!\d))")
+_SUBJECT_MRN = re.compile(rf"(?<![A-Za-z])(?i:{_RECORD_NO})(?P<no>\d{{4,10}})(?![\d/-]|\.\d)")
+
+
+def mail_subject_label(label_tokens: list[str]) -> bool:
+    return tuple(label_tokens) in _SUBJECT_LABELS
+
+
+def is_topic(value: str) -> bool:
+    return bool(set(re.findall(r"[a-z]+", value.casefold())) & _TOPIC_WORDS)
+
+
+def subject_line(text: str, start: int, end: int, bare: bool) -> list[Cand]:
+    """The names and record numbers in the subject line text[start:end]. A name must read as a full name, and needs
+    one more sign: a title, an initial, a listed surname, or a record number or age right after it ("Referral - Knee
+    Replacement" has the shape of a name too). No sign is needed where reading "Subject:" as a patient label would
+    already have removed the words (`bare`, up to its first comma, dash or digit, five words at most), so that
+    "Subject: <name>" and "Subject: Referral for <name>" lose nothing."""
+    out = []
+    cut = _OLD_LABEL_CUT.search(text, start, end)
+    plain_end = cut.start() if cut else end
+    if not bare or len(text[start:plain_end].split()) > 5:
+        plain_end = start
+    pos = start
+    for br in [*_SUBJECT_BREAK.finditer(text, start, end), None]:
+        s, e = pos, br.start() if br else end
+        pos = br.end() if br else end
+        # document words around the name are not part of it: "Discharge Summary <name>"
+        words = [m.span() for m in re.finditer(r"[^ \t\"'!?]+", text[:e]) if m.start() >= s]
+        while words and text[words[0][0]:words[0][1]].strip(".").casefold() in _AROUND_NAME:
+            words.pop(0)
+        while words and text[words[-1][0]:words[-1][1]].strip(".").casefold() in _AROUND_NAME:
+            words.pop()
+        if not words:
+            continue
+        s, e = words[0][0], words[-1][1]
+        if text[e - 1] == "." and not re.search(r"(?<!\w)[A-Za-z]\.$", text[s:e]):
+            e -= 1
+        title = re.match(rf"(?:(?!Mohd\b|Md\b){_TITLE}[ \t]*)+", text[s:e])
+        if title:
+            s += title.end()
+        name = text[s:e]
+        if is_topic(name) or not reads_as_full_name(name, STOP | ORG):
+            continue
+        if (e <= plain_end or title or re.search(r"(?<!\w)[A-Z]\.", name) or has_surname(name)
+                or _ABOUT_ONE_PERSON.match(text, e, end)):
+            out.append(Cand(s, e, "PATIENT_NAME", None, "patient", prio=PRIORITY["PATIENT_NAME"] + 1))
+    # a short record number ("IPD 5518"); four digits that look like a year are left alone
+    for m in _SUBJECT_MRN.finditer(text, start, end):
+        number = m.group("no")
+        if not re.fullmatch(r"(?:19|20)\d\d", number):
+            out.append(Cand(m.start("no"), m.end("no"), "MRN", number, "patient"))
+    return out
+
+
+def subject_lines(text: str) -> list[Cand]:
+    out = []
+    for m in _SUBJECT_LINE.finditer(text):
+        label = m.group("label").casefold()
+        out += subject_line(text, *m.span("value"), bare=label.endswith(("subject", "subj")))
     return out
 
 

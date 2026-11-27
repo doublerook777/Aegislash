@@ -318,3 +318,24 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
   two-word status in title case under `patient.display` / `.full` that has no listed word ("Under Observation") would
   be read as a name; flat CSV headers like `subject.display` are not changed. Seen, not fixed: `fields._TITLES` ends
   Devanagari titles with `\b`, which fails after a vowel sign ("श्रीमती" is cut after "श्री").
+
+## Mail "Subject:" lines (issue #27)
+- **Cause.** `subject` is a person label (`labels._SUBJECT`), so `Subject: Referral - <name>` read as a patient label and,
+  with `" - "` also a separator, "Referral" became the name. It was then copied through the file and its file name, while
+  the real name and the short record number stayed.
+- **Change.** `_labelled` no longer treats `Subject:` / `Subj:` as a label. `names.subject_lines` reads `Subject:` / `Sub:` /
+  `Re:` / `Fwd:` lines (and `names.subject_line` a `subject` JSON key or CSV column; such a value holding a document word
+  is not a patient-name value). The line is split at dashes, punctuation, "for", "of" and "regarding"; document words around a
+  piece are trimmed; a piece is a name when it reads as a full name (`gazetteer.reads_as_full_name`, no document word)
+  **and** has one more sign: a title, an initial, a listed surname, or a record number / age right after it. No sign is
+  needed inside what the old label rule already removed (a `Subject:` value up to its first comma, dash or digit, five
+  words at most), so `Subject: <name>` and `Subject: Referral for <name>` still work. On these lines `IPD` / `IP` / `UHID` /
+  `MRN` / `CR` followed by 4-10 digits is a record number, unless the digits read as a year.
+- **Checks.** selftest: 14 new lines (invented names; 10 fail before) including titles with no person that must survive, one
+  JSON e-mail and one file name that must stay `referral.txt` (both fail before). `dev/` and every committed set: output
+  byte-identical to main. The judge's fresh pools: referral mails keep their file names, token retention and coverage go
+  up or stay equal, keeps and linking unchanged.
+- **Left, on purpose.** `Subject: Referral - <unlisted name>` with nothing else after it, and `Re: <unlisted name>`: two
+  capitalised words after a dash also read `Referral - Knee Replacement` or `Re: Wound Dehiscence`, and a wrong name
+  would be copied through the whole file. The name is still found if the body has a cue for it. A bare
+  `Subject: <two words>` is still read as a name, as before. A short record number outside these lines is unchanged.
