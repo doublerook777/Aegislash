@@ -6,7 +6,7 @@ import os
 import unittest
 
 from aegis.privacy import plan, replace, stats
-from aegis.privacy.dates import shift_date_text
+from aegis.privacy.dates import shift_date_text, shift_days
 from aegis.types import empty_evidence
 
 
@@ -178,14 +178,65 @@ class PrivacyTests(unittest.TestCase):
         for i in range(6):
             self.assertEqual(rep(i, 3), {"text": "[DISTRICT]", "status": "suppressed"})
 
-        # the same 6 patients plus 4 more in Sitapur: no longer small, district kept (unchanged behaviour)
+        # the same 6 patients plus 4 more in Sitapur: Sitapur now has >= min_group_size so it stays,
+        # while Hardoi (1 profile < min_group_size) stays suppressed even in a large release (#32).
         for i in range(6, 10):
             rid = f"small.csv#row:{i}"
             results.append(_rec(rid, [dict(results[0]["findings"][3])], age=45, gender="F", district="sitapur"))
             keys[rid] = f"k:small{i}"
         p = plan(results, keys)
         self.assertEqual(replace(p, "small.csv#row:0", results[0]["findings"][3]), {"text": None, "status": "sanitized"})
-        self.assertEqual(replace(p, "small.csv#row:4", results[4]["findings"][3]), {"text": None, "status": "sanitized"})
+        self.assertEqual(replace(p, "small.csv#row:4", results[4]["findings"][3]), {"text": "[DISTRICT]", "status": "suppressed"})
+
+    def test_plan_requires_raksha_secret(self) -> None:
+        r1 = _rec("sec.csv#row:0")
+        os.environ.pop("RAKSHA_SECRET", None)
+        with self.assertRaisesRegex(RuntimeError, "secret_missing"):
+            plan([r1], {"sec.csv#row:0": "k:1"})
+        os.environ["RAKSHA_SECRET"] = ""
+        with self.assertRaisesRegex(RuntimeError, "secret_missing"):
+            plan([r1], {"sec.csv#row:0": "k:1"})
+
+    def test_shift_days_uniform_and_covers_positive_max(self) -> None:
+        secret_b = b"unit-test-secret"
+        # For max_days=2, valid non-zero offsets are {-2, -1, 1, 2}.
+        seen_small = {shift_days(f"key:{i}", secret_b, 2) for i in range(200)}
+        self.assertEqual(seen_small, {-2, -1, 1, 2})
+
+        # For max_days=180, both -180 and +180 must be reachable and 0 must never occur.
+        seen_full = [shift_days(f"patient:{i}", secret_b, 180) for i in range(4000)]
+        self.assertNotIn(0, seen_full)
+        self.assertIn(180, seen_full)
+        self.assertIn(-180, seen_full)
+
+    def test_large_release_hides_rare_district(self) -> None:
+        # 10 common-district profiles (pauri) + 2 rare-district profiles (chamoli) without rare conditions
+        results, keys = [], {}
+        for i in range(10):
+            rid = f"pauri.csv#row:{i}"
+            fs = [
+                {"path": "col:1", "start": 0, "end": 2, "type": "AGE", "text": "52", "norm": "52", "role": "patient"},
+                {"path": "col:3", "start": 0, "end": 8, "type": "VILLAGE", "text": "Khirsu", "norm": "khirsu", "role": "patient"},
+                {"path": "col:5", "start": 0, "end": 5, "type": "DISTRICT", "text": "Pauri", "norm": "pauri", "role": "patient"},
+            ]
+            results.append(_rec(rid, fs, age=52, gender="M", district="pauri"))
+            keys[rid] = f"k:pauri:{i}"
+
+        for i in range(2):
+            rid = f"chamoli.csv#row:{i}"
+            fs = [
+                {"path": "col:1", "start": 0, "end": 2, "type": "AGE", "text": "52", "norm": "52", "role": "patient"},
+                {"path": "col:3", "start": 0, "end": 9, "type": "VILLAGE", "text": "Joshimath", "norm": "joshimath", "role": "patient"},
+                {"path": "col:5", "start": 0, "end": 7, "type": "DISTRICT", "text": "Chamoli", "norm": "chamoli", "role": "patient"},
+            ]
+            results.append(_rec(rid, fs, age=52, gender="M", district="chamoli"))
+            keys[rid] = f"k:chamoli:{i}"
+
+        p = plan(results, keys)
+        self.assertEqual(replace(p, "pauri.csv#row:0", results[0]["findings"][1]), {"text": "Pauri", "status": "generalized"})
+        self.assertEqual(replace(p, "pauri.csv#row:0", results[0]["findings"][2]), {"text": None, "status": "sanitized"})
+        self.assertEqual(replace(p, "chamoli.csv#row:0", results[10]["findings"][1]), {"text": "[VILLAGE]", "status": "suppressed"})
+        self.assertEqual(replace(p, "chamoli.csv#row:0", results[10]["findings"][2]), {"text": "[DISTRICT]", "status": "suppressed"})
 
     def test_risk_report_on_synthetic_release(self) -> None:
         import json
