@@ -188,3 +188,43 @@ def test_digits_only_mrn_links_across_hospitals_when_names_match() -> None:
 def test_mohd_md_prefix_cross_script() -> None:
     assert full_names_match(normalize_tokens("Mohd. Shahid"), normalize_tokens("मोहम्मद शाहिद"))
     assert full_names_match(normalize_tokens("Md. Shahid"), normalize_tokens("Mohammad Shahid"))
+
+
+def test_primary_and_alternate_phone_links_patient() -> None:
+    recs = [
+        _ev(
+            "intake/reg_a.csv#row:0",
+            names=[_nm("Nandini Rawat")],
+            ids=[{"type": "PHONE", "norm": "9810445566"}, {"type": "PHONE", "norm": "9810445577"}],
+        ),
+        _ev(
+            "followup/note_b.txt#doc",
+            names=[_nm("Nandini Rawat", role="relative")],
+            ids=[{"type": "PHONE", "norm": "9810445566"}],
+        ),
+        _ev(
+            "followup/note_c.txt#doc",
+            names=[_nm("Nandini Rawat")],
+            ids=[{"type": "PHONE", "norm": "9810445577"}],
+        ),
+    ]
+    out = resolve(recs)
+    assert out["intake/reg_a.csv#row:0"] is not None
+    assert out["intake/reg_a.csv#row:0"] == out["followup/note_b.txt#doc"] == out["followup/note_c.txt#doc"]
+
+
+def test_patient_key_and_psn_independent_of_input_paths() -> None:
+    layout_a = [
+        _ev("folder_one/reg.csv#row:0", names=[_nm("Prakash Bisht")], ids=[{"type": "PHONE", "norm": "9755001122"}], dob="1980-04-12"),
+        _ev("folder_one/visit.txt#doc", names=[_nm("Prakash Bisht")], ids=[{"type": "PHONE", "norm": "9755001122"}]),
+    ]
+    layout_b = [
+        _ev("nested/archive_2026/patients_export.csv#row:9", names=[_nm("Prakash Bisht")], ids=[{"type": "PHONE", "norm": "9755001122"}], dob="1980-04-12"),
+        _ev("ward_notes/discharge_summary.txt#doc", names=[_nm("Prakash Bisht")], ids=[{"type": "PHONE", "norm": "9755001122"}]),
+    ]
+    out_a = resolve(layout_a)
+    out_b = resolve(layout_b)
+    key_a = out_a["folder_one/reg.csv#row:0"]
+    key_b = out_b["nested/archive_2026/patients_export.csv#row:9"]
+    assert key_a is not None and key_a == key_b
+    assert pseudonym(key_a) == pseudonym(key_b)

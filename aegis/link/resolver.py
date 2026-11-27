@@ -207,16 +207,23 @@ def _parse_record(idx: int, ev: Evidence) -> _RecordInfo:
 
     unique_full = tuple(sorted(set(full_names)))
     # Multi-patient index/summary records (e.g. patient_index.json) hold multiple unrelated people
-    # and must never bridge separate patients together.
-    is_multi_patient = (
-        len(phones) > 1
-        or any(len(vals) > 1 for vals in single_ids.values())
-        or any(
-            not full_names_match(a, b)
-            for i, a in enumerate(unique_full)
-            for b in unique_full[i + 1 :]
-        )
+    # and must never bridge separate patients together. Allow primary + alternate phone on one patient.
+    has_conflicting_names = any(
+        not full_names_match(a, b)
+        for i, a in enumerate(unique_full)
+        for b in unique_full[i + 1 :]
     )
+    has_conflicting_gov_ids = any(
+        len(vals) > 1
+        for id_type, vals in single_ids.items()
+        if id_type in {"AADHAAR", "ABHA_NUMBER", "PAN"}
+    )
+    total_ids_no_name = (
+        0
+        if unique_full
+        else (len(phones) + len(mrns) + sum(len(v) for v in single_ids.values()))
+    )
+    is_multi_patient = has_conflicting_names or has_conflicting_gov_ids or total_ids_no_name >= 3
 
     return _RecordInfo(
         idx=idx,
@@ -541,9 +548,37 @@ def _apply_unique_merges(
             cm.union(c1.root, c2.root)
 
 
-def _canonical_patient_key(record_ids: list[str]) -> str:
-    """Opaque, deterministic patient key containing zero raw PII."""
-    joined = "\n".join(sorted(record_ids)).encode("utf-8")
+def _canonical_patient_key(cluster: _Cluster, record_ids: list[str]) -> str:
+    """Opaque, deterministic patient key derived from canonical clues (independent of file paths)."""
+    parts: list[str] = []
+    for id_type in sorted(cluster.singleton_ids):
+        for val in sorted(cluster.singleton_ids[id_type]):
+            parts.append(f"id:{id_type}:{val}")
+    for p in sorted(cluster.phones):
+        parts.append(f"ph:{p}")
+    for m in sorted(cluster.mrns):
+        parts.append(f"mrn:{m}")
+    for d in sorted(cluster.dobs):
+        parts.append(f"dob:{d}")
+    for g in sorted(cluster.genders):
+        parts.append(f"gen:{g}")
+    for fn in sorted(cluster.full_names):
+        parts.append(f"fn:{' '.join(fn)}")
+    for sn in sorted(cluster.single_names):
+        parts.append(f"sn:{' '.join(sn)}")
+    for rel in sorted({f"{r.relation or ''}:{' '.join(r.tokens)}" for r in cluster.relatives}):
+        parts.append(f"rel:{rel}")
+    for vil in sorted(cluster.villages):
+        parts.append(f"vil:{' '.join(vil)}")
+    for age in sorted(cluster.ages):
+        parts.append(f"age:{age}")
+    for dist in sorted(cluster.districts):
+        parts.append(f"dist:{dist}")
+    for pin in sorted(cluster.pins):
+        parts.append(f"pin:{pin}")
+    if not parts:
+        parts = [f"rid:{rid}" for rid in sorted(record_ids)]
+    joined = "\n".join(parts).encode("utf-8")
     return "k:" + hashlib.sha256(joined).hexdigest()[:12]
 
 
@@ -579,9 +614,9 @@ def resolve(evidence: list[Evidence]) -> dict[str, str | None]:
 
     out: dict[str, str | None] = {}
     for root in cm.active_roots():
-        members = cm.clusters[root].members
-        rids = [records[idx].record_id for idx in members]
-        key = _canonical_patient_key(rids) if len(rids) >= 2 else None
+        cluster = cm.clusters[root]
+        rids = [records[idx].record_id for idx in cluster.members]
+        key = _canonical_patient_key(cluster, rids) if len(rids) >= 2 else None
         for rid in rids:
             out[rid] = key
 
