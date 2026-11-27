@@ -306,6 +306,8 @@ CASES = [
     ("64-year-old male referred from Civil Hospital; on insulin from January.", [], ["Civil Hospital", "insulin", "January"]),
     # all-caps and mixed-case "SURNAME, Given"
     ("Patient: KULKARNI, SURESH\nName: PATIL, Meera", ["KULKARNI, SURESH", "PATIL, Meera"], []),
+    # Hindi/Urdu age labels ("Umr", "Umra", "Umrah", "उमर") including ages > 120
+    ("Umr: 91\nUmra: 128\nउमर: 136", ["91", "128", "136"], []),
 ]
 
 
@@ -382,6 +384,12 @@ TABLES = [
      {"zz_reach": "PHONE", "zz_bill": None}),
     # all-caps and mixed-case "SURNAME, Given" in an unreadable column
     (["PX_UPPER"], [["KULKARNI, SURESH"], ["PATIL, Meera"], ["THENGAL, BARNALI"]], {"PX_UPPER": "PATIENT_NAME"}),
+    # "umr"/"umra"/"umrah"/"उमर" (age, incl. >120) vs "umr_no" (MRN)
+    (["umr", "umra", "umrah", "उमर", "umr_ling", "umr_no"],
+     [["91", "128", "54", "67", "47/F", "104920"],
+      ["63", "42", "136", "39", "28/M", "104921"],
+      ["35", "71", "29", "141", "35/F", "104922"]],
+     {"umr": "AGE", "umra": "AGE", "umrah": "AGE", "उमर": "AGE", "umr_ling": "AGE", "umr_no": "MRN"}),
 ]
 
 
@@ -466,6 +474,10 @@ CELLS = [
     ("Patient", "PATIL, Meera", ["PATIL, Meera"], []),
     ("Patient", "D'MELLO, ANITA R.", ["D'MELLO, ANITA R"], []),
     ("Name", "Kulkarni, MBBS", ["Kulkarni"], ["MBBS"]),
+    # "umr"/"umra"/"उमर" age cells including >120
+    ("umr", "91", ["91"], []),
+    ("umra", "128", ["128"], []),
+    ("उमर", "१३६", ["१३६"], []),
 ]
 
 
