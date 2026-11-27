@@ -28,6 +28,8 @@ _CONDITION_KEYS = ("diagnosis", "diagnoses", "condition", "dx", "icd", "नि�
 _LABEL_LINE = re.compile(r"^\s*(?:[-*•]\s*)?(?P<label>[^:=\n]{1,40}?)\s*(?::(?!\d|//)|=| - | – )[ \t]*(?P<value>.*)$")
 # "नाम- <name>": tried only when the line has none of the separators above
 _NAME_DASH_LINE = re.compile(r"^\s*(?:[-*•]\s*)?(?P<label>[^:=\n]{1,40}?)(?<![\s\d])- [ \t]*(?P<value>.*)$")
+# a "label" that ends in a URL query parameter ("...?_format"); "Patient?: yes" does not
+_QUERY_TAIL = re.compile(r"\?[^\s?]+$")
 _NAME_LABEL_WORDS = frozenset(("name", "naam", "nm", "नाम"))
 
 
@@ -324,6 +326,8 @@ def _labelled(text: str, dmy: bool) -> list[Cand]:
                 if not lab or not set(tokens(lab.group("label"))) & _NAME_LABEL_WORDS:
                     continue  # "Patient- stable" is a sentence, "नाम- <name>" is a label
             label = lab.group("label")
+            if _QUERY_TAIL.search(label):
+                continue  # "Patient/p1?_format=json": a reference or URL with a query, not a "label=value" line
             if re.search(r"\d{4}", label):
                 continue  # "PAN ABCDE1234F: BP 118/76": the "label" holds the number itself
             dashed = not re.match(r"\s*[:=]", m.group(0)[lab.end("label"):])

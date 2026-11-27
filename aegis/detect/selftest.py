@@ -582,6 +582,11 @@ DOCS = [
     # an e-mail saved as JSON: its "subject" is a title when it holds a document word
     ({"subject": "Referral - Chandni Mamgain (IPD 6204)", "body": "Referral enclosed. Mamgain is on Tab. Torsemide 10 mg."},
      ["Chandni Mamgain", "6204", "Mamgain"], ["Referral", "Torsemide 10 mg"]),
+    # a FHIR reference or URL with a query is not a "label=value" line: it must still resolve
+    ({"resourceType": "Observation", "id": "o7", "status": "final", "code": {"text": "Haemoglobin"},
+      "subject": {"reference": "Patient/hx7?_format=json"}, "basedOn": [{"reference": "ServiceRequest/sr2?_pretty=true"}],
+      "note": [{"text": "Patient Name: Chandni Mamgain\nCopy kept at Patient/hx7?_format=xml"}]},
+     ["Chandni Mamgain"], ["json", "true", "xml", "Patient/hx7"]),
 ]
 
 

@@ -363,3 +363,13 @@ RAKSHA_SECRET=practice .venv/bin/python main.py --input dev/input --output out
 - **For link (Member-3), not a detect bug:** on locally generated cases outside the repo, linking F0.5 on three unseen
   pools fell between main 515ac4f and 20c3530 (#39): 1.00 -> 0.938, 0.972 -> 0.893, 1.00 -> 0.972. Precision stayed
   1.00; recall fell. The committed sets do not show it.
+
+## A FHIR reference with a query (issue #35, detect part)
+- **Cause.** The "label: value" line rule also splits on `=`. In `Patient/p1?_format=json` the "label" `Patient/p1?_format`
+  read as a patient label, so `json` became a name, was copied through the file and broke the reference.
+- **Change.** `_labelled` skips a label that ends in a URL query parameter (`?` followed by non-space characters).
+  `Patient?: ...` and labels with `/` or `&` (`Age/Sex`) are read as before. Query values that name a person
+  (`?name=...`) are still found by `names.find_url_pii`.
+- **Checks.** One selftest FHIR document (fails before). `dev/` and the committed sets: output unchanged except
+  `bundle_query_ref.json` in the first breaker set, whose corrupted reference is now intact.
+- **Left.** The io part (not passing `reference` / `fullUrl` / `id` to detect) is Member-1's.
