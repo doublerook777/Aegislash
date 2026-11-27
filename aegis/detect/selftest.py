@@ -293,6 +293,12 @@ CASES = [
     ("Re: Wound Dehiscence", [], ["Wound Dehiscence"]),
     ("Subject: Appointment Reminder\nSub: Fire Safety Drill", [], ["Appointment Reminder", "Fire Safety Drill"]),
     ("Subject: Referral - CKD Stage 4, IP 2024 audit", [], ["CKD Stage 4", "2024"]),
+    # initials plus an unlisted surname in list/line-start or before age/sex (invented data)
+    ("OT list 04/02/2025\n1. P. N. Kothiyal, 62M, CABG done, Hb 11.8\nSurgeon: Dr. Nandita Gokhale",
+     ["P. N. Kothiyal"], ["CABG", "Hb 11.8", "Nandita Gokhale"]),
+    ("2) B S Semwal, 44/F\nR. Bamrara\n1. E. Coli positive, 2. S. Creatinine 1.3\nDr. A. K. Gokhale on call",
+     ["B S Semwal", "R. Bamrara"], ["E. Coli", "S. Creatinine", "Gokhale"]),
+    ("Booked K. T. Kothiyal, 39F for echo.", ["K. T. Kothiyal"], ["echo"]),
 ]
 
 

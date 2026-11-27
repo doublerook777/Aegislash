@@ -467,8 +467,50 @@ def _after_kin_words(text: str, s: int, e: int) -> int | None:
             return None
 
 
+_INITIAL_DOTTED = r"(?:[A-Z]\.(?:[ \t]?[A-Z]\.){0,2})"
+_INITIAL_SPACED = r"[A-Z](?:[ \t]+[A-Z]\.?){1,2}"
+_INITIALS_STRONG = rf"(?:{_INITIAL_DOTTED}[ \t]*|{_INITIAL_SPACED}[ \t]+)"
+_INITIALS_BARE_ANY = rf"(?:{_INITIAL_DOTTED}[ \t]*|[A-Z](?:[ \t]+[A-Z]\.?){{0,2}}[ \t]+)"
+_SUR_WORD = r"(?:[A-Z]'[A-Z][a-z]+|[A-Z][a-z]+)"
+_SUR_SEQ = rf"{_SUR_WORD}(?:[ \t]+{_SUR_WORD})?"
+_AGE_SEX_FOLLOW = r"[ \t]*[,(][ \t]*\d{1,3}[ \t]*/?[ \t]*(?:[MFmf](?![A-Za-z])|(?i:yrs?|years?|y/o|saal)\b)"
+_INIT_AGE_CUE = re.compile(rf"(?<![A-Za-z0-9.])(?P<name>{_INITIALS_BARE_ANY}{_SUR_SEQ})(?={_AGE_SEX_FOLLOW})")
+_INIT_LIST_CUE = re.compile(
+    rf"(?m)^[ \t]*(?:\d{{1,3}}[.)][ \t]*|[-*•][ \t]+)?(?P<name>{_INITIALS_STRONG}{_SUR_SEQ})"
+    rf"(?=[ \t]*(?:[,;:\-(/\n0-9]|$|[ \t]+(?:was|is|were|had|has|for|on|with|under|came|admitted|discharged|posted|scheduled|planned|signed|seen|c/o|k/c/o)\b))"
+)
+_INITIAL_MEDICAL = frozenset(
+    "bilirubin creatinine cholesterol albumin globulin electrolytes potassium calcium magnesium urea amylase lipase "
+    "pylori coli typhi aureus difficile pneumoniae tuberculosis complex section fluids injection ray rays dimer "
+    "deficiency positive negative trace nil absent present reactive nonreactive".split()
+)
+
+
+def _initial_names(text: str) -> list[Cand]:
+    """Treat 1-3 capital initials followed by an unlisted capitalised surname as a patient name in lists,
+    line starts, or right before age/sex while keeping Dr./clinical abbreviations protected."""
+    out: list[Cand] = []
+    disallow = STOP | ORG | _NEVER_IN_NAME | _PRONOUNS | _NOT_THE_PATIENT | _NEVER_FIRST | _INITIAL_MEDICAL
+    protected = protected_spans(text)
+    for pattern in (_INIT_AGE_CUE, _INIT_LIST_CUE):
+        for m in pattern.finditer(text):
+            s, e = m.span("name")
+            if _STAFF_BEFORE_SIMPLE.search(text[max(0, s - 25):s]) or any(ps <= s < pe for ps, pe in protected):
+                continue
+            parts = [(w.start() + s, w.end() + s, w.group(0)) for w in re.finditer(r"[^\s]+", text[s:e])]
+            # Trim a trailing non-name capitalised word (e.g. "Hb" after surname) if >=1 surname word remains.
+            while len(parts) >= 3 and len(parts[-2][2].rstrip(".")) > 1 and parts[-1][2].rstrip(".").casefold() in disallow:
+                parts.pop()
+                e = parts[-1][1]
+            cand_text = text[s:e]
+            if not reads_as_full_name(cand_text, disallow):
+                continue
+            out.append(Cand(s, e, "PATIENT_NAME", None, "patient"))
+    return out
+
+
 def _strict_names(text: str) -> list[Cand]:
-    out = []
+    out = _initial_names(text)
     for pattern, role in _STRICT_CUES:
         for m in pattern.finditer(text):
             words = [w.strip(".").casefold() for w in m.group("name").split()]
