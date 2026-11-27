@@ -4,7 +4,7 @@ Owns every replacement string: PSN for linked names/MRNs, `[TYPE]` placeholders,
 date shifts in the original format, truthful age bands, PIN prefix, village generalization,
 rare-condition / small-cell handling (k-anonymity), `config/policy.yaml`. Also owns
 `scripts/risk_report.py` (our measured re-identification risk), `README.md` and the 2-page brief
-(`brief/`).
+(`docs/brief.pdf`).
 
 Contract it provides: [privacy](../../contracts/privacy.md). Reads findings from detect and keys
 from link ([types](../../contracts/types.md)).
