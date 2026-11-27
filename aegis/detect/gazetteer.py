@@ -141,6 +141,77 @@ DEVA_SURNAMES = _DEVA_SURNAMES
 DEVA_NOT_NAME = _DEVA_NOT_NAME
 DEVA_PLACE_OR_ORG = _DEVA_PLACE_OR_ORG
 
+GIVEN_NAMES = frozenset("""
+aadhya aamir aaradhya aarav abdul abdullah abhay abhijit abhishek abirami abraham aditya adnan afreen afsana aisha
+aishwarya ajay ajesh ajinkya ajith akbar akhilesh akram akshay alia alok alpesh alphonsa altaf amal amandeep amarjeet
+ambika ameya amit amol ananya anika anil anirban aniruddha anish anita anjali anjana anju ankit ankita annamma
+anoop anshul anthony antony anuj anuradha anusha anwar aparna aqeel arif arijit arindam arjun arnab arpit arumugam
+arun arvind aryan ashfaq ashish ashok ashutosh ashwini asif aslam aswathy atharv athira atul avinash ayesha babita
+bablu balamurugan balbir baldev baljit balram balwinder banrilang barnali basavaraj beena bhargavi bhaskar bhavesh
+bhavin bhumika bhupendra bhupinder bijaya biju bikash bindu binoy biplab biswajit brijesh chaitanya chethan chinmoy
+chintan chirag david davinder debashish deepak deepika deepthi deepti devendra dhanalakshmi dharmendra dharmesh
+dhaval dheeraj dhruv dibyajyoti dileep dilip dinesh dolma dorjee ebenezer elango emmanuel faisal faizan farhan
+farid farzana fatima firoz ganesan ganesh gaurav geeta george ghanshyam gireesh girija girish gomathi gopal gopika
+govind guddu gurdeep gurdev gurmeet gurpreet guruprasad hamid hanuman harbhajan hardeep harini harish harjeet harmeet
+harpal harpreet harshit hasan haseena hasina hemant hemanta hemen hetal himanshu hiral hitesh hrishikesh hrithik
+hussain ibrahim imkong imran indrajit iqbal irfan ishaan ishita ismail itishree jacob jagdish jaideep jaiprakash
+jaison jameel jasbir jasmeet jaspreet jaswinder javed jayachandran jayakumar jayalakshmi jayanti jayesh jessy jignesh
+jisha jitendra jobin joseph joydeep junaid jyotirmoy kailash kakoli kaleem kalpesh kamla kamlesh kanhaiya kanimozhi
+kapil karim karthik karthikeyan kashif kaushik kedar keerthana keshav ketan khadija khalid kiara kishan krishnamurthy
+krupa kuldeep kulwinder kunal lakshman lalit lalita lalremsiami lalrinawma leena lhamo lobsang lokesh lopamudra
+lovepreet madan madhav madhumita mahender mahendra mahesh maheswari majid makarand mallika mallikarjun malsawmi
+manashi manasi manaswini mandar mandeep mangesh manikandan maninder manish manjeet manju manjula manjunath manoj
+manpreet mariamma mariyam mathew mayank meena meenakshi meenu mehboob milind minati mitali mitesh mohammad mohammed
+mohan mohanlal mohini mohit monika monu moumita mounika moushumi mridul mrinal mukesh mumtaz murugan mustafa mythili
+nadeem nafisa nagaraj nagarajan nagaraju nandhini nandini narasimha narendra naresh nargis naseem nasir nasreen
+natarajan navdeep naved navjot navneet nazia neelam neeraj neetu neiphiu nikhil nikita nilesh nilutpal nimisha
+nirmala nishant nithya nitin noorjahan nusrat omkar omprakash padmaja padmavathi pallab pallavi pankaj pappu paramjeet
+paresh parminder paromita parth partha parvathi parvati parveen parvez pavithra pawan perumal phurba pinki pintu
+piyali piyush prabhakar prabhjot prachi pradeep pradip prajwal pramila pramod pranab pranjal pranjit prasanth prashant
+praveen pravin priya priyanka pushpendra rachana radhika raghav raghavendra ragini rahim rahul rajalakshmi rajeev
+rajendra rajesh rajinder rajitha rajkumar raju rakesh ramaiah rambabu ramesh ramkumar ramlal ramulu ramya ranjana
+ranjeet ranjita rashid rashmi rashmita ravindra razia reema reena rehana rehman remya renjith renu reshma reshmi
+revathi rinku rishabh ritika ritu riyaz rizwan rohan rohini rohit romesh rubina rukhsar rukmini ruksana rupali
+rupinder saanvi sachin sagarika sahana sahil saira sajan saji sajid sajith sakina saleem salim salma salman sameena
+sameer samuel sandeep sangeeta sanjay sanjeev santosh saranya saravanan sarfaraz sarita sasmita sathish satish
+satnam satyabrata satyam satyanarayana saurabh savita sayan sebastian sejal selvam selvaraj selvi senthil shabana
+shabbir shabnam shadab shahid shahnawaz shahnaz shahrukh shailaja shailendra shaji shakil shakir shalini shamim
+shankar shanmugam shanthi sharmila shashank shazia sheeba sheela sheetal sherin shiju shikha shilpa shivakumar
+shivam shoaib shreya shrikant shruthi shruti shubham shubhangi shweta shwetha shyam shyamal siddharth siddhesh
+sikandar simran sirisha sitaram sivakumar snehal sohail sohan sonali sonam sonu soumya sourav sowmya sravani sreedevi
+sreeja sreejith sridhar srinivas srinivasan subbarao subhadra subhash subhashree subramanian subrata sudeshna sudhakar
+sudheer sudheesh sudipta sujata sujit sukhbir sukhdev sukhwinder sultana sumit sunil sunita suparna supriya surendra
+suresh surinder suryanarayana susanta sushant sushma sushmita swagatika swapan swapnil swathi swati sweta tabassum
+tahir tamilarasi tanmoy tanveer tapan tarun tashi tejal tejaswini tejinder temjen temsula tenzin thoiba thomas
+tomba treesa tukaram tushar uday umesh unnikrishnan urvashi usman vaibhav vaishali vaishnavi varghese varun veena
+venkata venkatesan vihaan vijay vijayalakshmi vikram vikrant vimla vinay vinayak vineeta vineetha vinod vipin vipul
+virendra vishal vishnupriya vivaan vivek wahida waseem wasim xavier yashaswini yashwant yasir yasmeen yesudas yogendra
+yogesh yogita yusuf zainab zakir zeenat zeeshan zothanpuia zoya zubair
+""".split())
+
+DEVA_GIVEN_NAMES = frozenset("""
+अंकित अंकिता अंजना अंजलि अंजू अंबिका अंशुल अकबर अकरम अकील अक्षय अखिलेश अजय अतुल अदनान अनन्या अनवर अनिल अनीता अनीश
+अनुज अनुराधा अपर्णा अफसाना अब्दुल अब्दुल्ला अभय अभिषेक अमित अरविंद अरुण अर्पित अल्ताफ अविनाश अशोक असलम आदित्य आफरीन
+आमिर आयशा आरिफ आर्यन आलिया आलोक आशीष आशुतोष आसिफ इकबाल इब्राहिम इमरान इरफान इस्माइल उदय उमेश उस्मान ऋतिक ऋषभ ओंकार
+ओमप्रकाश कन्हैया कपिल कमला कमलेश करीम कलीम काशिफ किशन कुणाल कुलदीप केशव कैलाश खदीजा खालिद गणेश गिरीश गीता गुड्डू
+गुरप्रीत गुरमीत गोपाल गोविंद गौरव घनश्याम चिराग जगदीश जमील जयदीप जयप्रकाश जसप्रीत ज़ाकिर ज़ीनत ज़ुबैर ज़ैनब ज़ोया
+जावेद जितेंद्र जुनैद तनवीर तबस्सुम तरुण ताहिर दिनेश दीपक दीपिका दीप्ति देवेंद्र धर्मेंद्र धीरज ध्रुव नंदिनी नदीम
+नरेंद्र नरेश नवनीत नसरीन नसीम नाज़िया नावेद नासिर निकिता नितिन निर्मला निशांत नीतू नीरज नीलम नीलेश नुसरत पंकज पप्पू
+परवीन परवेज़ पल्लवी पवन पार्वती पिंकी पिंटू पीयूष पुष्पेंद्र प्रदीप प्रभाकर प्रमोद प्रवीण प्रशांत प्रियंका प्रिया
+फरज़ाना फरहान फरीद फातिमा फिरोज़ फैज़ान फैसल बबलू बबीता बलदेव बलराम बीना ब्रिजेश भास्कर भूपेंद्र मंजू मदन मनजीत
+मनदीप मनप्रीत मनीष मनोज मयंक महेंद्र महेश माजिद माधव मीना मीनाक्षी मीनू मुकेश मुमताज़ मुस्तफा मोनिका मोनू मोहन
+मोहनलाल मोहम्मद मोहित मोहिनी यशवंत यासिर यास्मीन यूसुफ योगेंद्र योगेश रंजना रंजीत रज़िया रमेश रविंद्र रहमान रहीम
+राकेश रागिनी राघव राजकुमार राजीव राजू राजेंद्र राजेश राधिका रामकुमार रामबाबू रामलाल राशिद राहुल रिंकू रिज़वान रितिका
+रितु रियाज़ रीना रीमा रुखसाना रुखसार रुबीना रूपाली रेनू रेशमा रेहाना रोहन रोहिणी रोहित लक्ष्मण ललित ललिता लीना
+लोकेश वरुण वसीम विक्रम विक्रांत विजय विनय विनीता विनोद विपिन विपुल विमला विवेक विशाल वीणा वीरेंद्र वैभव वैशाली
+शंकर शकील शबाना शब्बीर शमीम शशांक शहनाज़ शाकिर शाज़िया शालिनी शाहनवाज़ शाहरुख शाहिद शिखा शिवम शीतल शीला शुभम शैलेंद्र
+शोएब श्याम श्रुति श्रेया श्वेता संगीता संजय संजीव संतोष संदीप सचिन सतीश सत्यम समीर सरफराज़ सरिता सलमा सलमान सलीम
+सविता साजिद सायरा साहिल सिमरन सीताराम सुखदेव सुधाकर सुनीता सुनील सुप्रिया सुभाष सुमित सुरेंद्र सुरेश सुल्ताना सुशांत
+सुषमा सोनम सोनाली सोनू सोहन सोहेल सौरभ स्वाति हनुमान हरदीप हरप्रीत हरीश हर्षित हसन हामिद हितेश हिमांशु हुसैन हेमंत
+""".split())
+
+_SURNAME_NO_APOSTROPHE = frozenset(s.replace("'", "") for s in SURNAMES if "'" in s)
+
 
 def _clean(word: str) -> str:
     return word.casefold().strip(".")
