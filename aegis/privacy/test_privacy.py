@@ -381,6 +381,29 @@ class PrivacyTests(unittest.TestCase):
         self.assertEqual(st["records_suppressed"], 0)
 
 
+class TehsilTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._old_secret = os.environ.get("RAKSHA_SECRET")
+        os.environ["RAKSHA_SECRET"] = "practice-test-secret"
+
+    def tearDown(self) -> None:
+        if self._old_secret is None:
+            os.environ.pop("RAKSHA_SECRET", None)
+        else:
+            os.environ["RAKSHA_SECRET"] = self._old_secret
+
+    def test_tehsil_follows_its_district(self) -> None:
+        # twelve patients share one district (kept, so the tehsil stays); one is alone in another (both hidden)
+        def finding(kind, text):
+            return {"path": "col:0", "start": 0, "end": len(text), "type": kind, "text": text, "norm": None, "role": None}
+        results = [_rec(f"t.csv#row:{i}", [finding("TEHSIL", "Dwarahat")], age=47, gender="M",
+                        district="lucknow" if i < 12 else "almora") for i in range(13)]
+        p = plan(results, {r["record_id"]: f"k:{i}" for i, r in enumerate(results)})
+        self.assertIsNone(replace(p, "t.csv#row:0", results[0]["findings"][0])["text"])
+        self.assertEqual(replace(p, "t.csv#row:12", results[12]["findings"][0]),
+                         {"text": "[TEHSIL]", "status": "suppressed"})
+
+
 class CompactDateTests(unittest.TestCase):
     def test_hl7_compact_dates_keep_their_shape(self) -> None:
         self.assertEqual(shift_date_text("19881104", None, 10), "19881114")

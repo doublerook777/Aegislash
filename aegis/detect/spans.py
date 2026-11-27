@@ -9,7 +9,7 @@ PRIORITY = {
     "ABHA_ADDRESS": 100, "EMAIL": 99, "ABHA_NUMBER": 98, "AADHAAR_MASKED": 97, "INSURANCE_ID": 96,
     "PAN": 95, "MRN": 94, "AADHAAR": 93, "PHONE": 90, "OTHER_ID": 88, "DOB": 85, "DATE": 80, "PIN": 75,
     "HOUSE": 70, "LANDMARK": 69, "VILLAGE": 68, "LOCALITY": 67, "RELATIVE_NAME": 65, "PATIENT_NAME": 64,
-    "AGE": 55, "DISTRICT": 12, "GENDER": 11, "CONDITION": 10,
+    "AGE": 55, "TEHSIL": 13, "DISTRICT": 12, "GENDER": 11, "CONDITION": 10,
 }
 PROPAGATED = 40  # priority for values copied from elsewhere in the file
 

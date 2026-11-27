@@ -27,7 +27,7 @@ from aegis.types import DIRECT_TYPES, TYPES, Finding, RecordResult, Replacement
 
 _DIRECT_SET = frozenset(DIRECT_TYPES)
 _ALL_TYPES_SET = frozenset(TYPES)
-_KEEP_BY_DEFAULT = frozenset(("CONDITION", "DISTRICT", "GENDER"))
+_KEEP_BY_DEFAULT = frozenset(("CONDITION", "DISTRICT", "GENDER", "TEHSIL"))
 
 _DIRECT_PLACEHOLDER = {
     "PATIENT_NAME": "[PATIENT]",
@@ -210,6 +210,9 @@ def _apply_replace(
     if t in _KEEP_BY_DEFAULT:
         if t == "DISTRICT" and (tier == "suppress_qi" or hide_district):
             return {"text": "[DISTRICT]", "status": "suppressed"}
+        # a tehsil or block is smaller than its district: it never stays where the district is hidden
+        if t == "TEHSIL" and (tier == "suppress_qi" or hide_district):
+            return {"text": "[TEHSIL]", "status": "suppressed"}
         return {"text": None, "status": "sanitized"}
 
     return {"text": "[REDACTED]", "status": "sanitized"}

@@ -106,6 +106,10 @@ PR #25 notes (2026-11-27, judge run):
   inside a longer value (CSV cell, text line, JSON string); see contracts/types.md. io re-encodes it on write.
 - No change to `aegis/types.py` or the JSON contracts. `Cand.full_name` in `aegis/detect/spans.py` is internal to detect.
 
+Issue #33 note (2026-11-27):
+- Contract change (additive): new info-only finding type `TEHSIL` (`aegis/types.py` `INFO_TYPES`, contracts/types.md). Not
+  evidence, so linking is unaffected. `privacy` keeps it unless it hides the patient's district, then writes `[TEHSIL]`.
+
 ## Open questions
 Format: what I'm unsure about | why it matters | options | recommended default | owner to answer
 - Exact deadline clock time | fixes the freeze time | give time | deadline − 4h | team

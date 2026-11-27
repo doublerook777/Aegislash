@@ -390,6 +390,15 @@ TABLES = [
       ["63", "42", "136", "39", "28/M", "104921"],
       ["35", "71", "29", "141", "35/F", "104922"]],
      {"umr": "AGE", "umra": "AGE", "umrah": "AGE", "उमर": "AGE", "umr_ling": "AGE", "umr_no": "MRN"}),
+    # tehsil and block name an area smaller than the district: flagged so that privacy can hide them with it
+    (["Tehsil", "Block Name", "District"], [["Dwarahat", "Syalde", "Almora"], ["रानीखेत", "Tarikhet", "Almora"]],
+     {"Tehsil": "TEHSIL", "Block Name": "TEHSIL"}),
+    # "block" also means a nerve or heart block, or part of a building; with no district beside it, it is left alone
+    (["Block", "Procedure"], [["Femoral", "Local infiltration"], ["Axillary", "Sedation"]],
+     {"Block": None, "Procedure": None}),
+    (["OPD Block", "Anaesthesia Block", "District"], [["Wing B", "Complete Heart Block", "Almora"],
+                                                     ["Block 2", "Ulnar Nerve", "Almora"]],
+     {"OPD Block": None, "Anaesthesia Block": None}),
 ]
 
 
