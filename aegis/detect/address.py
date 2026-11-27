@@ -45,6 +45,20 @@ VILLAGE_CUE = re.compile(
 _LIVES_IN = re.compile(
     rf"\b(?i:resident of|residing (?:at|in)|resides (?:at|in)|hailing from|hails from|native of|lives (?:at|in))"
     rf" (?:(?i:village|vill\.?|gram) )?(?P<v>{_PLACE_WORD}(?: {_PLACE_WORD}){{0,2}})")
+# Facility/staff terms aren't dropped by _is_place (which allows "hospital" via _PLACE_STOP);
+# months and clinical words are already rejected by _is_place().
+_FROM_NOT_PLACE = frozenset(
+    "hospital clinic centre center medicals medical college institute university lab labs "
+    "pharmacy phc chc aiims opd icu ward dept department dr doctor".split()
+)
+_REFERRAL_BEFORE = re.compile(
+    r"\b(?i:referred|transferred|shifted|brought|sent|coming|come|referred\s+(?:here|in)|discharged|admitted)\s*$"
+)
+# TODO: Devanagari age-from phrases (e.g. "५८ वर्षीय … से")
+_AGE_FROM = re.compile(
+    rf"\b\d{{1,3}}(?:[- ]?(?i:year[- ]old|yr[- ]old|yrs?[- ]old|y/?o|yo)\b| *(?:/[MFmf]|[MFmf]\b))"
+    rf"(?P<ctx>[^.;\n]{{0,45}}?)\b(?i:from) +(?:(?i:village|vill\.?|gram) )?(?P<v>{_PLACE_WORD}(?: {_PLACE_WORD}){{0,2}})"
+)
 _THEN_VILLAGE = re.compile(rf"(?<![A-Za-z])(?P<v>{_PLACE_WORD}) (?i:village|gaon)\b|(?<![ऀ-ॿ])(?P<d>{_DEVA_W}(?:-{_DEVA_W})?) (?:गांव|गाँव)(?![ऀ-ॿ])")
 # Hindi: "निवासी रसूलपुर" (resident), and the place a patient was brought from: "<place> से लेकर आए".
 # A word from HI_NOT_NAME (time, "home", "hospital", pronoun ...) is not a place.
@@ -126,6 +140,13 @@ def has_no_pin(text: str) -> bool:
 _CARE_OF_ADDRESS = re.compile(r"(?<![A-Za-z/])(?i:c/o)[ :.-]+(?P<a>\d{1,4}[A-Z]?(?:/\d+)?, *[^;\n|]{5,120})")
 
 
+def _emit_place(text: str, s: int, e: int, out: list[Cand]) -> None:
+    place = text[s:e]
+    if _is_place(place):
+        kind = "DISTRICT" if place.casefold() in _UP_DISTRICTS else "VILLAGE"
+        out.append(Cand(s, e, kind, norm_name(place), "patient"))
+
+
 def find_places(text: str, care_of: bool = True) -> list[Cand]:
     """Places announced by a clear cue, safe to run on any free text."""
     out = []
@@ -149,10 +170,13 @@ def find_places(text: str, care_of: bool = True) -> list[Cand]:
                 out.append(Cand(m.start("v"), m.end("v"), "VILLAGE", norm_name(m.group("v")), "patient"))
     for pattern in (_LIVES_IN, _THEN_VILLAGE):
         for m in pattern.finditer(text):
-            group = "v" if m.group("v") else "d"
-            if _is_place(m.group(group)):
-                kind = "DISTRICT" if m.group(group).casefold() in _UP_DISTRICTS else "VILLAGE"
-                out.append(Cand(m.start(group), m.end(group), kind, norm_name(m.group(group)), "patient"))
+            group = "v" if ("v" in m.groupdict() and m.group("v")) else "d"
+            _emit_place(text, m.start(group), m.end(group), out)
+    for m in _AGE_FROM.finditer(text):
+        place = m.group("v")
+        if not (_REFERRAL_BEFORE.search(m.group("ctx")) or _STATE.match(place)
+                or set(place.casefold().split()) & _FROM_NOT_PLACE):
+            _emit_place(text, m.start("v"), m.end("v"), out)
     for m in DISTRICT_CUE.finditer(text):
         out.append(Cand(m.start("d"), m.end("d"), "DISTRICT", norm_name(m.group("d")), "patient"))
     # "c/o- 14, Nehru Marg, ...": care-of followed by a number is an address, not a complaint or a person

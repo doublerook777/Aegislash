@@ -299,6 +299,11 @@ CASES = [
     ("2) B S Semwal, 44/F\nR. Bamrara\n1. E. Coli positive, 2. S. Creatinine 1.3\nDr. A. K. Gokhale on call",
      ["B S Semwal", "R. Bamrara"], ["E. Coli", "S. Creatinine", "Gokhale"]),
     ("Booked K. T. Kothiyal, 39F for echo.", ["K. T. Kothiyal"], ["echo"]),
+    # bare village after "<age>-year-old ... from <Place>" without eating hospital referrals or months (invented data)
+    ("Harishankar Pant, a 64-year-old carpenter from Bhatwari, came with his daughter. BP 142/88. Tab. Losartan 50 mg 0-0-1.",
+     ["Harishankar Pant", "Bhatwari"], ["Losartan 50 mg", "142/88"]),
+    ("A 58 y/o woman from New Tehri, Hb 11.2 g/dL.", ["New Tehri"], ["Hb 11.2"]),
+    ("64-year-old male referred from Civil Hospital; on insulin from January.", [], ["Civil Hospital", "insulin", "January"]),
 ]
 
 
